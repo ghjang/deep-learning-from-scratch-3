@@ -14,6 +14,7 @@
 | 5 | [exploration_05_python_object_model.md](./exploration_05_python_object_model.md) | step01 직후 | Python 객체 모델 — CPython 내부, descriptor, 리플렉션, 룩업 체계 5가지 (★공식 참조) |
 | 6 | [exploration_06_data_types.md](./exploration_06_data_types.md) | step01 직후 | Python 기본 자료형 — list/tuple/str, 레퍼런스 모델, 얕은/깊은 복사 |
 | 7 | [exploration_07_syntax_idioms.md](./exploration_07_syntax_idioms.md) | step01 직후 | Python 문법과 이디엄 — 데코레이터, f-string, == vs is, lambda, @override/@overload |
+| 8 | [exploration_08_monkey_patching.md](./exploration_08_monkey_patching.md) | step01 직후 | 런타임 클래스 조작 (Monkey Patching), 네임스페이스, 객체→소스 역직렬화 |
 
 > 파일 번호 = **생성 순서** (탐구 역사 보존)
 > 아래 "추천 읽는 순서"는 처음 읽을 때 논리적 흐름 기준
