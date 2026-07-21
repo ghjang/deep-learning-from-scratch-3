@@ -14,4 +14,9 @@ rezero.core — 핵심 클래스들
 참고 자료:
   - 정답지: dezero/core.py
   - 핵심 개념: Define-by-Run (동적 계산 그래프)
+
+MLX 백엔드 (Issue #1):
+  - Variable.data의 타입을 ndarray로 가정하는 부분을 mlx.array까지 확장하면
+    M시리즈 칩에서 GPU 가속 가능. cuda.py의 get_array_module() 패턴 참고.
+  - 단, DeZero 학습 목적상 역전파 체인은 rezero 자체에 두는 방향 권장.
 """

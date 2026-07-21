@@ -16,4 +16,8 @@ rezero.functions — DeZero 함수 모음
 
 참고 단계: step26 ~ step60 (단계별로 점진 확장)
 참고 자료: dezero/functions.py
+
+MLX 백엔드 (Issue #1):
+  - 각 forward()에서 np.* 대신 xp.* (get_array_module 결과)를 쓰면 NumPy/MLX 겸용.
+  - cuda.py와 core.py의 백엔드 추상화가 선행되어야 함.
 """
