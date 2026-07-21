@@ -142,7 +142,94 @@ print(Variable.__dict__['count'])      # 0 — 클래스 변수
 2. **쓸 때 (할당)**: `self.x = ...` → **무조건 인스턴스 변수** (클래스 변수 아님)
 3. **`self.` 없이**: 인스턴스 변수 접근 **불가능** (Java/C#과 반대)
 
-**키워드**: `#attribute` `#속성` `#instancevariable` `#classvariable` `#룩업규칙` `#self필수` `#__dict__` `#네임스페이스` `#명시적self`
+#### A.2.6 보충 — MRO와 전역 변수 (LEGB 규칙)
+
+##### A. MRO (Method Resolution Order)
+
+**다중 상속 시 어떤 부모 클래스부터 찾을지 결정하는 순서**. 파이썬은 C3 알고리즘으로 계산.
+
+```python
+class A:
+    def hi(self): return "A"
+class B(A):
+    def hi(self): return "B"
+class C(A):
+    def hi(self): return "C"
+class D(B, C):       # 다중 상속
+    pass
+
+print(D.__mro__)
+# (<class 'D'>, <class 'B'>, <class 'C'>, <class 'A'>, <class 'object'>)
+#                ↑ B 먼저, 그 다음 C (선언 순서)
+print(D().hi())     # "B" — B가 먼저니까
+```
+
+- **C3 규칙**: 자식이 부모보다 먼저, 부모는 선언 순서대로, 충돌 시 TypeError
+- **DeZero는 단일 상속만 쓰**므로 MRO 단순 (`Variable → object`)
+- 단일 상속에서도 `__mro__`로 확인하면 부모 체인 볼 수 있음:
+  ```python
+  print(Variable.__mro__)   # (<class 'Variable'>, <class 'object'>)
+  ```
+
+##### B. 전역 변수와 LEGB 규칙
+
+**파이썬은 전역 변수 허용**. 읽기 자유, 쓰기는 `global` 키워드 필요.
+
+```python
+counter = 0                       # 모듈 레벨 = 전역 (G)
+
+def increment_wrong():
+    counter += 1                  # ❌ UnboundLocalError
+                                  # 함수 안에서 할당하면 "지역"으로 간주
+
+def increment_right():
+    global counter                # ✅ 전역임을 명시
+    counter += 1
+```
+
+**메서드 안에서 변수 찾는 순서 = LEGB**:
+
+```
+L - Local       (함수/메서드 안)
+E - Enclosing   (바깥 함수 — 중첩 함수일 때)
+G - Global      (모듈 레벨)
+B - Built-in    (print, len 등 내장)
+```
+
+```python
+x = "전역"                       # G
+class C:
+    x = "클래스 속성"             # 클래스 레벨 (LEGB에선 G와 별도 취급 아님)
+    def m(self):
+        x = "지역"               # L
+        print(x)                 # "지역" (가장 가까운 scope)
+        # x를 L에 안 두면 → E → G 순서로 찾음
+```
+
+##### C. 핵심 함정 — `x` vs `self.x`는 룩업 체계가 다름!
+
+```python
+x = "전역"
+class Variable:
+    x = "클래스 속성"
+
+    def show(self):
+        print(x)          # LEGB 탐색 → "전역" (G에서 찾음)
+                          # 주의: "클래스 속성"은 여기서 안 찾아짐!
+        print(self.x)     # 인스턴스→클래스→MRO 탐색 → "클래스 속성"
+```
+
+→ 두 룩업 체계가 완전히 다름. `x`는 LEGB, `self.x`는 인스턴스→클래스→MRO.
+**A.2.5의 "`self.` 없이 인스턴스 변수 접근 불가"의 진짜 이유**가 바로 이것.
+
+##### D. 파이썬에서 전역 변수 — 쓰냐?
+
+- **작은 스크립트**: 자주 씀 (편함)
+- **큰 프로젝트**: 피함 (추적 어려움, 부작용 위험)
+- **DeZero**: 의외로 좀 씀. `Config` 클래스의 클래스 변수로 "전역 설정" 흉내 (step18+)
+- `is_simple_core` (Variable의 core 선택 스위치)도 사실 전역 변수!
+
+**키워드**: `#attribute` `#속성` `#instancevariable` `#classvariable` `#룩업규칙` `#self필수` `#__dict__` `#네임스페이스` `#명시적self` `#MRO` `#C3선형화` `#전역변수` `#LEGB` `#global키워드`
 
 ---
 
