@@ -1054,7 +1054,114 @@ class Parameter(Variable):
 
 파이썬 3.13이니 `@override` 바로 쓸 수 있음. 다만 DeZero 책에선 안 나옴 (3.12+ 기능이라). 학습 후 실험적으로 도입 가능.
 
-**키워드**: `#데코레이터` `#@staticmethod` `#@property` `#PEP318` `#설탕` `#Python24` `#학습서철학` `#데코레이터중첩` `#@override` `#PEP698` `#Python3.12` `#타입체커용` `#pyright` `#JavaOverride비교`
+#### C.1.4 메서드 오버로딩 — 파이썬은 미지원! (`@overload`는 타입 힌트용)
+
+> 브로 질문: "메서드 오버로딩을 파이썬이 지원하나?"
+
+**결론**: **네이티브 메서드 오버로딩 미지원**. C++/Java/C#처럼 "같은 이름, 다른 시그니처" 불가.
+
+##### 직접 확인 — 안 됨
+
+```python
+class Foo:
+    def bar(self, x: int):
+        return x + 1
+    
+    def bar(self, x: str):       # ❌ 이전 bar를 덮어써버림!
+        return x + "!"
+
+f = Foo()
+f.bar(1)      # ❌ TypeError — 마지막 bar만 남아서 int 못 받음
+```
+
+→ 클래스의 이름 공간이 딕셔너리라 같은 이름은 마지막이 이김.
+
+##### 왜 안 지원할까?
+
+1. **동적 타입** — 컴파일 타임에 시그니처 구분 불가
+2. **단순함** — 같은 이름 여러 개면 혼란 (PEP 20: Simple is better than complex)
+3. **대안이 충분함** — `*args`, `**kwargs`, 기본값, `singledispatch` 등
+
+##### 우회 방법 4가지
+
+**방법 1: 기본 인자 + 조건문 (가장 흔함)**
+```python
+class Foo:
+    def bar(self, x=None, s=None):
+        if x is not None:
+            return x + 1           # int 버전
+        elif s is not None:
+            return s + "!"         # str 버전
+```
+
+**방법 2: `*args` + isinstance**
+```python
+class Foo:
+    def bar(self, *args):
+        if len(args) == 1 and isinstance(args[0], int):
+            return args[0] + 1
+        elif len(args) == 1 and isinstance(args[0], str):
+            return args[0] + "!"
+```
+
+**방법 3: `functools.singledispatch` (가장 정석)**
+```python
+from functools import singledispatch
+
+@singledispatch
+def bar(x):
+    raise TypeError(f"지원 안 함: {type(x)}")
+
+@bar.register
+def _(x: int):
+    return x + 1
+
+@bar.register
+def _(x: str):
+    return x + "!"
+```
+
+**방법 4: `@overload` (typing) — 타입 힌트용, 런타임 효과 없음!**
+```python
+from typing import overload
+
+class Foo:
+    @overload
+    def bar(self, x: int) -> int: ...      # 선언만 (구현 없음)
+    @overload
+    def bar(self, x: str) -> str: ...      # 선언만
+    def bar(self, x):                      # 실제 구현은 하나!
+        if isinstance(x, int):
+            return x + 1
+        elif isinstance(x, str):
+            return x + "!"
+```
+
+→ `@overload`는 pyright/mypy에게 "이런 시그니처로 쓸 수 있다" 알려주는 역할. **런타임엔 아무 효과 없음** (`@override`와 같은 패턴).
+
+##### 아이러니 — 연산자는 오버로딩되는데, 메서드는 안 됨
+
+| 종류 | 파이썬 지원 | 이유 |
+|---|---|---|
+| **연산자 오버로딩** (`+`, `==`) | ✅ 지원 | 시그니처 고정 (`__add__(self, other)`) |
+| **메서드 오버로딩** (`foo(int)`, `foo(str)`) | ❌ 미지원 | 시그니처 자유로워 구분 애매 |
+
+→ 연산자는 시그니처가 고정이라 오버로딩이 단순하지만, 메서드는 임의 시그니처라 복잡해서 포기.
+
+##### DeZero에서의 우회 패턴
+
+```python
+class Function:
+    def __call__(self, *inputs):           # *inputs로 가변 인자
+        if len(inputs) == 1:
+            return self.forward_single(inputs[0])
+        else:
+            return self.forward_multi(*inputs)
+```
+
+→ DeZero는 **가변 인자 + 조건문**으로 오버로딩 흉내. step11~13(가변 길이 인수)이 이 패턴 학습.
+
+**키워드**: `#메서드오버로딩` `#미지원` `#@overload` `#typing` `#타입힌트용` `#singledispatch` `#가변인자` `#연산자오버로딩과비교` `#DeZero우회` `#Java오버로딩비교`
 
 ---
 
