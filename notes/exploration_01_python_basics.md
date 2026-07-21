@@ -1,7 +1,7 @@
-# 🧪 보충 탐구 #1 — Python 클래스 / 캡슐화 / 문법 이디엄 / 프레임워크 디자인
+# 🧪 보충 탐구 #1 — Python 클래스 / 캡슐화 / 프레임워크 디자인
 
 > **step01 직후 보충 학습** (2026-07-21)
-> step 진도 외에 파이썬/NumPy/프레임워크 등 깊이 파고 싶었던 주제들 정리.
+> step 진도 외에 파이썬 클래스/캡슐화/프레임워크 디자인 등 깊이 파고 싶었던 주제들 정리.
 > 형식: 핵심 요약 + 짧은 코드 예시. 자세한 건 키워드로 검색.
 
 ---
@@ -1024,10 +1024,14 @@ else:
 ---
 
 **학습 완료일**: 2026-07-21
-**총 주제 수**: 13개
+**총 주제 수**: 9개
 - A. Python 클래스 기본: 5개 (self, 멤버변수/룩업, dunder, class 상속, 메서드 3종)
 - B. 캡슐화: 2개 (접근권한, @property)
-- C. 문법/이디엄: 5개 (데코레이터, f-string, == vs is, 박싱, 파이썬 철학)
-- D. 프레임워크: 2개 (래퍼 패턴, is_simple_core)
+- C. 프레임워크 디자인: 2개 (래퍼 패턴, is_simple_core)
 
-> NumPy 기본 (3종)은 [탐구 #2](./exploration_02_numpy_basics.md)로 분리됨.
+> **분리된 주제들** (각 별도 탐구로 이관):
+> - NumPy 기본 → [탐구 #2](./exploration_02_numpy_basics.md)
+> - 문법/이디엄 (데코레이터, f-string, lambda 등) → [탐구 #7](./exploration_07_syntax_idioms.md)
+> - CPython 내부, 리플렉션, 룩업 체계 → [탐구 #5](./exploration_05_python_object_model.md)
+> - 기본 자료형, 레퍼런스 → [탐구 #6](./exploration_06_data_types.md)
+> - Monkey Patching, 런타임 조작 → [탐구 #8](./exploration_08_monkey_patching.md)
