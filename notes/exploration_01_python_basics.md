@@ -803,7 +803,117 @@ forward = staticmethod(forward)
 
 → 책은 학습 목적상 복잡한 데코레이터(`@staticmethod`/`@classmethod`)는 피하고, 유용한 것(`@property`, `@contextmanager`)은 적극 사용.
 
-**키워드**: `#데코레이터` `#@staticmethod` `#@property` `#PEP318` `#설탕` `#Python24` `#학습서철학`
+#### C.1.2 데코레이터 2개 이상 쌓기 — 가능!
+
+데코레이터는 **여러 개를 쌓을 수 있음**. 가장 아래 데코레이터가 먼저 적용돼.
+
+```python
+@decorator_a
+@decorator_b
+@decorator_c
+def foo():
+    pass
+
+# 실제로 일어나는 일:
+def foo():
+    pass
+foo = decorator_a(decorator_b(decorator_c(foo)))
+# 적용 순서: c → b → a (아래에서 위로!)
+```
+
+##### 실전 예시 (웹 프레임워크에서 흔함)
+
+```python
+# Flask 웹 라우트 예시
+@app.route("/api")        # 라우팅 등록
+@require_auth             # 인증 확인
+@log_request              # 로깅
+def api_handler():
+    return {"status": "ok"}
+
+# 적용 순서: log_request → require_auth → route
+```
+
+##### 다른 데코레이터와 같이 쓰기
+
+```python
+class Variable:
+    @property
+    def shape(self):
+        return self.data.shape
+
+class TensorVariable(Variable):
+    @property
+    @override                    # ← property랑 같이 쓰기 가능
+    def shape(self):
+        return super().shape + ("tensor",)
+```
+
+#### C.1.3 `@override` — Python 3.12+ (PEP 698)
+
+**요약**: 부모 메서드를 오버라이드한다는 표시. **타입 체커(pyright/mypy)용**이고 런타임엔 효과 없음 (no-op).
+
+```python
+from typing import override
+
+class Animal:
+    def speak(self) -> str:
+        return "..."
+
+class Dog(Animal):
+    @override                    # ← "부모 메서드 오버라이드한다" 표시
+    def speak(self) -> str:
+        return "Woof"
+```
+
+##### 진짜 역할 — 오타/실수 잡기
+
+```python
+class Animal:
+    def bark(self) -> str:       # bark이라고 정의했다 치자
+        return "..."
+
+class Dog(Animal):
+    @override
+    def spak(self) -> str:       # ❌ 오타! spak vs bark
+        return "Woof"
+# pyright: "spak은 부모에 없는 메서드" 경고!
+```
+
+→ 부모에 해당 메서드가 없으면 **pyright가 잡아줌**. 이게 진짜 가치.
+
+##### Java/C#과의 비교
+
+| 언어 | 문법 | 런타임 효과 |
+|---|---|---|
+| **Java** | `@Override` 어노테이션 | 없음 (컴파일러용) |
+| **C#** | `override` 키워드 | 있음 (필수) |
+| **Python** | `@override` 데코레이터 (3.12+) | 없음 (타입 체커용) |
+
+→ 파이썬 `@override`는 Java `@Override`와 같은 철학. **컴파일/검증용**이지 런타임용이 아님.
+
+##### 실전 함정과 연결 (exploration_05 A.8.1)
+
+```python
+class Variable:
+    def __init__(self, data):
+        self.data = data
+
+class Parameter(Variable):
+    @override
+    def __init__(self, data):
+        super().__init__(data)
+        self.requires_grad = True
+# pyright가 부모 시그니처와 비교해서 문제 잡아줌
+```
+
+→ A.8.1의 "이름 충돌 덮어쓰기" 함정을 잡는 도구 중 하나. 브로가 Pylance 쓰고 있으니 진짜 유용.
+
+##### 우리 프로젝트에선?
+
+파이썬 3.13이니 `@override` 바로 쓸 수 있음. 다만 DeZero 책에선 안 나옴 (3.12+ 기능이라). 학습 후 실험적으로 도입 가능.
+
+**키워드**: `#데코레이터` `#@staticmethod` `#@property` `#PEP318` `#설탕` `#Python24` `#학습서철학` `#데코레이터중첩` `#@override` `#PEP698` `#Python3.12` `#타입체커용` `#pyright` `#JavaOverride비교`
 
 ---
 
