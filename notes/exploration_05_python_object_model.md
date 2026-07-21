@@ -1082,16 +1082,166 @@ print(d(5))          # 10 ← 인스턴스를 함수처럼 호출!
 
 → 파이썬이 극단적으로 "클래스도 객체"를 관철한 언어.
 
-### E.9 핵심 통찰 요약
+### E.9 런타임 클래스 조작 — Monkey Patching의 세계
+
+> 브로 통찰: "클래스 자체 수정이라... 메서드 코드 후크 넣거나 독스트링 달거나, 생각할 수 있는 모든 조작이 가능하단 소리?"
+> → **정답! 거의 모든 조작이 런타임에 가능.** 이게 파이썬 "동적(dynamic)"의 진짜 의미.
+
+#### E.9.1 메서드 교체/추가 (Monkey Patching)
+
+```python
+class Foo:
+    def bar(self):
+        return "원래 동작"
+
+f = Foo()
+print(f.bar())   # "원래 동작"
+
+# 런타임에 메서드를 완전히 교체!
+def new_bar(self):
+    return "🔥 바꿨다!"
+
+Foo.bar = new_bar           # 클래스 자체를 수정
+print(f.bar())              # "🔥 바꿨다!" ← 기존 인스턴스도 영향!
+```
+
+→ 이걸 **Monkey Patching** 이라고 함.
+
+#### E.9.2 런타임에 새 메서드/속성 추가
+
+```python
+class Foo: pass
+f = Foo()
+
+# 클래스에 없던 메서드를 런타임에 추가
+def greet(self, name):
+    return f"안녕 {name}"
+
+Foo.greet = greet
+print(f.greet("브로"))      # "안녕 브로"
+
+# 클래스 변수도 추가 가능
+Foo.version = "0.0.13"
+print(f.version)             # "0.0.13"
+```
+
+#### E.9.3 독스트링 동적 변경
+
+```python
+class Foo:
+    """원래 독스트링"""
+
+Foo.__doc__ = "🔥 런타임에 바꾼 독스트링"
+print(Foo.__doc__)          # "🔥 런타임에 바꾼 독스트링"
+help(Foo)                   # help()도 변경된 독스트링 표시!
+```
+
+→ 독스트링도 그냥 속성(`__doc__`)이라서 변경 가능.
+
+#### E.9.4 메서드 후크 (전/후 가로채기) — 데코레이터의 본질
+
+```python
+class Foo:
+    def bar(self):
+        return "원래 동작"
+
+original = Foo.bar
+
+def with_logging(self):
+    print(f"[LOG] bar() 호출")
+    result = original(self)
+    print(f"[LOG] bar() 결과: {result}")
+    return result
+
+Foo.bar = with_logging      # 래핑된 버전으로 교체
+
+f = Foo()
+f.bar()
+# [LOG] bar() 호출
+# [LOG] bar() 결과: "원래 동작"
+```
+
+→ 이게 진짜 **데코레이터의 본질**. 데코레이터가 결국 함수/메서드를 래핑하는 작업이니까.
+
+#### E.9.5 상속 구조까지 런타임에 변경 (극단적)
+
+```python
+class Base1:
+    def whoami(self): return "Base1"
+class Base2:
+    def whoami(self): return "Base2"
+
+class Foo(Base1): pass
+
+f = Foo()
+print(f.whoami())           # "Base1"
+
+Foo.__bases__ = (Base2,)    # 런타임에 부모를 바꿈!
+print(f.whoami())           # "Base2" ← 부모가 바뀜!
+```
+
+→ Java/C#에선 상상도 못 할 일.
+
+#### E.9.6 용어 정리
+
+| 용어 | 의미 |
+|---|---|
+| **Monkey Patching** | 런타임에 클래스/모듈의 코드를 교체/추가 |
+| **Metaprogramming** | 프로그램이 자기 자신의 코드를 조작 |
+| **Reflection** | 런타임에 구조 검사 + 조작 |
+
+#### E.9.7 "할 수 있다" ≠ "해야 한다"
+
+이런 조작은 **강력하지만 위험**:
+
+```python
+# 위험한 예시
+import some_library
+
+def hacked_method(self):
+    return "해킹!"
+
+some_library.SomeClass.method = hacked_method
+# 이제 some_library 전체가 해킹된 메서드 사용! 디버깅 지옥
+```
+
+**파이썬 커뮤니티 태도**:
+- ✅ **장점**: 긴급 버그 패치, 테스트 mock, 라이브러리 확장
+- ❌ **단점**: 디버깅 어려움, 의도치 않은 부작용, "마법" 코드
+- 📖 **PEP 20**: "명시적이 함축적보다 낫다" — 너무 마법 같은 코드는 피해
+
+**실전에서 진짜 유용한 예**:
+1. **테스트 Mock**: `Database.query = fake_query`
+2. **라이브러리 확장**: `np.my_helper = my_helper`
+3. **데코레이터**: 표준적이고 권장되는 메타프로그래밍
+
+#### E.9.8 다른 언어와 비교
+
+| 언어 | 런타임 클래스 조작 |
+|---|---|
+| **Python** | ✅ 거의 모든 것 가능 |
+| **JavaScript** | ✅ prototype 조작으로 가능 |
+| **Ruby** | ✅ "Open Class"로 가능 |
+| **Java** | ❌ 제한적 (리플렉션 일부, 바이트코드 조작 필요) |
+| **C++** | ❌ 불가능 (컴파일 타임 결정) |
+
+→ 동적 언어(Python/JS/Ruby)의 공통 능력.
+
+**키워드**: `#MonkeyPatching` `#런타임조작` `#메타프로그래밍` `#메서드교체` `#독스트링변경` `#후크` `#데코레이터본질` `#__bases__변경` `#테스트Mock` `#Java불가` `#consentingadults`
+
+---
+
+### E.10 핵심 통찰 요약
 
 1. **클래스도 객체** — `type` 메타클래스의 인스턴스 (브로 "메타객체" 통찰 정답)
 2. **`cls`는 메타객체 참조** — 실제 조작 가능 (인스턴스 생성, 속성 접근, 수정)
 3. **함수도 객체** — 변수/인자/반환/컬렉션 전부 가능 (일급 객체)
 4. **callable의 공통점** — 함수, 클래스, `__call__` 인스턴스 전부 호출 가능
 5. **메타클래스** — `type(...)`으로 런타임에 클래스 자체 생성
-6. **DeZero 연결** — Function 클래스가 `__call__` 사용 (step02+ 핵심)
+6. **런타임 클래스 조작** — Monkey Patching, 메서드 교체/추가, 상속 변경 전부 가능
+7. **DeZero 연결** — Function 클래스가 `__call__` 사용 (step02+ 핵심)
 
-**키워드**: `#클래스도객체` `#메타객체` `#type` `#메타클래스` `#cls` `#classmethod` `#일급객체` `#callable` `#__call__` `#동적클래스생성` `#Java비교` `#firstclass` `#function객체`
+**키워드**: `#클래스도객체` `#메타객체` `#type` `#메타클래스` `#cls` `#classmethod` `#일급객체` `#callable` `#__call__` `#동적클래스생성` `#Java비교` `#firstclass` `#function객체` `#MonkeyPatching` `#런타임조작`
 
 ---
 
