@@ -231,6 +231,90 @@ class Variable:
 
 **키워드**: `#attribute` `#속성` `#instancevariable` `#classvariable` `#룩업규칙` `#self필수` `#__dict__` `#네임스페이스` `#명시적self` `#MRO` `#C3선형화` `#전역변수` `#LEGB` `#global키워드`
 
+#### A.2.7 보충 — 인스턴스로 클래스 변수 참조 (읽기 vs 쓰기 차이)
+
+**브로 질문**: "인스턴스 레퍼런스로 클래스 변수를 참조할 수 있나?"
+
+**요약**: 읽기 ✅ 가능, 쓰기(할당) ⚠️ 인스턴스 변수 새로 생성 (클래스 변수 수정 아님).
+
+##### 읽기 — 가능 (룩업이 클래스로 올라감)
+
+```python
+class Variable:
+    count = 0                    # 클래스 변수
+
+x = Variable()
+print(x.count)                   # ✅ 0 — 인스턴스로 클래스 변수 읽기 가능
+print(Variable.count)            # ✅ 0 — 클래스로도 읽기 가능 (더 명확)
+```
+
+A.2.2 룩업 순서: `x.__dict__` 없으면 → `type(x)` (클래스)에서 찾음.
+
+##### 쓰기(할당) — 인스턴스 변수가 새로 생김 ⚠️
+
+```python
+x.count = 100                    # ⚠️ 클래스 변수 수정이 아님!
+print(x.count)                   # 100 — 인스턴스 변수 (새로 생김)
+print(Variable.count)            # 0   — 클래스 변수 (그대로!)
+print(x.__dict__)                # {'count': 100} ← 인스턴스 변수로 추가됨
+```
+
+→ A.2.3의 "충돌 함정". `x.count = 100`은 "x에 count라는 새 인스턴스 변수 생성"일 뿐.
+
+##### 클래스 변수를 진짜 수정하려면
+
+```python
+Variable.count = 100             # ✅ 클래스 이름으로 직접 수정
+print(Variable.count)            # 100
+print(x.count)                   # 100 — 인스턴스로 읽으면 업데이트된 클래스 변수
+```
+
+→ **클래스 변수 수정은 항상 `ClassName.var = ...` 형태로**.
+
+##### 한눈에 정리
+
+| 코드 | 의미 | 효과 |
+|---|---|---|
+| `x.count` (읽기) | 인스턴스 → 클래스 순서로 찾음 | 클래스 변수 값 읽힘 |
+| `x.count = 100` (쓰기) | **무조건** 인스턴스 변수 생성 | 클래스 변수 안 건드림 ⚠️ |
+| `Variable.count` (읽기) | 클래스에서 바로 찾음 | 클래스 변수 값 |
+| `Variable.count = 100` (쓰기) | 클래스 변수 직접 수정 | 모든 인스턴스에 영향 |
+
+##### 함정: 가변 클래스 변수 (리스트/딕셔너리)
+
+```python
+class Bad:
+    items = []                  # 가변 클래스 변수 — 위험!
+
+a = Bad()
+a.items.append(1)               # 읽기 → 클래스 items 발견 → append는 그 객체 수정
+b = Bad()
+print(b.items)                  # [1] ← 다른 인스턴스에도 영향!
+```
+
+→ `append`는 할당이 아니라 "읽어온 리스트 객체의 메서드 호출"이라 진짜 클래스 변수가 수정됨. 가변 객체는 읽기/쓰기 경계가 모호함.
+
+##### 실용 예: 전역 카운터
+
+```python
+class Variable:
+    _created_count = 0           # 클래스 변수: 인스턴스 수 추적
+
+    def __init__(self, data):
+        self.data = data
+        Variable._created_count += 1     # ✅ 클래스 이름으로 수정!
+
+    @classmethod
+    def total_created(cls):
+        return cls._created_count        # ✅ cls로 읽기
+
+x1, x2, x3 = Variable(1), Variable(2), Variable(3)
+print(Variable.total_created())         # 3
+print(x3._created_count)                # 3 (인스턴스로도 읽기 가능)
+```
+
+**키워드**: `#인스턴스로클래스변수` `#읽기vs쓰기` `#할당함정` `#가변클래스변수` `#전역카운터` `#ClassName접근`
+
 ---
 
 ### A.3 `__init__`과 dunder 메서드
