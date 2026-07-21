@@ -12,7 +12,7 @@
 - [B. 런타임 클래스 검사 (리플렉션) — `__mro__`, `__bases__`, `__dict__`](#b-런타임-클래스-검사-리플렉션--__mro__-__bases__-__dict__)
 - [C. (향후 추가) Descriptor와 `@property` 내부](#c-향후-추가-descriptor와-property-내부)
 - [D. `__new__` vs `__init__` — 생성과 초기화의 분리](#d-__new__-vs-__init__--생성과-초기화의-분리)
-- [E. (향후 추가) 함수도 객체, 클래스도 객체](#e-향후-추가-함수도-객체-클래스도-객체)
+- [E. 함수도 객체, 클래스도 객체 — "모든 것이 객체"의 진짜 의미](#e-함수도-객체-클래스도-객체--모든-것이-객체의-진짜-의미)
 
 ---
 
@@ -908,15 +908,190 @@ __dict__
 
 ---
 
-## E. (향후 추가) 함수도 객체, 클래스도 객체
+## E. 함수도 객체, 클래스도 객체 — "모든 것이 객체"의 진짜 의미
 
-> "Python은 모든 것이 객체"의 진짜 의미.
+> 브로 통찰에서 출발: "cls로 '클래스 참조'라는 건, 타입 정보 자체를 특수 메타객체처럼 취급한다는 거?"
+> → **정답!** 클래스 자체도 객체야. 이게 파이썬 철학 "모든 것이 객체"의 진짜 의미.
 
-예정 주제:
-- 함수도 callable 객체 (`def foo` → `foo`는 `function` 타입 객체)
-- 클래스도 callable 객체 (`class Foo` → `Foo`는 `type` 타입 객체)
-- `__call__` 메서드 (이후 step02 Function에서 핵심!)
-- 일급 객체 (first-class object)의 의미
+### E.1 클래스 자체도 객체 (메타객체)
+
+```python
+class Variable:
+    pass
+
+x = Variable()         # x는 Variable의 인스턴스 (일반 객체)
+
+print(type(x))         # <class 'Variable'>  ← x의 타입은 Variable
+print(type(Variable))  # <class 'type'>      ← Variable의 타입은 type!
+```
+
+→ `Variable` 클래스 자체가 **`type`이라는 메타클래스의 인스턴스**. 그래서 "특수 메타객체"라는 브로 표현이 진짜 정확함.
+
+### E.2 클래스가 객체라는 증거 (직접 실험)
+
+```python
+class Variable:
+    count = 0
+    def __init__(self, data):
+        self.data = data
+
+# 1. 클래스를 변수에 담을 수 있음 (일급 객체)
+ClsRef = Variable
+x = ClsRef(np.array(1.0))     # Variable()과 동일!
+print(type(x))                 # <class 'Variable'>
+
+# 2. 클래스를 함수 인자로 전달
+def create_instance(cls, *args):
+    return cls(*args)
+
+y = create_instance(Variable, np.array(2.0))
+print(type(y))                 # <class 'Variable'>
+
+# 3. 클래스의 속성 접근 (객체니까)
+print(Variable.__name__)       # 'Variable'   ← 클래스의 속성
+print(Variable.__bases__)      # (<class 'object'>,)
+print(Variable.__dict__)       # {'count': 0, '__init__': ...}
+print(id(Variable))            # 4316873984   ← 고유 식별자
+
+# 4. 클래스를 리스트에 담기
+classes = [Variable, int, str, list]
+print(classes)                 # [<class '__main__.Variable'>, <class 'int'>, ...]
+```
+
+→ **전부 객체로서의 행위**. 변수에 담기, 인자로 전달, 속성 접근, 컬렉션에 담기. 다 가능.
+
+### E.3 시각화 — 메타클래스 체인
+
+```
+인스턴스         클래스          메타클래스
+─────────       ───────         ─────────
+x       ─→    Variable   ─→     type
+y       ─→    Variable   ─→     type
+42      ─→    int        ─→     type
+"hi"    ─→    str        ─→     type
+[1,2]   ─→    list       ─→     type
+
+특이점: type ─→ type (자기 자신의 인스턴스!)
+```
+
+→ 모든 클래스의 타입은 `type`. 그리고 `type` 자체도 `type`의 인스턴스 (재귀적!).
+
+```python
+print(type(type))   # <class 'type'>  ← type도 type의 인스턴스
+```
+
+### E.4 `cls`가 바로 이 메타객체
+
+브로가 짚은 "cls로 클래스 참조"가 바로 이 이야기:
+
+```python
+class Variable:
+    count = 0
+
+    @classmethod
+    def from_list(cls, lst):       # cls = 클래스 자체 (메타객체)
+        print(f"cls = {cls}")             # <class '__main__.Variable'>
+        print(f"cls.__name__ = {cls.__name__}")  # 'Variable'
+        return cls(np.array(lst))         # cls()로 인스턴스 생성!
+```
+
+→ `cls`는 단순한 "참조"가 아니라 **실제 조작 가능한 클래스 객체**. 인스턴스 생성(`cls()`), 속성 접근(`cls.attr`), 심지어 클래스 자체 수정까지 가능.
+
+### E.5 메타클래스의 마법 — 클래스 동적 생성
+
+```python
+# 보통: class 키워드로 정의
+class Variable: ...
+
+# 동적 생성: type() 호출로 런타임에 클래스 만들기!
+Variable2 = type('Variable', (object,), {'count': 0, 'data': None})
+# 인자: (이름, 부모 튜플, 속성 딕셔너리)
+
+print(Variable2)             # <class '__main__.Variable'>
+print(Variable2.__name__)    # 'Variable'
+print(Variable2.count)       # 0
+```
+
+→ `type(...)` 호출로 **런타임에 새 클래스를 생성** 가능. 이게 메타프로그래밍의 극한.
+
+### E.6 함수도 객체 (callable 객체)
+
+함수도 마찬가지로 객체야:
+
+```python
+def foo(x):
+    return x * 2
+
+print(type(foo))              # <class 'function'>  ← 함수 객체
+
+# 일급 객체 (first-class object)의 특성:
+# 1. 변수에 담기
+bar = foo
+print(bar(3))                 # 6
+
+# 2. 인자로 전달
+def apply(f, x):
+    return f(x)
+print(apply(foo, 5))          # 10
+
+# 3. 반환값
+def get_multiplier():
+    return foo
+f = get_multiplier()
+print(f(7))                   # 14
+
+# 4. 컬렉션에 담기
+funcs = [foo, str, int]
+print(funcs[0](10))           # 20
+```
+
+→ 함수도 변수/인자/반환/컬렉션 모두 가능. 일반 객체와 동일한 취급.
+
+### E.7 "callable" — 호출 가능한 객체의 공통점
+
+함수, 클래스, 그리고 `__call__` 정의한 인스턴스 전부 **callable**:
+
+```python
+# 1. 함수는 callable
+def foo(): return 42
+foo()                # 42
+
+# 2. 클래스는 callable (인스턴스 생성)
+class Foo: pass
+Foo()                # <Foo 객체> ← 호출하면 인스턴스 생성
+
+# 3. __call__ 정의한 인스턴스도 callable
+class Doubler:
+    def __call__(self, x):
+        return x * 2
+
+d = Doubler()
+print(d(5))          # 10 ← 인스턴스를 함수처럼 호출!
+```
+
+→ DeZero의 Function 클래스가 이 패턴 사용! `f = Square(); y = f(x)` 형태 (step02+).
+
+### E.8 다른 언어와의 비교
+
+| 언어 | 클래스의 정체 | 동적 생성 |
+|---|---|---|
+| **Python** | `type`의 인스턴스 (객체) | ✅ `type(...)`로 런타임 생성 가능 |
+| **Java** | `Class<T>` 객체로 존재하지만 제한적 | 리플렉션으로 일부 가능 |
+| **C#** | `Type` 객체, 리플렉션 지원 | 리플렉션으로 가능 |
+| **C++** | 런타임 객체 아님 (컴파일 타임 개념) | ❌ 불가 |
+
+→ 파이썬이 극단적으로 "클래스도 객체"를 관철한 언어.
+
+### E.9 핵심 통찰 요약
+
+1. **클래스도 객체** — `type` 메타클래스의 인스턴스 (브로 "메타객체" 통찰 정답)
+2. **`cls`는 메타객체 참조** — 실제 조작 가능 (인스턴스 생성, 속성 접근, 수정)
+3. **함수도 객체** — 변수/인자/반환/컬렉션 전부 가능 (일급 객체)
+4. **callable의 공통점** — 함수, 클래스, `__call__` 인스턴스 전부 호출 가능
+5. **메타클래스** — `type(...)`으로 런타임에 클래스 자체 생성
+6. **DeZero 연결** — Function 클래스가 `__call__` 사용 (step02+ 핵심)
+
+**키워드**: `#클래스도객체` `#메타객체` `#type` `#메타클래스` `#cls` `#classmethod` `#일급객체` `#callable` `#__call__` `#동적클래스생성` `#Java비교` `#firstclass` `#function객체`
 
 ---
 
