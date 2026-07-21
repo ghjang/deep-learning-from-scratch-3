@@ -1,6 +1,6 @@
 # 🧪 보충 탐구 #4 — Symbolic vs Numeric: sympy, PyTorch, 그리고 DeZero의 그래프
 
-> **step01 직후 보충 학습 #3** (2026-07-21)
+> **step01 직후 보충 학습 #4** (2026-07-21)
 > 브로가 2권 학습 중 sympy + manim으로 수식/애니메이션을 만들어본 경험에서 출발.
 > "MLX에서 sympy처럼 심볼릭 조작, LaTeX, eval 호출이 가능할까?"라는 오바망상(?)을 검증.
 > → 결론: **오바망상 아님!** 핵심 질문이며, sympy vs PyTorch는 근본적으로 다른 패러다임.
