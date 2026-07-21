@@ -448,7 +448,148 @@ len(x)          # 3 — len이 __len__ 호출
 
 **키워드**: `#dunder` `#매직메서드` `#전역함수` `#len` `#print` `#str` `#repr` `#프로토콜` `#오리타이핑` `#pythonic` `#가독성` `#일관성` `#연산자오버로딩` `#PEP20`
 
----
+#### A.3.2 연산자 ↔ 매직 메서드 — 연산자 오버로딩의 세계
+
+> 브로 통찰: "던더 형태 메서드에 대응되는 연산자는 전부 오버로딩 가능?"
+> → **정답!** 거의 모든 연산자가 매직 메서드로 구현돼 있고, 클래스에서 재정의 가능.
+
+##### 연산자 ↔ 매직 메서드 대응표
+
+```python
+# 산술 연산자
+x + y       # x.__add__(y)
+x - y       # x.__sub__(y)
+x * y       # x.__mul__(y)
+x / y       # x.__truediv__(y)
+x ** y      # x.__pow__(y)
+x // y      # x.__floordiv__(y)
+x % y       # x.__mod__(y)
+-x          # x.__neg__()
++x          # x.__pos__()
+
+# 비교 연산자
+x == y      # x.__eq__(y)
+x != y      # x.__ne__(y)
+x < y       # x.__lt__(y)
+x > y       # x.__gt__(y)
+x <= y      # x.__le__(y)
+x >= y      # x.__ge__(y)
+
+# 논리/비트 연산자
+x & y       # x.__and__(y)
+x | y       # x.__or__(y)
+x ^ y       # x.__xor__(y)
+x << y      # x.__lshift__(y)
+~x          # x.__invert__()
+
+# 인덱싱/슬라이싱
+x[key]      # x.__getitem__(key)
+x[key] = v  # x.__setitem__(key, v)
+del x[key]  # x.__delitem__(key)
+
+# 반복
+for i in x  # x.__iter__() + x.__next__()
+len(x)      # x.__len__()
+x in y      # y.__contains__(x)
+
+# 호출/컨텍스트
+x(args)     # x.__call__(args)
+with x:     # x.__enter__() / x.__exit__()
+```
+
+→ 전부 연산자/내장 함수로 접근 가능, 클래스에서 던더 정의하면 커스텀 동작.
+
+##### 왜 "오버로딩"이라 부르나?
+
+"오버로딩" = 기존 연산자의 의미를 **클래스에 맞게 다시 정의**.
+
+```python
+class Variable:
+    def __init__(self, data):
+        self.data = data
+
+    def __add__(self, other):           # + 연산자 오버로딩!
+        return Variable(self.data + other.data)
+
+x = Variable(np.array([1, 2]))
+y = Variable(np.array([3, 4]))
+z = x + y           # Variable([4, 6]) — +가 새 동작!
+```
+
+##### 프로토콜 패턴 — "몇 개만 정의하면 나머지 자동"
+
+```python
+class MyContainer:
+    def __init__(self):
+        self.items = []
+    def __len__(self):          # 길이 프로토콜
+        return len(self.items)
+    def __getitem__(self, i):   # 인덱싱 프로토콜
+        return self.items[i]
+    def __iter__(self):         # 이터레이션 프로토콜
+        return iter(self.items)
+
+c = MyContainer(); c.items = [1, 2, 3]
+len(c)         # 3
+c[0]           # 1
+list(c)        # [1, 2, 3]      ← iter + next 자동
+for x in c:    # 1, 2, 3        ← 같은 프로토콜
+    pass
+```
+
+→ 파이썬이 정의한 프로토콜을 기반으로 나머지 자동 추론. 이게 오리 타이핑의 힘.
+
+##### DeZero에서의 실전 (미래 step)
+
+```python
+# step19+: 출력 가독성
+class Variable:
+    def __repr__(self): return f"variable({self.data})"
+    def __len__(self): return len(self.data)
+
+# step20+: 연산자 오버로딩 (핵심!)
+class Variable:
+    def __add__(self, other): return add(self, other)
+    def __mul__(self, other): return mul(self, other)
+    def __neg__(self): return neg(self)
+    def __sub__(self, other): return sub(self, other)
+    def __truediv__(self, other): return div(self, other)
+    def __pow__(self, c): return pow(self, c)
+
+# 이제 자연스러운 수학 표현!
+x = Variable(np.array(2.0))
+y = (x ** 2 + 1) * 3      # 자연스럽게 계산 + 계산 그래프 자동 구축!
+```
+
+→ DeZero의 궁극적 목표: **"수학 표현식을 자연스럽게 쓰면 자동 미분"**. 연산자 오버로딩 덕분에 가능.
+
+##### 다른 언어와 비교
+
+| 언어 | 연산자 오버로딩 | 난이도 |
+|---|---|---|
+| **Python** | 던더 메서드 정의 | 쉬움 (관례적) |
+| **C++** | `operator+` 등 정의 | 중간 (복잡) |
+| **C#** | `operator +` 정의 | 중간 |
+| **Java** | ❌ **불가능** (의도적 제외) | — |
+| **Rust** | trait + `impl` | 어려움 (엄격) |
+
+→ 파이썬이 진짜 쉬운 편. 과학 계산/딥러닝 생태계가 파이썬으로 발달한 이유 중 하나.
+
+##### Java가 연산자 오버로딩을 금지한 이유
+
+Java는 C++에서의 혼란 교훈으로 **의도적 금지**:
+```java
+// Java: BigDecimal은 + 못 쓰고 메서드로
+BigDecimal c = a.add(b);        // + 못 쓰게 막음
+```
+```python
+# Python: 자연스럽게
+c = Decimal("0.1") + Decimal("0.2")   # + 연산자 오버로딩 가능
+```
+
+→ 파이썬은 **"관례를 지키는 어른"** 이라면 자유롭게 허용 (consenting adults 철학).
+
+**키워드**: `#연산자오버로딩` `#__add__` `#__eq__` `#__getitem__` `#__call__` `#프로토콜` `#Java금지` `#consentingadults` `#DeZero20+` `#수학표현` `#C++비교`
 
 ### A.4 `class Foo:` vs `class Foo(object):`
 
