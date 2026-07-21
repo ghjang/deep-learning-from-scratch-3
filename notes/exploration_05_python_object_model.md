@@ -1536,6 +1536,13 @@ print(ast.unparse(tree))
 
 → 소스 → AST → 소스 변환 가능. 하지만 **원본 포맷(들여쓰기, 빈 줄)은 보존 안 됨**.
 
+> 💡 **`astor` vs `ast.unparse`**: 둘 다 AST→소스 변환 도구.
+> - `astor`: 서드파티 (`pip install astor`). 2013년부터. 예전 국룰.
+> - `ast.unparse`: 파이썬 **표준** (Python 3.9+, 2020). 설치 불필요.
+> - 요즘은 `ast.unparse`가 표준이라 `astor`는 레거시로 추세 하락.
+> - 우리 프로젝트(3.13)에선 `ast.unparse` 바로 쓰면 됨.
+> - 파이썬 진영의 **"좋은 서드파티 → 표준 흡수"** 전통적 패턴 (`pathlib`, `enum`, `dataclasses` 등도 같은 사례).
+
 ##### 도구 3: `black`/`ruff` 조합 (반자동 포맷팅)
 
 ```python
