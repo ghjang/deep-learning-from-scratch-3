@@ -373,7 +373,75 @@ Python:    "메모리? 그냥 dict에 넣어둘게. 넌 로직에 집중해"
 3. **단위 테스트 작성** (이름 충돌 같은 조용한 버그 잡기)
 4. (선택) 나중에 타입 힌트 + mypy 도입
 
-**키워드**: `#상속` `#__dict__평평함` `#super().__init__` `#출처무관` `#이름충돌덮어쓰기` `#Java슬롯비교` `#private없음연결` `#Parameter상속` `#실수함정` `#린터` `#mypy` `#pylint` `#ruff` `#pyright` `#Pylance` `#정적분석` `#PEP20` `#관대한언어`
+##### 도구 선택 가이드 — 4개 도구가 전부 다르다
+
+브로 직감 정답: 4개 도구는 전부 서드파티(파이썬 표준 아님). 2개 카테고리로 나뉨.
+
+```
+┌─ 타입 체커 (Type Checker) ────────┐
+│  mypy    (파이썬 진영 원조, 느림)  │
+│  pyright (MS제, 빠름, VSCode 통합) │
+└───────────────────────────────────┘
+
+┌─ 린터 (Linter) ───────────────────┐
+│  pylint (전통, 잔소리 많음, 느림)   │
+│  ruff   (신세대, Rust제, 빠름, 대세)│
+└───────────────────────────────────┘
+```
+
+**각 도구 상세**:
+
+| 도구 | 종류 | 특징 | 비고 |
+|---|---|---|---|
+| **ruff** | 린터 | Rust로 작성, 진짜 빠름 (10~100배). pylint+flake8+isort 통합. 요즘 대세 | Astral 사 (uv와 같은 회사) |
+| **pyright** | 타입 체커 | MS제. **VSCode Pylance의 엔진**. mypy보다 빠르고 정확 | 브로가 이미 쓰고 있음 |
+| **mypy** | 타입 체커 | 타입 힌트 검사 원조. Guido 관여. 안정적 | 느림, 엄격 모드 아니면 허술 |
+| **pylint** | 린터 | 2003년부터. 상세 분석. super 누락에 강함 | 잔소리 과다, 최근 ruff로 대체 추세 |
+
+**요즘 국룰 조합**: ruff + pyright (FastAPI, Pydantic, Hugging Face 등 메이저 프로젝트 대부분)
+
+##### 우리 프로젝트 추천: Pylance(pyright) + (필요시 ruff)
+
+브로 상황 분석:
+- VSCode + Pylance 이미 사용 → **pyright는 이미 충족**
+- 학습용 프로젝트 → 너무 엄격하면 질림
+- uv 기반 환경 → ruff와 같은 회사라 통합 자연스러움
+
+**결정 트리**:
+```
+VSCode 쓰나요? ─── 네 ───→ Pylance(pyright) 이미 충족 ✅
+        │
+        아니요 ───→ mypy 또는 pyright 별도 설치
+
+추가로 린터 필요?
+   안 함 ──── 학습 단계라 충분할 수 있음
+   도입 ──── ruff 추천 (uv와 같은 회사, 빠름)
+```
+
+##### 우리 프로젝트에 ruff 도입한다면 (참고용)
+
+```bash
+# ruff 설치 (uv로, 개발 의존성으로)
+uv add --dev ruff
+```
+
+```toml
+# pyproject.toml에 추가
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]  # 기본 린트 규칙
+# E: pycodestyle errors
+# F: pyflakes (잘못된 import, 미사용 변수 등)
+# W: warnings
+# I: isort (import 정렬)
+```
+
+→ **지금 당장은 Pylance만으로 충분**. 학습 진행하면서 필요해지면 ruff 도입 검토.
+
+**키워드**: `#상속` `#__dict__평평함` `#super().__init__` `#출처무관` `#이름충돌덮어쓰기` `#Java슬롯비교` `#private없음연결` `#Parameter상속` `#실수함정` `#린터` `#mypy` `#pylint` `#ruff` `#pyright` `#Pylance` `#정적분석` `#PEP20` `#관대한언어` `#도구선택가이드` `#ruff추천` `#uv와같은회사` `#결정트리`
 
 ---
 
