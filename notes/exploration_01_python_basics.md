@@ -48,6 +48,119 @@ x = Variable(np.array(1.0))
 
 **키워드**: `#self` `#this` `#인스턴스참조` `#명시적` `#PEP8`
 
+#### 💡 1.1 보충: 멤버 변수 용어 + 접근 룩업 규칙 (질문에서 파생)
+
+##### A. 파이썬 멤버 변수 용어 정리
+
+파이썬은 **여러 용어가 혼용**됨. 공식 용어는 **attribute (속성)**.
+
+```python
+class Variable:
+    count = 0                          # ① 클래스 변수 (class variable / class attribute)
+                                       #   모든 인스턴스가 공유
+
+    def __init__(self, data):
+        self.data = data               # ② 인스턴스 변수 (instance variable / instance attribute)
+        self.grad = None               # ② 인스턴스 변수 — 인스턴스마다 따로
+```
+
+| 개념 | 파이썬 공식 용어 | 동의어/타 언어 |
+|---|---|---|
+| `self.x = ...` | **instance attribute** | field, member, instance variable |
+| `x = ...` (클래스 바디) | **class attribute** | static variable, class variable |
+| 포괄적 | **attribute** | member, field |
+
+→ 가장 정확한 표현: **"attribute (속성)"**. "variable"은 관행적 표현.
+
+##### B. 인스턴스 메서드에서의 멤버 접근 룩업 규칙
+
+**파이썬은 Java/C#과 달리 `self.` 없이 인스턴스 변수 접근 불가능**. 이게 가장 큰 차이.
+
+```python
+# Java/C# — 암묵적 this (생략 가능)
+class Foo {
+    int data;
+    void show() {
+        System.out.println(data);      // ← this. 생략 OK
+    }
+}
+
+# Python — 명시적 self (생략 불가)
+class Foo:
+    def __init__(self):
+        self.data = 0
+
+    def show(self):
+        print(self.data)               # ✅ self. 필수
+        # print(data)                  # ❌ NameError
+```
+
+**읽을 때 룩업 순서** (`self.x`를 읽으면):
+```
+1. self.__dict__ (인스턴스 고유 변수)에서 'x' 찾기
+2. 없으면 type(self) (클래스)에서 'x' 찾기 → 클래스 변수
+3. 없으면 부모 클래스로 올라감 (MRO 순서)
+4. 없으면 AttributeError
+```
+
+**할당할 때** (`self.x = ...`):
+- **무조건 인스턴스 변수** 생성/수정 (클래스 변수 수정 아님!)
+
+##### C. 핵심 케이스 — 클래스 변수와 인스턴스 변수 충돌 ⚠️
+
+```python
+class Variable:
+    count = 0                          # 클래스 변수
+
+    def __init__(self):
+        self.count = 100               # ⚠️ 인스턴스 변수가 클래스 변수를 가림!
+
+x = Variable()
+print(x.count)                         # 100 (인스턴스 변수)
+print(Variable.count)                  # 0   (클래스 변수 — 안 바뀜)
+```
+
+→ `self.count = 100`은 인스턴스 변수를 새로 만드는 것. 클래스 변수 안 건드림. 진짜 함정.
+
+##### D. `__dict__` 로 확인
+
+```python
+x = Variable(np.array(1.0))
+print(x.__dict__)                      # {'data': array(1.0)} — 인스턴스 변수들
+print(Variable.__dict__['count'])      # 0 — 클래스 변수
+```
+
+##### E. 핵심 규칙 3가지
+
+1. **읽을 때**: `self.x` → 인스턴스 → 클래스 순서로 찾음
+2. **쓸 때 (할당)**: `self.x = ...` → **무조건 인스턴스 변수** (클래스 변수 아님)
+3. **`self.` 없이**: 인스턴스 변수 접근 **불가능** (Java/C#과 반대)
+
+##### F. DeZero 예시
+
+```python
+# 미래의 Variable (step07+ 예고)
+class Variable:
+    def __init__(self, data):
+        self.data = data               # 인스턴스 변수
+        self.grad = None               # 인스턴스 변수
+        self.creator = None            # 인스턴스 변수
+        self.generation = 0            # 인스턴스 변수
+
+    def backward(self):
+        # 전부 self. 접두어 필수!
+        ...
+
+# 클래스 변수 사용 예 (안 가르쳐주지만 실제 프레임워크에선 자주 씀)
+class Variable:
+    _global_count = 0                  # 클래스 변수: 인스턴스 생성 추적용
+    def __init__(self, data):
+        self.data = data
+        Variable._global_count += 1    # ClassName.attr 로 접근 (명확)
+```
+
+**키워드**: `#attribute` `#속성` `#instancevariable` `#classvariable` `#룩업규칙` `#self필수` `#__dict__` `#네임스페이스` `#명시적self`
+
 ---
 
 ### 1.2 `__init__`은 왜 양쪽에 언더바가? (dunder) 🐍
