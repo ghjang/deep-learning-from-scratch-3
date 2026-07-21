@@ -11,7 +11,7 @@
 | 2 | [exploration_02_numpy_basics.md](./exploration_02_numpy_basics.md) | step01 직후 | NumPy 기본 (3권 중심) — ndarray 내부, shape/axis, 브로드캐스팅, 수학 함수, 난수 |
 | 3 | [exploration_03_backend_adapters.md](./exploration_03_backend_adapters.md) | step01 직후 | 백엔드 어댑터: Variable을 CuPy/MLX로 확장한다면 (autograd, Define-by-Run, xp 패턴) |
 | 4 | [exploration_04_symbolic_vs_numeric.md](./exploration_04_symbolic_vs_numeric.md) | step01 직후 | sympy vs PyTorch/DeZero: 심볼릭 vs 수치 계산 패러다임 (manim/Graphviz 시각화 비교) |
-| 5 | [exploration_05_python_object_model.md](./exploration_05_python_object_model.md) | step01 직후 | Python 객체 모델 — CPython 내부, descriptor, 리플렉션, 룩업 체계 5가지 (★공식 참조) |
+| 5 | [exploration_05_python_object_model.md](./exploration_05_python_object_model.md) | step01 직후 | Python 객체 모델 — CPython 내부, descriptor, 리플렉션, 룩업 체계 5가지, `__new__`/`__init__`, 메타클래스 (★공식 참조) |
 | 6 | [exploration_06_data_types.md](./exploration_06_data_types.md) | step01 직후 | Python 기본 자료형 — list/tuple/str, 레퍼런스 모델, 얕은/깊은 복사 |
 | 7 | [exploration_07_syntax_idioms.md](./exploration_07_syntax_idioms.md) | step01 직후 | Python 문법과 이디엄 — 데코레이터, f-string, == vs is, lambda, @override/@overload |
 | 8 | [exploration_08_monkey_patching.md](./exploration_08_monkey_patching.md) | step01 직후 | 런타임 클래스 조작 (Monkey Patching), 네임스페이스, 객체→소스 역직렬화 |
