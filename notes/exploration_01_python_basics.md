@@ -327,7 +327,7 @@ f"[{x:_>10}]"    # [_______abc]  폭 10, 우측 정렬, 빈칸을 _로 채움
 
 ### 1.5 `@staticmethod`, `@classmethod`가 뭔가요? 🐍
 
-**요약**: 둘 다 "인스턴스 없이 호출 가능한 메서드"지만 차이가 있음. DeZero의 Function 구현(step02+)에서 `@staticmethod`가 자주 등장.
+**요약**: 둘 다 "인스턴스 없이 호출 가능한 메서드"지만 차이가 있음. DeZero 책 본문(steps/)에서는 **아예 등장하지 않음** (검증 완료). 다만 완성된 `dezero/` 프레임워크의 `models.py`, `datasets.py`에서는 일부 사용됨.
 
 ```python
 class Variable:
@@ -466,7 +466,7 @@ Variable.is_valid_data(some_data)
 
 → 실제 동작은 일반 함수와 동일. "Variable과 관련 있다"는 것을 코드로 표현.
 
-**DeZero 실례** (앞으로 step02+에서 등장 예정):
+**DeZero 실례** — `dezero/` 프레임워크에선 쓰이지만 **책 본문(steps/)엔 안 나옴** (검증 완료). 가상 예시:
 ```python
 class Function:
     def __call__(self, input):     # 인스턴스 메서드 (self로 상태 관리)
@@ -826,11 +826,213 @@ class Variable:
 
 **키워드**: `#접근권한` `#public` `#protected` `#private` `#네임맹글링` `#consentingadults` `#관례`
 
+#### 💡 1.14 보충: 게터/세터 — 파이썬은 `@property`로 (질문에서 파생)
+
+**브로 질문**: "객체지향이라면서 게터/세터는 보통 다 있잖아?"
+
+**요약**: 파이썬에도 있음. 하지만 철학이 다름 — **"처음엔 public으로 시작, 검증 필요해지면 그때 `@property`로 전환"**.
+
+##### 방식 1: 처음엔 그냥 public (가장 흔함)
+
+```python
+class Variable:
+    def __init__(self, data):
+        self.data = data               # 그냥 public
+
+x = Variable(np.array(1.0))
+print(x.data)                          # ✅ 직접 접근
+x.data = np.array(2.0)                 # ✅ 직접 할당
+```
+
+→ Java/C#이면 `getData()`/`setData()` 만들겠지만, 파이썬은 이렇게 안 함.
+
+##### 방식 2: 검증/계산이 필요해지면 `@property` 도입
+
+```python
+class Variable:
+    def __init__(self, data):
+        self.data = data
+
+    @property
+    def shape(self):                   # ← getter 역할
+        return self.data.shape
+
+    @property
+    def ndim(self):
+        return self.data.ndim
+
+# 사용:
+x = Variable(np.array([[1, 2], [3, 4]]))
+print(x.shape)                         # (2, 2) ← 메서드인데 () 없이!
+print(x.ndim)                          # 2
+# x.shape = (5, 5)                     # ❌ setter 없으면 AttributeError
+```
+
+→ `x.shape()` 아니고 `x.shape`. **마치 속성처럼 보이지만 실제론 메서드 호출**. 이게 `@property`의 마법.
+
+##### 방식 3: getter + setter 둘 다 (검증 필요시)
+
+```python
+class Variable:
+    def __init__(self, data):
+        self._data = data              # 내부적으론 _data
+
+    @property
+    def data(self):                    # getter
+        return self._data
+
+    @data.setter
+    def data(self, value):             # setter — 검증/부작용 가능
+        if not isinstance(value, np.ndarray):
+            raise TypeError("data는 ndarray여야 함")
+        self._data = value
+
+# 사용:
+x = Variable(np.array(1.0))
+x.data = np.array(2.0)                 # ✅ setter 호출 (검증됨)
+# x.data = "문자열"                    # ❌ TypeError
+```
+
+##### DeZero 실제 사용 (step19에서 등장, 검증 완료)
+
+```python
+# steps/step19.py의 Variable
+class Variable:
+    def __init__(self, data):
+        self.data = data
+        ...
+
+    @property
+    def shape(self):
+        return self.data.shape
+
+    @property
+    def ndim(self):
+        return self.data.ndim
+
+    @property
+    def size(self):
+        return self.data.size
+
+    @property
+    def dtype(self):
+        return self.data.dtype
+```
+
+→ 전엔 `x.data.shape`로 접근했는데, 이제 `x.shape`로 바로 접근. Variable이 "ndarray 같은 느낌"으로 확장됨.
+
+##### 비교표
+
+| 관점 | Java/C# | 파이썬 |
+|---|---|---|
+| 기본 접근 | private + getter/setter | public |
+| 검증 필요시 | getter/setter 유지 | `@property`로 전환 |
+| 문법 | `getData()` / `setData()` | `x.data` (속성처럼) |
+| 철학 | "미리 막자" | "어른이니까 자유롭게, 필요시 막자" |
+
+**키워드**: `#property` `#게터` `#세터` `#캡슐화` `#descriptor` `#Python철학`
+
+---
+
+### 1.15 파이썬은 진짜 편한가? — 철학/이디엄 관점 🐍
+
+**브로 질문**: "파이썬이 편하다는데 어디가?"
+
+**요약**: Java/C# 하던 사람한테 첫인상은 "느슨하고 불안"해 보일 수 있음. 하지만 **학습/프로토타이핑/데이터 분석** 분야에선 진짜 편함. 이유 5가지.
+
+##### 1. 컴파일/빌드 단계 없음 (인터프리터)
+
+```java
+// Java: 컴파일 → 실행 2단계
+$ javac Main.java && java Main
+```
+```python
+# Python: 그냥 실행 1단계
+$ python main.py
+```
+
+코드 고치고 바로 실행. 실험 사이클 짧음. DeZero도 `uv run python steps/step01.py` 한 줄.
+
+##### 2. 타입 선언 안 해도 됨 (동적 타입)
+
+```java
+// Java
+List<Variable> list = new ArrayList<>();
+Map<String, Integer> map = new HashMap<>();
+```
+```python
+# Python
+list = []
+map = {}
+```
+
+타입 적는 시간 절약. 단점(모호함)도 있어서 최근엔 **type hints** 옵션 도입:
+```python
+def add(x: int, y: int) -> int:    # 선택적
+    return x + y
+```
+
+##### 3. 표현력 높음 (적은 코드로 많은 표현)
+
+```python
+# 리스트 컴프리헨션
+squares = [x**2 for x in range(10) if x % 2 == 0]
+# [0, 4, 16, 36, 64]
+
+# 동시 할당 + 한 줄 스왑
+a, b, c = 1, 2, 3
+x, y = y, x
+
+# with 문 — 자원 자동 정리
+with open('file.txt') as f:         # 끝나면 자동 close
+    content = f.read()
+```
+
+##### 4. "배터리 포함" (표준 라이브러리 풍부)
+
+Python 설치만으로 JSON/정규표현식/HTTP/날짜/수학 등 다 내장. Java처럼 Maven에서 안 깔아도 됨.
+```python
+import json, re, datetime, urllib.request    # 전부 표준
+```
+
+##### 5. 에러가 빨리 드러남 (REPL + 동적)
+
+```python
+$ python
+>>> x = [1, 2, 3]
+>>> x[10]                # 바로 IndexError
+>>> import numpy as np   # 바로 설치/사용
+```
+
+→ Java의 "컴파일 에러 → 수정 → 컴파일 → 또 에러" 사이클 없음.
+
+##### 반대로 불편한 점도 (공감)
+
+- **컴파일 타임 검사 없음**: 실행해봐야 에러 앎 → 테스트 중요
+- **느슨한 캡슐화**: private가 관례라 마음대로 접근 가능
+- **성능**: Java/C#보다 보통 느림 (NumPy는 C 호출이라 빠름)
+- **대규모 프로젝트**: 동적 타입이 발목 잡을 수 있음
+
+##### 결론
+
+| 상황 | 편한가? |
+|---|---|
+| 스크립트/프로토타입 | ✅ 진짜 편함 |
+| 데이터 분석/ML | ✅ NumPy 생태계 압도적 |
+| 학습/교육 | ✅ 문법 얕아서 빠른 시작 |
+| 대규모 엔터프라이즈 | ❌ Java/C#이 나음 |
+| 시스템 프로그래밍 | ❌ C/Rust/Go가 나음 |
+
+→ DeZero가 Python 쓰는 이유: "프레임워크 배울 때 언어 디테일에 안 끌리게".
+
+**키워드**: `#Python철학` `#인터프리터` `#동적타입` `#표현력` `#배터리포함` `#REPL`
+
 ---
 
 **학습 완료일**: 2026-07-21
-**총 주제 수**: 14개 (Python 기본 8, NumPy 3, 프레임워크 2, 비교 1)
-**다음 step**: step02 (Function 도입) — 여기서 배운 `__call__`, `@staticmethod`가 바로 등장!
+**총 주제 수**: 16개 (Python 기본 10, NumPy 3, 프레임워크 2, 비교 1)
+**다음 step**: step02 (Function 도입) — `__call__`이 핵심 역할 (Function 인스턴스를 함수처럼 호출).
+참고: `@staticmethod`는 **책 본문(step 파일)에 아예 등장하지 않음** (검증 완료). 책은 전부 인스턴스 메서드로 구현. step18부터 `@property`, `@contextlib.contextmanager` 데코레이터가 등장함.
 
 ---
 
