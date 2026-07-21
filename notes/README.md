@@ -7,22 +7,23 @@
 
 | # | 파일 | 시점 | 주제 |
 |---|---|---|---|
-| 1 | [exploration_01_python_basics.md](./exploration_01_python_basics.md) | step01 직후 | Python 클래스 / 캡슐화 / 문법 이디엄 / 프레임워크 디자인 (13가지) |
+| 1 | [exploration_01_python_basics.md](./exploration_01_python_basics.md) | step01 직후 | Python 클래스 / 캡슐화 / 프레임워크 디자인 |
 | 2 | [exploration_02_numpy_basics.md](./exploration_02_numpy_basics.md) | step01 직후 | NumPy 기본 (3권 중심) — ndarray 내부, shape/axis, 브로드캐스팅, 수학 함수, 난수 |
 | 3 | [exploration_03_backend_adapters.md](./exploration_03_backend_adapters.md) | step01 직후 | 백엔드 어댑터: Variable을 CuPy/MLX로 확장한다면 (autograd, Define-by-Run, xp 패턴) |
 | 4 | [exploration_04_symbolic_vs_numeric.md](./exploration_04_symbolic_vs_numeric.md) | step01 직후 | sympy vs PyTorch/DeZero: 심볼릭 vs 수치 계산 패러다임 (manim/Graphviz 시각화 비교) |
-| 5 | [exploration_05_python_object_model.md](./exploration_05_python_object_model.md) | step01 직후 | Python 객체 모델 — CPython 내부, 리플렉션, 룩업 체계 5가지 (★공식 참조) |
+| 5 | [exploration_05_python_object_model.md](./exploration_05_python_object_model.md) | step01 직후 | Python 객체 모델 — CPython 내부, descriptor, 리플렉션, 룩업 체계 5가지 (★공식 참조) |
 | 6 | [exploration_06_data_types.md](./exploration_06_data_types.md) | step01 직후 | Python 기본 자료형 — list/tuple/str, 레퍼런스 모델, 얕은/깊은 복사 |
+| 7 | [exploration_07_syntax_idioms.md](./exploration_07_syntax_idioms.md) | step01 직후 | Python 문법과 이디엄 — 데코레이터, f-string, == vs is, lambda, @override/@overload |
 
 > 파일 번호 = **생성 순서** (탐구 역사 보존)
 > 아래 "추천 읽는 순서"는 처음 읽을 때 논리적 흐름 기준
 
 ## 🎯 추천 읽는 순서 (처음 읽을 때)
 
-현재 파일 번호 순서(1→6)가 곧 추천 순서와 일치함. 논리적 의존 관계:
+현재 파일 번호 순서(1→7)가 곧 추천 순서와 일치함. 논리적 의존 관계:
 
 ```
-[#1 Python 기본]
+[#1 Python 클래스/캡슐화]
    ↓ Variable 클래스가 파이썬에서 어떻게 구현되는지 (래퍼 패턴, attribute 등)
 [#2 NumPy 기본]
    ↓ Variable이 담는 'data'가 실제로 뭔지 (ndarray, shape, axis)
@@ -34,9 +35,11 @@
    ↓ 파이썬 객체의 내부 구조/리플렉션/룩업 체계 (★공식 참조, 필요시 독자적 참조도 가능)
 [#6 Python 기본 자료형]
    ↓ list/tuple/str/레퍼런스 모델 (#5의 전제 지식)
+[#7 Python 문법과 이디엄]
+   ↓ 데코레이터, f-string, lambda, == vs is, @override/@overload (#1과 병행 읽기도 좋음)
 ```
 
-- **처음부터 끝까지 읽기**: 1 → 2 → 3 → 4 → 5 → 6 (기본)
+- **처음부터 끝까지 읽기**: 1 → 2 → 3 → 4 → 5 → 6 → 7 (기본)
 - **특정 주제만**: 각 탐구는 독립적으로도 읽을 수 있음 (필요시 다른 탐구 링크로 연결)
 - **키워드 검색**: 각 항목의 `#키워드` 태그로 검색해서 찾기
 
