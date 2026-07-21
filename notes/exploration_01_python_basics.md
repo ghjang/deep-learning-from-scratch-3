@@ -806,7 +806,61 @@ class Variable:
 책도 이대로 가. PyTorch 실제 구현은 `_data`, `__grad` 등으로 내부 변수 관리하지만,
 학습 단계에선 public이 읽기 편함. 나중에 (step16+ 메모리 관리 쯤) `_` 관례 시도해볼 수 있음.
 
-**키워드**: `#접근권한` `#public` `#protected` `#private` `#네임맹글링` `#consentingadults` `#관례`
+#### B.1.1 `__` 밑줄 2개 — "사기성 private"의 정체
+
+> 브로 통찰: "`__` 프리픽스는 맹글링된다? 사기성 private 처리군!"
+
+**정확한 표현!** `__`는 진짜 private가 아니라 **"이름만 비틀어 놓은 것"**. 알면 접근 가능한 사기성.
+
+##### 사기성인 이유 — 우회 너무 쉬움
+
+```python
+class MyClass:
+    def __init__(self):
+        self.__secret = "비밀"     # _MyClass__secret으로 맹글링됨
+
+obj = MyClass()
+# print(obj.__secret)              # ❌ AttributeError — "사기성" private
+print(obj._MyClass__secret)        # ✅ "비밀" — 우회 가능!
+```
+
+→ 컴파일러가 강제하는 게 아니라 **이름 바꾸기일 뿐**. 알면 바로 접근 가능.
+
+##### Java/C# `private`와 비교
+
+| | Java/C# `private` | 파이썬 `__` |
+|---|---|---|
+| 컴파일러 강제 | ✅ 진짜 막음 | ❌ 이름만 비틀음 |
+| 우회 가능 | (리플렉션으로만) | ✅ `_ClassName__attr`로 바로 |
+| 철학 | "막아야 함" | "건드리지 말라는 합의" |
+
+##### 상속 시 예상치 못한 버그 — 이름이 **두 개** 공존 ⚠️
+
+```python
+class Base:
+    def __init__(self):
+        self.__value = 1     # _Base__value
+
+class Derived(Base):
+    def __init__(self):
+        super().__init__()
+        self.__value = 2     # _Derived__value — 다른 이름!
+
+d = Derived()
+print(d._Base__value)        # 1 (Base의 것)
+print(d._Derived__value)     # 2 (Derived의 것)
+# __value가 2개! 혼란 야기
+```
+
+→ 상속하면 맹글링 이름이 달라져서 **이름 충돌 안 나는 게 아니라 두 개가 공존**. 진짜 사기성.
+
+##### 그래서 실전에선?
+
+- **`_` 밑줄 1개** (관례) — 대부분의 "내부용" 표시
+- **`__` 밑줄 2개** (맹글링) — 드묾, 상속 시 충돌 피하려는 특수 경우만
+- **진짜 캡슐화 필요시** — `@property` 사용 (B.2 참조)
+
+**키워드**: `#접근권한` `#public` `#protected` `#private` `#네임맹글링` `#사기성private` `#상속충돌` `#consentingadults` `#관례`
 
 ---
 
