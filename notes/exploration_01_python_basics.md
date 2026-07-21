@@ -259,7 +259,7 @@ class C:
     def m(self):
         x = "지역"               # L
         print(x)                 # "지역" (가장 가까운 scope)
-        # x를 L에 안 두면 → E → G 순서로 찾음
+        # x를 L에 안 두면 → E → G → B 순서로 찾음
 ```
 
 ##### C. 핵심 함정 — `x` vs `self.x`는 룩업 체계가 다름!
