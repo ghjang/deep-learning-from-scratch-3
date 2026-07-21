@@ -1473,7 +1473,142 @@ np.array = lambda x: "해킹!"   # ← 전역 수정, numpy 전체 망가짐!
 
 **키워드**: `#네임스페이스` `#__dict__` `#딕셔너리구현` `#LEGB` `#PartialClass` `#C#비교` `#Mixin` `#다중상속` `#런타임추가` `#globals()` `#setattr` `#consentingadults`
 
----
+#### E.9.10 동적으로 수정한 클래스를 소스 코드로 출력할 수 있나?
+
+> 브로 질문: "동적으로 수정한 클래스 객체를 소스 코드 파일로 출력 가능? 코드 포맷팅된 형태로?"
+> → **완전 자동은 어렵지만 부분적 추출은 가능.** 도구들 있음.
+
+##### 핵심 어려움: 런타임 객체 ≠ 소스 코드
+
+파이썬은 런타임에 **바이트코드(bytecode)**로 실행돼. 원래 소스 코드 형태(텍스트)를 항상 보존하지 않음.
+
+```
+소스 코드 (.py 파일)
+    ↓ 컴파일
+바이트코드 (.pyc 파일)
+    ↓ 실행
+런타임 객체 (메모리)
+
+← 역방향(객체 → 소스)은 정보 손실이 큼!
+```
+
+→ 컴파일 과정에서 포맷팅(들여쓰기, 빈 줄, 주석)이 날아감. 그래서 완벽한 역직렬화는 어려움.
+
+##### 도구 1: `inspect.getsource` — 원래 소스 추출
+
+```python
+import inspect
+
+class Foo:
+    def bar(self):
+        """Bar 메서드"""
+        return self.data + 1
+
+print(inspect.getsource(Foo.bar))
+# def bar(self):
+#     """Bar 메서드"""
+#     return self.data + 1
+```
+
+→ 원본 소스 파일이 있으면 추출 가능. 파이썬이 소스 파일을 읽을 때 어디서 왔는지 기억해둬서 가능.
+
+**한계**: 소스 파일이 있어야 함.
+- `exec("class Dynamic: pass")`로 만든 클래스 → ❌
+- `type('Dynamic', (), {'x': 1})`로 만든 클래스 → ❌
+- REPL에서 입력한 코드 → ❌
+
+##### 도구 2: `ast` (추상 구문 트리)
+
+```python
+import inspect
+import ast
+
+source = inspect.getsource(Foo.method)
+tree = ast.parse(source)
+print(ast.dump(tree, indent=2))   # 트리 구조 출력
+
+# 다시 소스로 변환 (Python 3.9+)
+print(ast.unparse(tree))
+# def method(self):
+#     x = 1
+#     return x + 2
+```
+
+→ 소스 → AST → 소스 변환 가능. 하지만 **원본 포맷(들여쓰기, 빈 줄)은 보존 안 됨**.
+
+##### 도구 3: `black`/`ruff` 조합 (반자동 포맷팅)
+
+```python
+import inspect
+import subprocess
+
+source = inspect.getsource(Foo)
+# (가상) black/ruff로 포맷팅
+# formatted = subprocess.run(['ruff', 'format', '-'], input=source, ...)
+```
+
+→ 런타임 정보 → 소스 추출 → 포맷팅 도구 조합. 완전 자동화는 아님.
+
+##### 도구 4: 객체 상태 직렬화 (소스는 아님)
+
+```python
+import pprint
+
+class Foo:
+    def __init__(self):
+        self.x = 1
+        self.y = "hello"
+
+f = Foo()
+pprint.pprint(f.__dict__)
+# {'x': 1, 'y': 'hello'}
+```
+
+→ 상태는 쉽게 출력 가능. 하지만 "소스 코드"는 아님.
+
+##### JavaScript가 진짜 신기한 케이스
+
+```javascript
+function foo() {
+    return 42;
+}
+
+console.log(foo.toString());
+// function foo() {
+//     return 42;
+// }
+```
+
+→ JS는 **함수를 문자열로 변환**하는 게 정말 잘 됨. `toString()` 한 방이면 소스가 나옴. 파이썬보다 훨씬 깔끔.
+
+##### 다른 언어와 비교
+
+| 언어 | 런타임 → 소스 역직렬화 | 방법 |
+|---|---|---|
+| **JavaScript** | ✅ 매우 잘 됨 | `Function.toString()` |
+| **Python** | ⚠️ 부분적 | `inspect.getsource` (소스 파일 있을 때만) |
+| **Java** | ⚠️ 디컴파일 | 바이트코드 디컴파일러 (JD-GUI 등) |
+| **C#** | ⚠️ 가능 | 리플렉션 + Roslyn (코드 생성) |
+| **C++** | ❌ 불가능 | 컴파일 타임 정보만 |
+
+##### 실전 가치 — 언제 유용할까?
+
+1. **코드 생성기** — 템플릿 기반 소스 생성 (ORM, API 클라이언트)
+2. **문서화 도구** — Sphinx, pdoc 등이 클래스 정보로 문서 생성
+3. **리팩토링 도구** — AST 조작 후 소스 재작성
+4. **테스트 생성** — 모형 객체에서 테스트 코드 자동 생성
+
+→ DeZero 학습에선 진짜 안 쓰임. 하지만 실전 메타프로그래밍에선 종종 등장.
+
+##### 핵심 통찰
+
+1. **완벽한 자동 역직렬화는 어려움** — 런타임 객체 ≠ 소스 코드
+2. **`inspect.getsource`** — 원본 소스 파일이 있을 때만 추출 가능
+3. **`ast` 모듈** — AST 조작으로 변환은 가능하지만 포맷 손실
+4. **JS가 가장 잘 됨** — `Function.toString()` 한 방
+5. **실전 가치**: 코드 생성, 문서화, 리팩토링 도구 등
+
+**키워드**: `#소스코드출력` `#역직렬화` `#inspect.getsource` `#ast` `#ast.unparse` `#바이트코드` `#JavaScript.toString` `#코드생성` `#문서화` `#리팩토링` `#메타프로그래밍`
 
 ### E.10 핵심 통찰 요약
 
