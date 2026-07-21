@@ -26,26 +26,58 @@
 
 ## Step 01 — [1고지] 테니스 공 같은 '상자' (Variable 도입)
 
-**Issue**: (링크)
-**완료일**: -
-**상태**: ⏳
+**Issue**: [#2](https://github.com/ghjang/deep-learning-from-scratch-3/issues/2)
+**완료일**: 2026-07-21
+**상태**: ✅
 
 ### 📖 요약 (한 줄)
 
-
-### ❓ 질문 / 막힌 점
-
+Variable 클래스 도입 — numpy ndarray를 감싸는 "데이터 상자"를 만들어, 이후 역전파 메타정보를 붙일 토대 마련.
 
 ### 💡 통찰 / 배운 점
 
+**Variable은 "래퍼 패턴"** — Java의 `Integer/int` 박싱(Boxing)과 유사
+- 원시값(`ndarray`) → 객체(`Variable`)로 감싸서 **메타정보(`grad`, `creator` 등)를 붙일 공간** 확보
+- PyTorch `Tensor`, TF `Tensor`도 같은 철학
+- 책의 "테니스 공 상자" 비유 = 이 래핑 구조를 직관적으로 설명
+
+**왜 그냥 ndarray 안 쓰고 상자를?**
+- ndarray 자체엔 "이 데이터가 어떤 연산에서 왔는지" 추적 기능이 없음
+- 역전파(step07+)를 구현하려면 계산 그래프 정보가 필요 → 그걸 담을 그릇이 Variable
+
+### 📐 NumPy 차원 (키워드)
+
+| 표현 | ndim | shape | 비고 |
+|---|---|---|---|
+| `np.array(1.0)` | 0 | `()` | 스칼라 |
+| `np.array([1.0])` | 1 | `(1,)` | 벡터 (길이 1) |
+| `np.array([[1.0, 2.0], [3.0, 4.0]])` | 2 | `(2, 2)` | 행렬 |
+
+- `ndim`: 차원 수 (축의 개수)
+- `shape`: 각 축의 크기 튜플
+- step01은 단일값 미분 다루니 **0차원 스칼라** 사용. 텐서(다차원)는 step41+에서.
+
+### 📝 코드 메모
+
+```python
+class Variable:
+    def __init__(self, data):
+        self.data = data   # 상자 안의 "공"
+
+x = Variable(np.array(1.0))  # 상자에 0차원 스칼라 담기
+x.data = np.array(2.0)        # 상자의 내용물 교체 가능 (.data는 일반 속성)
+```
+
+- `self.data`는 일반 속성이라 **재할당 가능** → 나중에 `self.grad = ...` 식으로 결과 대입에 활용
+- `inspect()` 헬퍼 패턴 도입 (Variable 내부 구조 탐구용, step별 재사용 예정)
 
 ### 🔗 관련 링크
 
+- Issue: https://github.com/ghjang/deep-learning-from-scratch-3/issues/2
+- 구현: `rezero/steps/step01.py`
+- 정답지: `steps/step01.py`
 
-### 📝 코드 / 수식 메모
-
-
----
+**키워드**: `#Variable` `#래퍼패턴` `#박싱` `#ndarray` `#ndim` `#shape` `#스칼라` `#0차원`
 
 ## Step 02 — [1고지] 변수를 낳는 함수 (Function 도입)
 
