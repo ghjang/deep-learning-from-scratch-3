@@ -10,7 +10,7 @@
 
 - **A. Python 클래스 기본**
   - [A.1 `self`와 인스턴스 메서드](#a1-self와-인스턴스-메서드-)
-  - [A.2 멤버 변수(속성) 용어와 접근 룩업 규칙](#a2-멤버-변수속성-용어와-접근-룩업-규칙)
+  - [A.2 멤버 변수(속성) — 용어, 룩업 규칙, 스코프](#a2-멤버-변수속성--용어-룩업-규칙-스코프)
   - [A.3 `__init__`과 dunder 메서드](#a3-__init__과-dunder-메서드)
   - [A.4 `class Foo:` vs `class Foo(object):`](#a4-class-foo-vs-class-fooobject)
   - [A.5 메서드 3종류: 인스턴스/클래스/스태틱](#a5-메서드-3종류-인스턴스클래스스태틱)
@@ -54,9 +54,9 @@ x = Variable(np.array(1.0))
 
 ---
 
-### A.2 멤버 변수(속성) 용어와 접근 룩업 규칙
+### A.2 멤버 변수(속성) — 용어, 룩업 규칙, 스코프
 
-#### A.2.1 용어 정리
+#### A.2.1 용어 정리 — attribute vs instance variable/class variable
 
 파이썬은 **여러 용어가 혼용**됨. 공식 용어는 **attribute (속성)**.
 
@@ -78,7 +78,9 @@ class Variable:
 
 → 가장 정확한 표현: **"attribute (속성)"**. "variable"은 관행적 표현.
 
-#### A.2.2 인스턴스 메서드에서의 멤버 접근 룩업
+---
+
+#### A.2.2 멤버 접근 기본 규칙 — `self.x` 룩업과 핵심 3가지
 
 **파이썬은 Java/C#과 달리 `self.` 없이 인스턴스 변수 접근 불가능**. 이게 가장 큰 차이.
 
@@ -101,7 +103,13 @@ class Foo:
         # print(data)                  # ❌ NameError
 ```
 
-**읽을 때 룩업 순서** (`self.x`를 읽으면):
+**핵심 규칙 3가지** (외워둘 것):
+
+1. **읽을 때**: `self.x` → 인스턴스 → 클래스 → 부모(MRO) 순서로 찾음
+2. **쓸 때 (할당)**: `self.x = ...` → **무조건 인스턴스 변수** (클래스 변수 아님)
+3. **`self.` 없이**: 인스턴스 변수 접근 **불가능** (Java/C#과 반대)
+
+**읽을 때 구체적 룩업 순서** (`self.x`를 읽으면):
 ```
 1. self.__dict__ (인스턴스 고유 변수)에서 'x' 찾기
 2. 없으면 type(self) (클래스)에서 'x' 찾기 → 클래스 변수
@@ -112,7 +120,18 @@ class Foo:
 **할당할 때** (`self.x = ...`):
 - **무조건 인스턴스 변수** 생성/수정 (클래스 변수 수정 아님!)
 
-#### A.2.3 핵심 케이스 — 클래스 변수와 인스턴스 변수 충돌 ⚠️
+`__dict__`로 내부 확인:
+```python
+x = Variable(np.array(1.0))
+print(x.__dict__)                      # {'data': array(1.0)} — 인스턴스 변수들
+print(Variable.__dict__['count'])      # 0 — 클래스 변수
+```
+
+---
+
+#### A.2.3 클래스 변수 vs 인스턴스 변수 — 충돌, 함정, 실용 패턴
+
+##### 충돌 케이스 ⚠️
 
 ```python
 class Variable:
@@ -126,23 +145,57 @@ print(x.count)                         # 100 (인스턴스 변수)
 print(Variable.count)                  # 0   (클래스 변수 — 안 바뀜)
 ```
 
-→ `self.count = 100`은 인스턴스 변수를 새로 만드는 것. 클래스 변수 안 건드림. 진짜 함정.
+→ `self.count = 100`은 인스턴스 변수를 새로 만드는 것. 클래스 변수 안 건드림.
 
-#### A.2.4 `__dict__` 로 내부 확인
+##### 한눈에 정리 — 인스턴스로 클래스 변수 참조
+
+| 코드 | 의미 | 효과 |
+|---|---|---|
+| `x.count` (읽기) | 인스턴스 → 클래스 순서로 찾음 | 클래스 변수 값 읽힘 |
+| `x.count = 100` (쓰기) | **무조건** 인스턴스 변수 생성 | 클래스 변수 안 건드림 ⚠️ |
+| `Variable.count` (읽기) | 클래스에서 바로 찾음 | 클래스 변수 값 |
+| `Variable.count = 100` (쓰기) | 클래스 변수 직접 수정 | 모든 인스턴스에 영향 |
+
+→ **클래스 변수 수정은 항상 `ClassName.var = ...` 형태로**.
+
+##### 함정: 가변 클래스 변수 (리스트/딕셔너리)
 
 ```python
-x = Variable(np.array(1.0))
-print(x.__dict__)                      # {'data': array(1.0)} — 인스턴스 변수들
-print(Variable.__dict__['count'])      # 0 — 클래스 변수
+class Bad:
+    items = []                  # 가변 클래스 변수 — 위험!
+
+a = Bad()
+a.items.append(1)               # 읽기 → 클래스 items 발견 → append는 그 객체 수정
+b = Bad()
+print(b.items)                  # [1] ← 다른 인스턴스에도 영향!
 ```
 
-#### A.2.5 핵심 규칙 3가지
+→ `append`는 할당이 아니라 "읽어온 리스트 객체의 메서드 호출"이라 진짜 클래스 변수가 수정됨. 가변 객체는 읽기/쓰기 경계가 모호함.
 
-1. **읽을 때**: `self.x` → 인스턴스 → 클래스 순서로 찾음
-2. **쓸 때 (할당)**: `self.x = ...` → **무조건 인스턴스 변수** (클래스 변수 아님)
-3. **`self.` 없이**: 인스턴스 변수 접근 **불가능** (Java/C#과 반대)
+##### 실용 예: 전역 카운터
 
-#### A.2.6 보충 — MRO와 전역 변수 (LEGB 규칙)
+```python
+class Variable:
+    _created_count = 0           # 클래스 변수: 인스턴스 수 추적
+
+    def __init__(self, data):
+        self.data = data
+        Variable._created_count += 1     # ✅ 클래스 이름으로 수정!
+
+    @classmethod
+    def total_created(cls):
+        return cls._created_count        # ✅ cls로 읽기
+
+x1, x2, x3 = Variable(1), Variable(2), Variable(3)
+print(Variable.total_created())         # 3
+print(x3._created_count)                # 3 (인스턴스로도 읽기 가능)
+```
+
+**키워드**: `#attribute` `#속성` `#instancevariable` `#classvariable` `#룩업규칙` `#self필수` `#__dict__` `#네임스페이스` `#명시적self` `#읽기vs쓰기` `#할당함정` `#가변클래스변수` `#전역카운터` `#ClassName접근`
+
+---
+
+#### A.2.4 스코프와 룩업 심화 — MRO와 LEGB
 
 ##### A. MRO (Method Resolution Order)
 
@@ -220,7 +273,7 @@ class Variable:
 ```
 
 → 두 룩업 체계가 완전히 다름. `x`는 LEGB, `self.x`는 인스턴스→클래스→MRO.
-**A.2.5의 "`self.` 없이 인스턴스 변수 접근 불가"의 진짜 이유**가 바로 이것.
+**A.2.2의 "`self.` 없이 인스턴스 변수 접근 불가"의 진짜 이유**가 바로 이것.
 
 ##### D. 파이썬에서 전역 변수 — 쓰냐?
 
@@ -229,91 +282,7 @@ class Variable:
 - **DeZero**: 의외로 좀 씀. `Config` 클래스의 클래스 변수로 "전역 설정" 흉내 (step18+)
 - `is_simple_core` (Variable의 core 선택 스위치)도 사실 전역 변수!
 
-**키워드**: `#attribute` `#속성` `#instancevariable` `#classvariable` `#룩업규칙` `#self필수` `#__dict__` `#네임스페이스` `#명시적self` `#MRO` `#C3선형화` `#전역변수` `#LEGB` `#global키워드`
-
-#### A.2.7 보충 — 인스턴스로 클래스 변수 참조 (읽기 vs 쓰기 차이)
-
-**브로 질문**: "인스턴스 레퍼런스로 클래스 변수를 참조할 수 있나?"
-
-**요약**: 읽기 ✅ 가능, 쓰기(할당) ⚠️ 인스턴스 변수 새로 생성 (클래스 변수 수정 아님).
-
-##### 읽기 — 가능 (룩업이 클래스로 올라감)
-
-```python
-class Variable:
-    count = 0                    # 클래스 변수
-
-x = Variable()
-print(x.count)                   # ✅ 0 — 인스턴스로 클래스 변수 읽기 가능
-print(Variable.count)            # ✅ 0 — 클래스로도 읽기 가능 (더 명확)
-```
-
-A.2.2 룩업 순서: `x.__dict__` 없으면 → `type(x)` (클래스)에서 찾음.
-
-##### 쓰기(할당) — 인스턴스 변수가 새로 생김 ⚠️
-
-```python
-x.count = 100                    # ⚠️ 클래스 변수 수정이 아님!
-print(x.count)                   # 100 — 인스턴스 변수 (새로 생김)
-print(Variable.count)            # 0   — 클래스 변수 (그대로!)
-print(x.__dict__)                # {'count': 100} ← 인스턴스 변수로 추가됨
-```
-
-→ A.2.3의 "충돌 함정". `x.count = 100`은 "x에 count라는 새 인스턴스 변수 생성"일 뿐.
-
-##### 클래스 변수를 진짜 수정하려면
-
-```python
-Variable.count = 100             # ✅ 클래스 이름으로 직접 수정
-print(Variable.count)            # 100
-print(x.count)                   # 100 — 인스턴스로 읽으면 업데이트된 클래스 변수
-```
-
-→ **클래스 변수 수정은 항상 `ClassName.var = ...` 형태로**.
-
-##### 한눈에 정리
-
-| 코드 | 의미 | 효과 |
-|---|---|---|
-| `x.count` (읽기) | 인스턴스 → 클래스 순서로 찾음 | 클래스 변수 값 읽힘 |
-| `x.count = 100` (쓰기) | **무조건** 인스턴스 변수 생성 | 클래스 변수 안 건드림 ⚠️ |
-| `Variable.count` (읽기) | 클래스에서 바로 찾음 | 클래스 변수 값 |
-| `Variable.count = 100` (쓰기) | 클래스 변수 직접 수정 | 모든 인스턴스에 영향 |
-
-##### 함정: 가변 클래스 변수 (리스트/딕셔너리)
-
-```python
-class Bad:
-    items = []                  # 가변 클래스 변수 — 위험!
-
-a = Bad()
-a.items.append(1)               # 읽기 → 클래스 items 발견 → append는 그 객체 수정
-b = Bad()
-print(b.items)                  # [1] ← 다른 인스턴스에도 영향!
-```
-
-→ `append`는 할당이 아니라 "읽어온 리스트 객체의 메서드 호출"이라 진짜 클래스 변수가 수정됨. 가변 객체는 읽기/쓰기 경계가 모호함.
-
-##### 실용 예: 전역 카운터
-
-```python
-class Variable:
-    _created_count = 0           # 클래스 변수: 인스턴스 수 추적
-
-    def __init__(self, data):
-        self.data = data
-        Variable._created_count += 1     # ✅ 클래스 이름으로 수정!
-
-    @classmethod
-    def total_created(cls):
-        return cls._created_count        # ✅ cls로 읽기
-
-x1, x2, x3 = Variable(1), Variable(2), Variable(3)
-print(Variable.total_created())         # 3
-print(x3._created_count)                # 3 (인스턴스로도 읽기 가능)
-```
-
-**키워드**: `#인스턴스로클래스변수` `#읽기vs쓰기` `#할당함정` `#가변클래스변수` `#전역카운터` `#ClassName접근`
+**키워드**: `#MRO` `#C3선형화` `#전역변수` `#LEGB` `#global키워드` `#네임스페이스` `#룩업체계차이`
 
 ---
 
