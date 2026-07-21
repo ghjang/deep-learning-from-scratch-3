@@ -98,7 +98,108 @@ except TypeError:
     print("immutable")
 ```
 
-**키워드**: `#오리타이핑` `#ducktyping` `#접근문법동일` `#EAFP` `#isinstance`
+### B.1 오리 타이핑의 깊은 의미 — 구조적 타이핑 (C++ TMP와 비교)
+
+> 브로 통찰: "오리 타이핑, 간만에 C++ TMP를 생각나게 하기도"
+
+정확한 비교! 둘 다 **"타입 이름이 아니라 구조로 동작"** 한다는 공통점. 하지만 실행 모델은 완전 반대.
+
+#### 명목적 vs 구조적 타이핑
+
+- **명목적 (nominal)**: "이 클래스가 `Iterable`을 **상속받았**나?" (Java, C#)
+- **구조적 (structural)**: "`iter()` 메서드가 **있**나?" (Python, TypeScript, Go)
+
+→ C++ TMP, Python Protocol, TypeScript, Go interface 전부 **구조적 타이핑**의 예.
+
+#### C++ TMP vs Python Protocol — 비교
+
+**C++ TMP (컴파일 타임 검증)**:
+```cpp
+template <typename T>
+auto process(T container) {
+    return container.size();  // T에 size() 있어야 함
+}
+process(std::vector<int>{1,2,3});  // OK
+// process(int{42});               // ❌ 컴파일 에러! int에 size() 없음
+```
+
+**Python Protocol (런타임 시도)**:
+```python
+def process(container):
+    return container.size()   # 그냥 호출, 없으면 죽음
+
+process(MyContainer())  # ✅ size() 있으면 OK
+process(42)             # ❌ RuntimeError — int엔 size() 없음 (실행해봐야 앎)
+```
+
+#### 본질적 차이 — 컴파일 타임 vs 런타임
+
+| | C++ TMP | Python 오리 타이핑 |
+|---|---|---|
+| **검증 시점** | 컴파일 타임 | 런타임 |
+| **오류 발견** | 빌드 실패 (빨리/정확) | 실행 중 (늦게/모호) |
+| **유연성** | 낮음 (엄격) | 높음 (관대) |
+| **철학** | "미리 다 검증" | "일단 해봐, 책임은 너" |
+
+#### C++20 concepts / Python typing.Protocol — 명시적 구조적 타이핑
+
+둘 다 "구조적 타이핑을 명시적으로" 만드는 도구:
+
+```cpp
+// C++20 concepts
+template <typename T>
+requires requires(T t) { t.size(); }
+auto process(T container) { return container.size(); }
+```
+
+```python
+# Python typing.Protocol (PEP 544)
+from typing import Protocol
+
+class Sized(Protocol):
+    def size(self) -> int: ...
+
+def process(container: Sized) -> int:
+    return container.size()
+
+# pyright가 에디터에서 정적 검증!
+process(MyContainer())   # ✅ pyright OK
+process(42)              # ⚠️ pyright 경고
+```
+
+→ **`typing.Protocol`이 사실상 C++20 concepts의 파이썬 버전**. 런타임은 관대하지만 pyright가 정적으로 검증.
+
+#### C++ TMP의 진짜 이질성 — 컴파일 타임 연산
+
+C++ TMP는 단순한 구조적 타이핑을 넘어 **"컴파일 타임에 실행되는 프로그래밍"** 이야:
+
+```cpp
+// 컴파일 타임에 팩토리얼 계산!
+template <int N>
+struct Factorial {
+    static constexpr int value = N * Factorial<N - 1>::value;
+};
+constexpr auto x = Factorial<5>::value;   // 컴파일 타임에 120으로 결정
+```
+
+→ 파이썬엔 이런 게 아예 없음 (런타임에 전부 실행). Python Protocol은 메타프로그래밍이 아니라 그냥 "런타임에 메서드 있나 확인"일 뿐.
+
+#### DeZero와의 연결
+
+DeZero의 모든 오리 타이핑이 사실 이거야:
+
+```python
+class Function:
+    def __call__(self, input):
+        x = input.data            # input.data만 있으면 됨 (프로토콜)
+        y = self.forward(x)
+        output = Variable(y)
+        return output
+```
+
+→ `input`이 `Variable`인지 **검사 안 함**. `.data` 있으면 됨. 이게 **오리 타이핑 = 구조적 타이핑**.
+
+**키워드**: `#오리타이핑` `#ducktyping` `#접근문법동일` `#EAFP` `#isinstance` `#구조적타이핑` `#명목적타이핑` `#C++TMP` `#C++20concepts` `#typing.Protocol` `#PEP544` `#컴파일타임vs런타임` `#Go인터페이스` `#TypeScript`
 
 ---
 
