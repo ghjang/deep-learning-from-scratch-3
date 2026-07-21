@@ -93,16 +93,20 @@ rezero/
 > **새 AI 세션에서 가장 먼저 읽을 것**: `LEARNING_PROGRESS.md`
 > 그 파일에 현재 학습 진척도(어디까지 했는지)가 step별로 정리되어 있습니다.
 
-### 핵심 문서 (3종)
+### 핵심 문서 (4종)
 
 | 파일 | 역할 |
 |---|---|
 | `LEARNING_PROGRESS.md` | 📊 **목차/상태 추적**. step01~60 체크리스트 + 이슈 링크 + 상태 이모지 |
-| `LEARNING_NOTES.md` | 📝 **자유 노트**. step별 헤딩 아래 질문/통찰/코드 메모 자유 기록 |
+| `LEARNING_NOTES.md` | 📝 **step 요약 노트**. step별 핵심 통찰/코드 메모 (가벼움) |
+| `notes/` | 🧪 **탐구 노트 디렉터리**. 주제별 개별 파일 (Python/NumPy/수학 등 깊이 파는 주제) |
 | GitHub Issues | 📌 **세부 토론**. 각 step 진행 추적 + 막힌 질문 영구 기록 |
 
-이 구조는 **"목차 = LEARNING_PROGRESS.md, 본문 = Issues"** 인 하이브리드.
-어디까지 했는지는 progress에서, 세부 맥락은 이슈에서.
+이 구조는 **"목차 = LEARNING_PROGRESS.md, step 요약 = LEARNING_NOTES.md, 탐구 = notes/, 본문 = Issues"** 인 하이브리드.
+- 어디까지 했는지는 progress에서
+- step 핵심은 LEARNING_NOTES.md에서
+- 깊이 탐구는 notes/에서 (개별 파일, LEARNING_NOTES.md에서 링크)
+- 세부 맥락은 Issues에서
 
 ### 🎨 학습 스타일 (브로의 선호, 반드시 존중)
 
@@ -183,8 +187,11 @@ rezero/
 새 세션에서 브로가 "이어서 작업하자" 하면:
 1. `LEARNING_PROGRESS.md`를 읽고 현재 step 파악
 2. 해당 step의 Issue를 확인해 진행 맥락 파악
-3. `LEARNING_NOTES.md` 해당 step 헤딩을 확인해 기존 질문/통찰 파악
+3. `LEARNING_NOTES.md` 해당 step 헤딩 + `notes/` 인덱스 확인해 기존 질문/통찰 파악
 4. 그 다음 위 사이클의 적절한 단계부터 이어서 진행
+
+> 브로는 탐구(잡생각)를 좋아하므로, step 진도 외에도 "이것 좀 더 파볼까?" 하는
+> 주제가 나오면 `notes/` 에 새 탐구 노트로 정리할 것.
 
 ### 상태 이모지 범례
 
@@ -271,7 +278,8 @@ pyproject.toml uv 프로젝트 명세
 uv.lock        의존성 버전 고정
 .python-version  (gitignored) Python 3.13 고정
 LEARNING_PROGRESS.md  📊 학습 진척도 추적 (목차)
-LEARNING_NOTES.md     📝 학습 자유 노트 (step별)
+LEARNING_NOTES.md     📝 학습 step 요약 노트 (가벼움)
+notes/                🧪 보충 탐구 노트 (주제별 개별 파일, 깊이 파는 주제)
 ```
 
 ---
