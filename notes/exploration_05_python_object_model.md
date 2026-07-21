@@ -751,6 +751,23 @@ obj.x
 ```
 → DeZero의 `self.data` 접근이 여기 해당.
 
+> 💡 **메서드도 속성 룩업으로 찾는다!** 파이썬에선 메서드 = 클래스 속성.
+> 메서드 전용 룩업이 따로 없고, 똑같이 인스턴스→클래스→MRO로 찾음.
+> ```python
+> class Variable:
+>     def square(self): ...        # 사실 클래스 속성! Variable.__dict__['square']
+>
+> v = Variable(3)
+> print(v.__dict__)               # {'data': 3} ← square 없음
+> print('square' in Variable.__dict__)  # True ← 클래스에 있음
+> v.square()                      # 속성 룩업으로 찾아서 자동 self 바인딩
+> ```
+> **자동 self 바인딩**: 인스턴스에서 접근하면 함수가 자동으로 `self=v`로 바인딩 (descriptor protocol, C 섹션 참조).
+> 그래서 인스턴스에 동일 이름 속성 넣으면 메서드 덮어쓰기도 가능:
+> ```python
+> f.greet = lambda: "instance"    # 메서드 덮어쓰기 (Java/C# 불가)
+> ```
+
 **3️⃣ 인덱스 룩업 (Index Lookup)**
 
 대괄호 `obj[key]`로 접근할 때. `__getitem__` 메서드가 발동.
