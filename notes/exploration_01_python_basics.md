@@ -1463,6 +1463,111 @@ $ python
 
 ---
 
+### C.6 `lambda` 표현식 — 제한적이지만 특정 용도에선 국룰
+
+> 브로 질문: "파이썬에서도 람다 표현이 많이 사용되나?"
+
+**결론**: **제한적으로 많이 씀**. 파이썬 lambda는 다른 언어(JS, C#)보다 약하지만, 짧은 용도론 진짜 자주 쓰임.
+
+#### 파이썬 lambda의 제약 — 표현식 1개만
+
+```python
+# 단일 표현식만 가능 (statement 안 됨)
+square = lambda x: x ** 2
+print(square(5))   # 25
+
+# 이런 건 안 됨:
+# f = lambda x:
+#     y = x + 1       # ❌ 할당 statement
+#     return y * 2     # ❌ return statement
+```
+
+→ "표현식 하나" 제약이 진짜 큰 한계. 여러 줄 로직은 `def` 써야.
+
+#### 다른 언어와 비교 — 파이썬이 약한 편
+
+```javascript
+// JavaScript — 여러 줄 가능!
+const f = (x) => {
+    const y = x + 1;
+    return y * 2;
+};
+```
+```python
+# Python — 여러 줄 불가능, def 써야
+def f(x):
+    y = x + 1
+    return y * 2
+```
+
+| 언어 | lambda/익명 함수 | 파워 |
+|---|---|---|
+| **Lisp/Scheme** | 완전한 lambda (여러 줄) | ⭐⭐⭐⭐⭐ |
+| **JavaScript** | 화살표 함수 (여러 줄) | ⭐⭐⭐⭐⭐ |
+| **C#** | `=>` 람다 (여러 줄) | ⭐⭐⭐⭐ |
+| **Java** | lambda (한 줄 권장, 여러 줄 가능) | ⭐⭐⭐⭐ |
+| **Python** | lambda (**표현식 1개만**) | ⭐⭐ |
+| **C++** | lambda (여러 줄) | ⭐⭐⭐⭐⭐ |
+
+#### 그래도 자주 쓰는 곳
+
+**1. `sorted`/`min`/`max`의 `key=` 인자 (가장 흔함)**
+```python
+students = [("철수", 90), ("영희", 85), ("민수", 95)]
+sorted(students, key=lambda s: s[1])   # 점수순 정렬
+# [('영희', 85), ('철수', 90), ('민수', 95)]
+
+words = ["banana", "apple", "cherry"]
+sorted(words, key=lambda w: len(w))    # 길이순
+```
+
+**2. `map`, `filter` (함수형 패턴)**
+```python
+squares = list(map(lambda x: x**2, [1, 2, 3]))      # [1, 4, 9]
+evens = list(filter(lambda x: x % 2 == 0, [1,2,3,4,5,6]))  # [2, 4, 6]
+```
+
+**3. DeZero에서 (미래)**
+```python
+# step28+: 수치 미분에서 간단 함수 전달
+def numerical_diff(f, x):
+    h = 1e-4
+    return (f(x + h) - f(x - h)) / (2 * h)
+
+result = numerical_diff(lambda x: x ** 2 + 1, 2.0)
+```
+
+#### lambda vs def 선택 기준
+
+| 상황 | 추천 | 이유 |
+|---|---|---|
+| **1줄 짜리 단순 함수** | ✅ `lambda` | 간결 |
+| **여러 줄 로직** | ❌ `def` | lambda는 표현식 1개만 |
+| **재사용 여러 번** | ❌ `def` | 이름 붙여서 명확하게 |
+| **`key=` 인자 등 콜백** | ✅ `lambda` | 자연스러운 패턴 |
+| **직렬화(pickle)** | ❌ `def` | lambda는 pickle 안 됨 |
+
+#### 파이썬 철학 — "왜 lambda가 약할까?"
+
+PEP 20: "There should be one-- and preferably only one --obvious way to do it."
+
+→ lambda를 제한적으로 만든 이유. **"여러 줄 함수는 `def`가 명백한 정답이니까, lambda는 짧은 것만"**.
+
+C#/JS는 "표현성" 중시 → lambda/화살표 함수 풀어줌.
+파이썬은 "단순함" 중시 → lambda 제한.
+
+#### 함정 — 클로저 캡처 버그
+
+```python
+funcs = [lambda: i for i in range(3)]
+print([f() for f in funcs])   # [2, 2, 2] ← 0,1,2가 아니라 다 2!
+# 이유: lambda가 i를 참조하지만, i는 루프 끝나면 2
+```
+
+→ lambda 많이 쓰면 디버깅 지옥 가능. 특히 클로저 캡처 주의.
+
+**키워드**: `#lambda` `#람다표현식` `#표현식1개제약` `#sorted_key` `#map` `#filter` `#closure함정` `#PEP20` `#단일명확방식` `#JS화살표함수비교` `#def권장`
+
 ## D. 프레임워크 디자인
 
 ### D.1 왜 프레임워크들은 다 Variable/Tensor 래퍼를 쓸까
