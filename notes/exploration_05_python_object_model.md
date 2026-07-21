@@ -1227,7 +1227,158 @@ some_library.SomeClass.method = hacked_method
 
 → 동적 언어(Python/JS/Ruby)의 공통 능력.
 
-**키워드**: `#MonkeyPatching` `#런타임조작` `#메타프로그래밍` `#메서드교체` `#독스트링변경` `#후크` `#데코레이터본질` `#__bases__변경` `#테스트Mock` `#Java불가` `#consentingadults`
+#### E.9.9 네임스페이스와 C# Partial Class
+
+> 브로 질문: "파이썬에 '네임스페이스'란 개념이 있나? 그리고 C# partial class 같은 게 가능한가?"
+> 브로 자답: "동적 타이핑이니 런타임에 넣어도 되겠네?" → **정답!**
+
+##### 파이썬의 네임스페이스 = 딕셔너리
+
+파이썬에 네임스페이스는 **공식 개념**. 그리고 모두 **딕셔너리로 구현**돼 있음.
+
+```python
+# 4가지 네임스페이스
+# 1. Built-in (내장) — 인터프리터 시작 시
+print, len, int, str        # builtins 모듈
+
+# 2. Global/Module (모듈) — 모듈 로드 시
+PI = 3.14                   # 이 모듈의 전역
+import numpy as np          # np도 전역
+
+# 3. Class (클래스) — class 정의 실행 시
+class Variable:
+    count = 0               # Variable.count
+
+# 4. Local (함수) — 함수 호출 시 생성, 종료 시 소멸
+def foo():
+    x = 1                   # foo의 local
+```
+
+**핵심**: 각 네임스페이스는 딕셔너리로 구현.
+```python
+print(type(Variable.__dict__))   # <class 'mappingproxy'> (읽기 전용 dict)
+print(type(globals()))           # <class 'dict'>
+```
+
+**LEGB 룰 = 네임스페이스 탐색 순서** (exploration_01 A.2.4 참조):
+```
+L - Local → E - Enclosing → G - Global → B - Built-in
+```
+
+##### C# Partial Class vs 파이썬 — 런타임으로 흉내
+
+**C#은 컴파일 타임 partial**:
+```csharp
+// File1.cs
+public partial class Foo {
+    public void Method1() { ... }
+}
+// File2.cs
+public partial class Foo {
+    public void Method2() { ... }
+}
+// 컴파일 시 하나로 합쳐짐
+```
+
+**파이썬은 런타임에 그냥 추가** (Monkey Patching과 같은 메커니즘):
+```python
+# file1.py
+class Foo:
+    def method1(self):
+        return "method1"
+
+# file2.py
+from file1 import Foo
+
+def method2(self):
+    return "method2"
+
+Foo.method2 = method2      # ← 런타임에 추가!
+
+f = Foo()
+print(f.method1())         # "method1"
+print(f.method2())         # "method2" ← partial처럼 동작!
+```
+
+→ 브로 자답 정답: "동적 타이핑이니 런타임에 넣어도 되겠네" → 정확함!
+
+##### 더 세련된 방법 — Mixin으로 확장
+
+```python
+class VariableCore:
+    def __init__(self, data):
+        self.data = data
+
+class VariableOpsMixin:
+    def square(self):
+        return self.data ** 2
+
+# 런타임에 Mixin의 메서드들을 추가
+for name, method in VariableOpsMixin.__dict__.items():
+    if not name.startswith('_'):
+        setattr(VariableCore, name, method)
+
+v = VariableCore(3)
+print(v.square())          # 9
+```
+
+##### 가장 pythonic한 방법 — 다중 상속
+
+```python
+class VariableCore:
+    def __init__(self, data):
+        self.data = data
+
+class VariableOps:
+    def square(self):
+        return self.data ** 2
+
+class Variable(VariableCore, VariableOps):
+    pass
+
+v = Variable(3)
+print(v.square())          # 9
+```
+
+→ 파이썬에선 partial이 **필요 없음**. 다중 상속이나 Mixin으로 자연스럽게 같은 효과.
+
+##### "언제든 어디든 추가/수정 가능"의 함정
+
+```python
+# 모듈 전역 네임스페이스
+globals()['new_var'] = 42
+print(new_var)             # 42
+
+# 클래스 네임스페이스
+class Foo: pass
+setattr(Foo, 'new_method', lambda self: "새 메서드")
+
+# 인스턴스 네임스페이스
+f = Foo()
+setattr(f, 'new_attr', 100)
+print(f.new_attr)          # 100
+```
+
+→ 전부 가능. 하지만 **위험**:
+```python
+import numpy as np
+np.array = lambda x: "해킹!"   # ← 전역 수정, numpy 전체 망가짐!
+```
+
+이래서 **"consenting adults"** 원칙이 중요. "기술적으로 가능은 하지만 하지 마".
+
+##### 다른 언어와 비교
+
+| 언어 | 네임스페이스 | Partial Class | 런타임 변경 |
+|---|---|---|---|
+| **Python** | 딕셔너리 (`__dict__`) | ❌ 없음 (Monkey Patching/Mixin으로 대체) | ✅ 자유로움 |
+| **C#** | 컴파일 타임 구조 | ✅ `partial` 키워드 | ❌ 제한적 |
+| **Java** | 컴파일 타임 패키지 | ❌ 없음 | ❌ 제한적 |
+| **C++** | 컴파일 타임 namespace | ❌ 없음 | ❌ 불가능 |
+
+→ C#이 `partial`이라는 **안전한 컴파일 타임** 도구를 제공하는 반면, 파이썬은 **런타임 자유**를 대신 줌.
+
+**키워드**: `#네임스페이스` `#__dict__` `#딕셔너리구현` `#LEGB` `#PartialClass` `#C#비교` `#Mixin` `#다중상속` `#런타임추가` `#globals()` `#setattr` `#consentingadults`
 
 ---
 
