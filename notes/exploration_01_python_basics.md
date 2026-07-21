@@ -256,6 +256,77 @@ print(type(t))   # <class 'TensorVariable'>  ← cls가 TensorVariable!
 
 **키워드**: `#classmethod` `#staticmethod` `#cls자동교체` `#팩토리메서드` `#상속` `#오버라이드`
 
+#### 💡 1.5 보충 2: 3종 메서드 — "무엇에 접근할 수 있는가" (질문에서 파생)
+
+**브로 질문**: "둘 다 인스턴스 레퍼런스는 받지 않는데, 한 놈은 클래스 자체에 대한 참조를 받는다?"
+
+→ **정확한 통찰**. 이걸 "접근 권한" 관점으로 명확히 정리.
+
+**3종 메서드 비교**:
+```python
+class MyClass:
+    name = "MyClass"      # 클래스 변수 (인스턴스가 공유)
+
+    def __init__(self, data):
+        self.data = data  # 인스턴스 변수 (각자 따로)
+
+    # 1. 인스턴스 메서드 (기본) - self로 인스턴스 참조
+    def instance_method(self):
+        return f"data={self.data}, name={self.name}"   # 둘 다 접근 OK
+
+    # 2. 클래스 메서드 - cls로 클래스 참조
+    @classmethod
+    def class_method(cls):
+        return f"name={cls.name}"
+        # cls.name OK, 하지만 cls.data는 의미 없음 (어느 인스턴스?)
+
+    # 3. 스태틱 메서드 - 아무 참조도 안 받음
+    @staticmethod
+    def static_method(data):
+        return isinstance(data, int)
+        # self/cls 불가, 입력(data)만으로 일함
+```
+
+**접근 권한 한눈에 보기**:
+
+| 메서드 종류 | 첫 인자 | 접근 가능 | 비유 |
+|---|---|---|---|
+| 인스턴스 메서드 | `self` | 인스턴스 변수 + 클래스 변수 | "나(this)에 대해 물어봐" |
+| 클래스 메서드 | `cls` | 클래스 변수만 | "우리 반(클래스)에 대해 물어봐" |
+| 스태틱 메서드 | (없음) | 둘 다 접근 불가, 입력만 | "난 그냥 여기 붙어있는 함수야" |
+
+**왜 스태틱 메서드를 쓰는가?** — "논리적 소속감" 때문
+```python
+# 스태틱 안 쓰면 (모듈 함수):
+def is_valid_variable_data(data): ...      # ❌ 어디 소속인지 모호
+is_valid_variable_data(some_data)
+
+# 스태틱으로 클래스에 넣으면:
+class Variable:
+    @staticmethod
+    def is_valid_data(data): ...           # ✅ "Variable 관련 검사" 명확
+Variable.is_valid_data(some_data)
+```
+
+→ 실제 동작은 일반 함수와 동일. "Variable과 관련 있다"는 것을 코드로 표현.
+
+**DeZero 실례** (앞으로 step02+에서 등장 예정):
+```python
+class Function:
+    def __call__(self, input):     # 인스턴스 메서드 (self로 상태 관리)
+        x = input.data
+        y = self.forward(x)        # forward 호출
+        ...
+
+    @staticmethod
+    def forward(x):                # 스태틱 (self/cls 불필요, 순수 변환)
+        return x ** 2              # Square에서 오버라이드
+```
+
+→ Function은 forward를 "입력 → 출력의 순수 변환"으로 모델링했기 때문에 스태틱 사용.
+
+**키워드**: `#3종메서드` `#접근권한` `#self` `#cls` `#논리적소속감` `#순수함수`
+
 ---
 
 ### 1.6 Python에 "primitive type"이 있나요? (박싱 비유 깊이) 🐍
