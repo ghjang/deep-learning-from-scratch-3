@@ -17,15 +17,11 @@
 - **B. Python 캡슐화와 접근 제어**
   - [B.1 `public`/`protected`/`private` 관례](#b1-publicprotectedprivate-관례-)
   - [B.2 게터/세터와 `@property`](#b2-게터세터와-property)
-- **C. Python 문법과 이디엄**
-  - [C.1 데코레이터(`@`)](#c1-데코레이터-)
-  - [C.2 f-string (포맷팅)](#c2-f-string-포맷팅)
-  - [C.3 `==` vs `is`](#c3--vs-is)
-  - [C.4 "primitive"와 박싱 — Python의 객체 철학](#c4-primitive와-박싱--python의-객체-철학)
-  - [C.5 파이썬은 진짜 편한가?](#c5-파이썬은-진짜-편한가)
-- **D. 프레임워크 디자인**
-  - [D.1 왜 프레임워크들은 다 Variable/Tensor 래퍼를 쓸까](#d1-왜-프레임워크들은-다-variabletensor-래퍼를-쓸까)
-  - [D.2 `is_simple_core` 학습용 스위치](#d2-is_simple_core-학습용-스위치)
+- **C. 프레임워크 디자인**
+  - [C.1 왜 프레임워크들은 다 Variable/Tensor 래퍼를 쓸까](#c1-왜-프레임워크들은-다-variabletensor-래퍼를-쓸까)
+  - [C.2 `is_simple_core` 학습용 스위치](#c2-is_simple_core-학습용-스위치)
+
+> **Python 문법/이디엄 (데코레이터, f-string, lambda 등)**: [exploration_07_syntax_idioms.md](./exploration_07_syntax_idioms.md)
 
 > **NumPy 기본**은 별도 탐구로 분리됨: [exploration_02_numpy_basics.md](./exploration_02_numpy_basics.md)
 > **PEP/C3 등 공통 용어**는 [notes/README.md 공통 용어 안내](./README.md#📖-공통-용어-안내-모든-탐구에서-인용) 참조.
@@ -975,9 +971,9 @@ class Variable:
 
 ---
 
-## D. 프레임워크 디자인
+## C. 프레임워크 디자인
 
-### D.1 왜 프레임워크들은 다 Variable/Tensor 래퍼를 쓸까
+### C.1 왜 프레임워크들은 다 Variable/Tensor 래퍼를 쓸까
 
 **요약**: 순수 ndarray엔 **"이 데이터가 어떤 연산에서 왔는지" 추적 기능이 없음**. 역전파/자동 미분을 위해 **메타정보를 붙일 그릇**이 필요 → 모든 주류 프레임워크가 래퍼 채택.
 
@@ -1005,7 +1001,7 @@ class Variable:
 
 ---
 
-### D.2 `is_simple_core` 학습용 스위치
+### C.2 `is_simple_core` 학습용 스위치
 
 **요약**: 책은 **학습 진도에 따라 같은 클래스의 다른 버전**을 보여줌. 초반(step01~22)은 단순 버전(`core_simple`), 후반(step33+)은 완전한 버전(`core`). `is_simple_core`는 어느 쪽을 import할지 선택하는 학습용 스위치.
 
