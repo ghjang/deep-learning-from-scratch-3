@@ -167,6 +167,49 @@ print(f"[{label:>10}] data={x.data!s:>10}  ndim={x.data.ndim}")
 
 **키워드**: `#f-string` `#format` `#포맷팅` `#중괄호표현식` `#Python36` `#PEP498`
 
+#### 💡 1.4 보충 2: f-string vs JS 템플릿 리터럴 + 정렬 기호 (질문에서 파생)
+
+**브로 질문**: "f문자열은 JS의 템플레이티드 스트링 따라온 건가? `>`는 우측 정렬?"
+
+**요약**: 둘 다 정확히 맞음. JS 템플릿 리터럴(ES6/2015)이 1년 먼저 도입, Python f-string(3.6/2016)이 형태만 약간 바꿔 따라옴.
+
+**비교표**:
+| | Python f-string | JS 템플릿 리터럴 |
+|---|---|---|
+| 문법 | `f"...{expr}..."` | `` `...${expr}...` `` |
+| 도입 | Python 3.6 (2016) | ES6 (2015) |
+| 표현식 | `{x + 1}` | `${x + 1}` |
+
+```python
+# Python
+name = "브로"
+f"안녕 {name}, 나이 {30 + 1}"        # "안녕 브로, 나이 31"
+```
+```javascript
+// JavaScript
+const name = "브로";
+`안녕 ${name}, 나이 ${30 + 1}`        // "안녕 브로, 나이 31"
+```
+
+**정렬 기호** (`{값:정렬기호폽}` 형식):
+```python
+x = "abc"
+f"[{x:>10}]"     # [       abc]  폭 10, 우측 정렬 (>)
+f"[{x:<10}]"     # [abc       ]  폭 10, 좌측 정렬 (<, 기본)
+f"[{x:^10}]"     # [   abc    ]  폭 10, 가운데 정렬 (^)
+f"[{x:_>10}]"    # [_______abc]  폭 10, 우측 정렬, 빈칸을 _로 채움
+```
+
+| 기호 | 의미 |
+|---|---|
+| `>` | 우측 정렬 (right-align) |
+| `<` | 좌측 정렬 (기본값) |
+| `^` | 가운데 정렬 (center) |
+
+→ 브로가 `inspect()`에서 쓴 `{label:>10}` = "label을 폭 10에 우측 정렬"
+
+**키워드**: `#f-string` `#JS템플릿리터럴` `#ES6` `#정렬` `#폭지정` `#포맷팅`
+
 ---
 
 ### 1.5 `@staticmethod`, `@classmethod`가 뭔가요? 🐍
@@ -523,8 +566,157 @@ if x == None:    # X (비권장)
 
 ---
 
+### 1.13 데코레이터(`@`) — 왜 DeZero 책엔 `@staticmethod`가 없을까? 🐍
+
+**브로 질문**: "책 속 코드에 `@staticmethod` 안 나와. 설마 파이썬에 없었나? 일부러 뺀 건가?"
+
+**요약**: **3가지 다 맞음**. `@staticmethod`는 **데코레이터**. DeZero 책이 안 쓴 건 (a) 코드 단순화, (b) 학습 곡선 완화, (c) 동작 차이 없기 때문.
+
+#### 데코레이터란?
+
+`@`로 시작하는 것들. "함수를 인자로 받아 새로운 함수를 반환하는 함수"를 간결하게 적용하는 문법. PEP 318 (2004년, Python 2.4)에서 도입.
+
+```python
+@staticmethod
+def forward(x):
+    return x ** 2
+
+# 위는 아래의 설탕(syntactic sugar) — 의미 동일
+def forward(x):
+    return x ** 2
+forward = staticmethod(forward)
+```
+
+#### DeZero 원본 확인 (브로가 발견한 것 검증)
+
+```bash
+$ grep -E "@staticmethod|@classmethod" dezero/core.py dezero/core_simple.py
+# (결과 없음 — 전부 인스턴스 메서드로 구현됨)
+```
+
+원본 `steps/step02.py`의 Function:
+```python
+class Function:
+    def __call__(self, input):       # 인스턴스 메서드 (self 받음)
+        x = input.data
+        y = self.forward(x)
+        ...
+
+    def forward(self, in_data):      # 인스턴스 메서드 (self 받음)
+        raise NotImplementedError()
+
+class Square(Function):
+    def forward(self, x):            # 인스턴스 메서드로 오버라이드
+        return x ** 2
+```
+
+#### 왜 책이 안 썼을까?
+
+| 이유 | 설명 |
+|---|---|
+| **A. 코드 단순화** | 학습서 목적상 "Function 구조"가 핵심이지 "데코레이터 활용"이 아님 |
+| **B. 학습 곡선** | 데코레이터는 "함수를 인자로 받는 함수" 개념 필요. 초중급에게 가파름 |
+| **C. 동작 차이 없음** | `forward(self, x)`나 `@staticmethod forward(x)`나 결과 동일 |
+
+#### rezero는?
+
+**추천: 책 스타일 그대로 (전부 인스턴스 메서드)**. 책 비교하며 읽기 좋고, 이해한 뒤 변형 실험은 언제든 가능.
+
+```python
+# 책 스타일 (rezero 추천)
+class Function:
+    def forward(self, x): ...     # self 받음
+
+# 현대 Pythonic 스타일 (변형 실험용)
+class Function:
+    @staticmethod
+    def forward(x): ...           # self 안 받음, 순수 함수
+```
+
+**키워드**: `#데코레이터` `#@staticmethod` `#PEP318` `#설탕` `#Python24` `#학습서철학`
+
+---
+
+### 1.14 Python의 접근 권한 — public/protected/private 🐍
+
+**브로 질문**: "파이썬에서 멤버 액세스 접근 권한 제어도 하낙? public/protected/private?"
+
+**요약**: **Python엔 진짜 접근 제어자가 없음**. 관례(밑줄 개수)로 표현. "consenting adults" (어른들의 합의) 원칙.
+
+#### 3단계 관례
+
+```python
+class MyClass:
+    def __init__(self):
+        self.public_var = "누구나 접근 OK"              # public
+        self._protected_var = "살짝 숨김 (관례)"          # protected
+        self.__private_var = "이름으로 숨김 (맹글링)"     # private
+
+    def public_method(self): ...                        # public
+    def _protected_method(self): ...                    # protected
+    def __private_method(self): ...                     # private
+```
+
+#### 동작 차이
+
+```python
+obj = MyClass()
+
+# 1. public — 막 접근 가능
+print(obj.public_var)         # ✅ OK
+
+# 2. protected (밑줄 1개) — "관례상" 접근 자제, 문법적 강제 없음
+print(obj._protected_var)     # ✅ 동작은 함 (경고 없음)
+                              # "이건 내부용이야"라는 암묵적 합의
+
+# 3. private (밑줄 2개) — 실제로 이름이 변조됨 (네임 맹글링)
+print(obj.__private_var)      # ❌ AttributeError
+print(obj._MyClass__private_var)  # ✅ 이렇게는 접근 가능 (비권장)
+```
+
+#### "consenting adults" 원칙
+
+Python 철학: "우리 모두 어른이니까, 밑줄 보고 알아서 하자". 강제하지 않고 관례에 맡김.
+
+```python
+# Java/C#처럼 캡슐화 강제 안 됨
+class BankAccount:
+    def __init__(self, balance):
+        self.__balance = balance     # private 시도 (네임 맹글링)
+
+account = BankAccount(1000)
+# account.__balance = 9999999999    # 의도: 막아야 함
+# 실제: _BankAccount__balance로 접근 우회 가능 (관례만 지킬 뿐)
+```
+
+#### 비교표 — Java/C# vs Python
+
+| | Java/C# | Python |
+|---|---|---|
+| `public` | 문법적 키워드 | (밑줄 없음, 기본값) |
+| `protected` | 문법적 키워드 | `_변수명` (밑줄 1개, 관례) |
+| `private` | 문법적 키워드 | `__변수명` (밑줄 2개, 네임 맹글링) |
+| 강제력 | 컴파일러가 강제 | 없음, 전적으로 관례 |
+| 접근 방지 | 불가능 (리플렉션 제외) | 관례 안 지키면 접근 가능 |
+
+#### rezero Variable에 적용?
+
+지금은 전부 public:
+```python
+class Variable:
+    def __init__(self, data):
+        self.data = data       # public
+```
+
+책도 이대로 가. PyTorch 실제 구현은 `_data`, `__grad` 등으로 내부 변수 관리하지만,
+학습 단계에선 public이 읽기 편함. 나중에 (step16+ 메모리 관리 쯤) `_` 관례 시도해볼 수 있음.
+
+**키워드**: `#접근권한` `#public` `#protected` `#private` `#네임맹글링` `#consentingadults` `#관례`
+
+---
+
 **학습 완료일**: 2026-07-21
-**총 주제 수**: 12개 (Python 기본 6, NumPy 3, 프레임워크 2, 비교 1)
+**총 주제 수**: 14개 (Python 기본 8, NumPy 3, 프레임워크 2, 비교 1)
 **다음 step**: step02 (Function 도입) — 여기서 배운 `__call__`, `@staticmethod`가 바로 등장!
 
 ---
