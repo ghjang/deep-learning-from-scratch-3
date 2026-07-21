@@ -1,4 +1,4 @@
-# 🧪 보충 탐구 #1 — Python 클래스 / NumPy / 프레임워크 기본기
+# 🧪 보충 탐구 #1 — Python 클래스 / 캡슐화 / 문법 이디엄 / 프레임워크 디자인
 
 > **step01 직후 보충 학습** (2026-07-21)
 > step 진도 외에 파이썬/NumPy/프레임워크 등 깊이 파고 싶었던 주제들 정리.
@@ -23,13 +23,11 @@
   - [C.3 `==` vs `is`](#c3--vs-is)
   - [C.4 "primitive"와 박싱 — Python의 객체 철학](#c4-primitive와-박싱--python의-객체-철학)
   - [C.5 파이썬은 진짜 편한가?](#c5-파이썬은-진짜-편한가)
-- **D. NumPy 기본**
-  - [D.1 `ndarray` 내부 구조](#d1-ndarray-내부-구조)
-  - [D.2 `shape` vs `size` vs `ndim`](#d2-shape-vs-size-vs-ndim)
-  - [D.3 0차원 스칼라 — `np.array(1.0)`이 0차원인 이유](#d3-0차원-스칼라--nparray10이-0차원인-이유)
-- **E. 프레임워크 디자인**
-  - [E.1 왜 프레임워크들은 다 Variable/Tensor 래퍼를 쓸까](#e1-왜-프레임워크들은-다-variabletensor-래퍼를-쓸까)
-  - [E.2 `is_simple_core` 학습용 스위치](#e2-is_simple_core-학습용-스위치)
+- **D. 프레임워크 디자인**
+  - [D.1 왜 프레임워크들은 다 Variable/Tensor 래퍼를 쓸까](#d1-왜-프레임워크들은-다-variabletensor-래퍼를-쓸까)
+  - [D.2 `is_simple_core` 학습용 스위치](#d2-is_simple_core-학습용-스위치)
+
+> **NumPy 기본**은 별도 탐구로 분리됨: [exploration_02_numpy_basics.md](./exploration_02_numpy_basics.md)
 
 ---
 
@@ -797,91 +795,9 @@ $ python
 
 ---
 
-## D. NumPy 기본
+## D. 프레임워크 디자인
 
-### D.1 `ndarray` 내부 구조
-
-**요약**: `ndarray`는 **C 구조체 + 연속 메모리 블록** 기반. 파이썬 객체는 얇은 헤더(메타정보)만 가지고, 실제 데이터는 C 배열에. 이래서 빠름.
-
-```python
-arr = np.array([[1.0, 2.0], [3.0, 4.0]])
-# 내부 구조 (단순화):
-# ┌────────────────────┐
-# │ ndarray 헤더        │  ← shape, dtype, strides 등 메타 (파이썬 객체)
-# ├────────────────────┤
-# │ 1.0 │ 2.0 │ 3.0 │ 4.0 │  ← 연속 C 메모리 (진짜 데이터)
-# └────────────────────┘
-print(arr.shape)     # (2, 2)  ← 헤더 정보
-print(arr.dtype)     # float64
-print(arr.strides)   # (16, 8)  ← 각 축 이동 시 바이트 수
-```
-
-- `strides`: 다음 요소로 가는 바이트 오프셋. (16, 8) = 행 이동 16바이트, 열 이동 8바이트
-- 이 구조 덕분에 `reshape`, `transpose`가 **데이터 복사 없이** 메타만 바꿔서 O(1)로 동작
-- 고차원 배열도 메모리는 **1차원 평탄화**되어 저장. shape/strides로 다차원 해석
-
-**키워드**: `#ndarray` `#C기반` `#strides` `#연속메모리` `#dtype` `#헤더`
-
----
-
-### D.2 `shape` vs `size` vs `ndim`
-
-**요약**: 셋 다 배열의 "형태"를 묘사하지만 다른 정보. 외워두면 NumPy 생활이 편해짐.
-
-```python
-arr = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
-
-print(arr.ndim)     # 2          ← 차원 수 (축 개수)
-print(arr.shape)    # (2, 3)     ← 각 축의 크기 튜플
-print(arr.size)     # 6          ← 전체 원소 수 = prod(shape)
-
-# 관계: size == shape 원소들의 곱
-# (2, 3) → 2 * 3 = 6
-# (2, 3, 4) → 24
-
-# 다른 예
-np.array(5).shape          # ()      0차원
-np.array([1,2,3]).shape    # (3,)    1차원 (길이 3)
-np.array([[1],[2]]).shape  # (2, 1)  2차원
-```
-
-- `ndim` = `len(shape)` (항상)
-- `size` = `prod(shape)` (항상)
-- DeZero에선 보통 `shape`을 많이 씀 (레이어 출력 형태 맞출 때)
-
-**키워드**: `#shape` `#size` `#ndim` `#형태정보` `#prod`
-
----
-
-### D.3 0차원 스칼라 — `np.array(1.0)`이 0차원인 이유
-
-**요약**: 수학에서 **스칼라**는 0차원. "축"이 없는 단일 값. NumPy는 이 수학적 정의를 그대로 따름. 괄호를 하나 감쌀 때마다 차원이 1씩 증가.
-
-```python
-# 괄호 수 = 차원 수
-np.array(5)             # 0차원, shape ()
-np.array([5])           # 1차원, shape (1,)
-np.array([[5]])         # 2차원, shape (1, 1)
-np.array([[[5]]])       # 3차원, shape (1, 1, 1)
-# 전부 "원소는 5 하나"지만 차원이 다름
-
-# 수학 대응:
-#   스칼라   → 0차원   5
-#   벡터    → 1차원   [1, 2, 3]
-#   행렬    → 2차원   [[1,2],[3,4]]
-#   텐서    → 3차원+  이미지, 시계열 등
-```
-
-- DeZero 초반(step01~step40)은 스칼라/벡터(0~1차원) 위주
-- step41+에서 텐서(2차원+) 다루기 시작. VGG16 같은 CNN은 4차원(N, C, H, W).
-
-**키워드**: `#스칼라` `#0차원` `#괄호수` `#수학대응`
-
----
-
-## E. 프레임워크 디자인
-
-### E.1 왜 프레임워크들은 다 Variable/Tensor 래퍼를 쓸까
+### D.1 왜 프레임워크들은 다 Variable/Tensor 래퍼를 쓸까
 
 **요약**: 순수 ndarray엔 **"이 데이터가 어떤 연산에서 왔는지" 추적 기능이 없음**. 역전파/자동 미분을 위해 **메타정보를 붙일 그릇**이 필요 → 모든 주류 프레임워크가 래퍼 채택.
 
@@ -909,7 +825,7 @@ class Variable:
 
 ---
 
-### E.2 `is_simple_core` 학습용 스위치
+### D.2 `is_simple_core` 학습용 스위치
 
 **요약**: 책은 **학습 진도에 따라 같은 클래스의 다른 버전**을 보여줌. 초반(step01~22)은 단순 버전(`core_simple`), 후반(step33+)은 완전한 버전(`core`). `is_simple_core`는 어느 쪽을 import할지 선택하는 학습용 스위치.
 
@@ -932,9 +848,10 @@ else:
 ---
 
 **학습 완료일**: 2026-07-21
-**총 주제 수**: 16개
+**총 주제 수**: 13개
 - A. Python 클래스 기본: 5개 (self, 멤버변수/룩업, dunder, class 상속, 메서드 3종)
 - B. 캡슐화: 2개 (접근권한, @property)
 - C. 문법/이디엄: 5개 (데코레이터, f-string, == vs is, 박싱, 파이썬 철학)
-- D. NumPy: 3개 (ndarray 내부, shape/size/ndim, 0차원)
-- E. 프레임워크: 2개 (래퍼 패턴, is_simple_core)
+- D. 프레임워크: 2개 (래퍼 패턴, is_simple_core)
+
+> NumPy 기본 (3종)은 [탐구 #2](./exploration_02_numpy_basics.md)로 분리됨.

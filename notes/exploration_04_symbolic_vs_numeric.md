@@ -1,4 +1,4 @@
-# 🧪 보충 탐구 #3 — Symbolic vs Numeric: sympy, PyTorch, 그리고 DeZero의 그래프
+# 🧪 보충 탐구 #4 — Symbolic vs Numeric: sympy, PyTorch, 그리고 DeZero의 그래프
 
 > **step01 직후 보충 학습 #3** (2026-07-21)
 > 브로가 2권 학습 중 sympy + manim으로 수식/애니메이션을 만들어본 경험에서 출발.
@@ -349,4 +349,4 @@ step09+:          plot_dot_graph — 계산 그래프 시각화 (Graphviz)
 - DeZero 시각화 함수: `dezero/utils.py`의 `plot_dot_graph`
 - sympy 공식: https://docs.sympy.org/
 - manim 공식: https://www.manim.community/
-- 탐구 #2 (백엔드): [exploration_02_backend_adapters.md](./exploration_02_backend_adapters.md)
+- 탐구 #3 (백엔드): [exploration_03_backend_adapters.md](./exploration_03_backend_adapters.md)
