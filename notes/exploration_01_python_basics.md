@@ -31,6 +31,49 @@
 
 ---
 
+## 📖 자주 인용하는 용어 안내
+
+이 탐구 노트들에서 반복적으로 등장하는 용어/표준을 미리 정리.
+
+### PEP (Python Enhancement Proposal)
+
+파이썬의 **"향상 제안서"**. 법률 발의안이나 RFC 같은 역할 — 파이썬을 어떻게 발전시킬지 공식 제안/토론/채택하는 문서. 누구나 쓸 수 있고, 번호가 붙어. 각 PEP는 보통 https://peps.python.org/pep-NNNN/ 형식으로 접근.
+
+| PEP | 제목 | 이 탐구에서 언급되는 곳 |
+|---|---|---|
+| **PEP 8** | Style Guide for Python Code | A.1 (self 관례), 전반적 코딩 스타일 |
+| **PEP 20** | The Zen of Python (`import this`) | C.5 (파이썬 철학) |
+| **PEP 227** | Nested Scopes — LEGB 규칙, 클래스 스코프 | A.2.4 (스코프와 룩업) |
+| **PEP 253** | C3 선형화 도입 (아래 참조) | A.2.4 (MRO) |
+| **PEP 318** | Decorators (`@staticmethod` 등) | C.1 (데코레이터) |
+| **PEP 498** | f-string (Python 3.6+) | C.2 (f-string) |
+
+→ "PEP N에 따르면..." 은 **"공식 표준이야"** 라는 뜻 (내 생각이 아니라).
+
+> 💡 **특히 PEP 8, PEP 20** 은 진짜 많이 인용되니 한 번 읽어보길 권장.
+
+### C3 선형화 (C3 Linearization)
+
+다중 상속에서 **MRO(메서드 결정 순서)를 계산하는 공식 알고리즘**. Dylan 언어에서 유래(1996), PEP 253으로 파이썬에 도입(Python 2.3+).
+
+**3가지 핵심 규칙**:
+1. 자식은 부모보다 먼저
+2. 상속 선언 순서 유지 (`class D(B, C)`면 B가 C보다 먼저)
+3. 부모의 MRO 보존
+
+세 규칙을 동시에 만족하는 순서가 하나일 때만 MRO 결정. 충돌하면 `TypeError`:
+```python
+class X(A, B): pass
+class Y(B, A): pass
+class Z(X, Y): pass   # ❌ TypeError — X는 A>B, Y는 B>A로 모순
+```
+
+→ **DeZero는 단일 상속만 쓰므로 C3 실질적无关**. 다만 "`__mro__`가 어떻게 정해지나?" 호기심에 대한 답.
+
+**키워드**: `#PEP` `#PEP8` `#PEP20` `#PEP227` `#PEP253` `#PEP318` `#PEP498` `#C3선형화` `#MRO` `#다중상속` `#Python표준`
+
+---
+
 ## A. Python 클래스 기본
 
 ### A.1 `self`와 인스턴스 메서드 🐍
