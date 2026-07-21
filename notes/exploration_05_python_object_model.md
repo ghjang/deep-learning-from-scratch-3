@@ -594,7 +594,7 @@ D.__mro__[0] = SomeOtherClass   # ❌ TypeError — MRO는 절대 바뀌면 안 
 **C3 규칙**:
 - 자식이 부모보다 먼저, 부모는 선언 순서대로, 충돌 시 TypeError
 - DeZero는 단일 상속만 쓰므로 MRO 단순 (`Variable → object`)
-- C3 알고리즘의 자세한 내용은 [exploration_01 용어 안내](./exploration_01_python_basics.md#📖-자주-인용하는-용어-안내) 참조
+- C3 알고리즘의 자세한 내용은 [notes/README 공통 용어 안내](./README.md#📖-공통-용어-안내-모든-탐구에서-인용) 참조
 
 #### B.1.2 리플렉션 — 런타임 순회
 
