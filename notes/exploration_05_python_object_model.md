@@ -521,6 +521,110 @@ class Layer:
 
 **키워드**: `#리플렉션` `#Reflection` `#__mro__` `#__bases__` `#__dict__` `#__name__` `#__subclasses__` `#__class__` `#getattr` `#setattr` `#hasattr` `#tuple` `#list` `#mutable` `#immutable` `#C3선형화` `#메타프로그래밍` `#Layerparams`
 
+### B.8 룩업 체계 전체 지도 — 파이썬엔 5가지가 있다
+
+> 브로 질문: "LEGB 룩업이랑 MRO 룩업 2개만 있는 거 아냐?"
+> → **아니요, 5가지!** 일상 코딩에선 2개가 90%라 그렇게 느껴질 뿐.
+
+#### 용어 정리 — "MRO 룩업"은 정확한 표현이 아님
+
+엄밀히 말해 MRO는 **"속성 룩업의 일부 단계"** 야. 전체 체계는 이렇게:
+
+| 브로 표현 | 공식/관용 명칭 | 발동 상황 |
+|---|---|---|
+| "LEGB 룩업" | **이름 룩업 (Name Lookup)** | `x` (점 없는 이름) |
+| "MRO 룩업" | **속성 룩업 (Attribute Lookup)**, MRO는 그 일부 | `obj.x`, `self.x`, `ClassName.x` |
+
+속성 룩업의 전체 단계:
+```
+self.x를 찾을 때:
+  1. 인스턴스 __dict__ 확인
+  2. 클래스 __dict__ 확인
+  3. 부모 클래스들 확인 ← 여기서 MRO 순서 사용!
+  4. 데이터 디스크립터 확인 (심화)
+  5. __getattr__ 정의돼 있으면 호출 (심화)
+```
+
+→ MRO는 3번 단계에서 부모를 탐색하는 순서. 그래서 "MRO 룩업"보다는 **"속성 룩업(MRO 사용)"** 이 정확.
+
+#### 파이썬의 5가지 룩업 체계
+
+**1️⃣ 이름 룩업 (Name Lookup) = LEGB**
+
+점(`.`) 없이 이름만 쓸 때. exploration_01 A.2.4 참조.
+```python
+def foo():
+    x = 1            # L에서 찾음
+    print(x)         # LEGB 순서
+```
+
+**2️⃣ 속성 룩업 (Attribute Lookup) = 인스턴스→클래스→MRO**
+
+점(`.`)으로 접근할 때. 위에서 설명한 5단계.
+```python
+obj.x
+# 1. obj.__dict__
+# 2. type(obj).__dict__ + MRO 순회
+# 3. (심화) descriptor 확인
+# 4. (심화) __getattr__ 호출
+```
+→ DeZero의 `self.data` 접근이 여기 해당.
+
+**3️⃣ 인덱스 룩업 (Index Lookup)**
+
+대괄호 `obj[key]`로 접근할 때. `__getitem__` 메서드가 발동.
+```python
+lst = [1, 2, 3]
+lst[0]              # 내부적으로 lst.__getitem__(0) 호출
+
+d = {"a": 1}
+d["a"]              # __getitem__("a")
+```
+→ DeZero step21의 `F.get_item(x, 0)`이 결국 이거.
+
+**4️⃣ 임포트 룩업 (Import Lookup)** — 모듈 시스템
+
+`import numpy` 할 때 파이썬이 모듈을 찾는 과정.
+```python
+import numpy        # 파이썬이:
+                    # 1. sys.modules에 있나? (캐시)
+                    # 2. sys.path의 각 디렉토리에 있나?
+                    # 3. 없으면 ModuleNotFoundError
+```
+
+**5️⃣ (심화) 디스크립터 룩업 (Descriptor Lookup)**
+
+`@property`, `@staticmethod` 등이 동작하는 핵심 메커니즘. 클래스 레벨에서 속성 접근을 가로챔.
+```python
+class C:
+    @property
+    def x(self):           # 이건 일반 메서드가 아니라 descriptor
+        return self._x
+
+c = C()
+c.x                        # 단순 속성 룩업처럼 보이지만
+                            # 실제론 C.x.__get__(c, C) 호출
+```
+→ 이 탐구 C 섹션(향후 추가)에서 다룰 주제. `@property`의 진실.
+
+#### 한눈에 정리
+
+| 룩업 종류 | 발동 상황 | 예 | 관련 __dunder__ |
+|---|---|---|---|
+| **이름 (LEGB)** | 점 없는 이름 | `x` | (없음) |
+| **속성 (MRO 사용)** | 점으로 접근 | `obj.x`, `self.x` | `__getattribute__`, `__getattr__` |
+| **인덱스** | 대괄호 접근 | `obj[key]` | `__getitem__` |
+| **임포트** | import 문 | `import numpy` | (모듈 시스템) |
+| **디스크립터** | 속성이 descriptor일 때 | `@property`, `@staticmethod` | `__get__`, `__set__` |
+
+#### 핵심 통찰
+
+- 일상 코딩에선 **1번(이름) + 2번(속성)** 이 90% → 그래서 2개로 느껴짐
+- DeZero를 끝까지 배우면 **3번(인덱스, step21) + 5번(디스크립터, @property)** 까지 다 다루게 됨
+- "파이썬은 사실 복잡한 룩업 체계를 가진 언어" — 브로가 직감한 게 정답
+
+**키워드**: `#룩업체계` `#NameLookup` `#AttributeLookup` `#IndexLookup` `#ImportLookup` `#DescriptorLookup` `#__getitem__` `#__getattribute__` `#__getattr__` `#5가지룩업`
+
 ---
 
 ## C. (향후 추가) Descriptor와 `@property` 내부
