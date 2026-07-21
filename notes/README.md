@@ -7,7 +7,8 @@
 
 | # | 파일 | 시점 | 주제 |
 |---|---|---|---|
-| 1 | [exploration_01_python_basics.md](./exploration_01_python_basics.md) | step01 직후 | Python 클래스 / NumPy / 프레임워크 기본기 (12가지) |
+| 1 | [exploration_01_python_basics.md](./exploration_01_python_basics.md) | step01 직후 | Python 클래스 / NumPy / 프레임워크 기본기 (16가지) |
+| 2 | [exploration_02_backend_adapters.md](./exploration_02_backend_adapters.md) | step01 직후 | 백엔드 어댑터: Variable을 CuPy/MLX로 확장한다면 (autograd, Define-by-Run, xp 패턴) |
 
 ## 📝 새 탐구 노트 작성 규칙
 
