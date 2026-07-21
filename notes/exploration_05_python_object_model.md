@@ -441,7 +441,100 @@ select = ["E", "F", "W", "I"]  # 기본 린트 규칙
 
 → **지금 당장은 Pylance만으로 충분**. 학습 진행하면서 필요해지면 ruff 도입 검토.
 
-**키워드**: `#상속` `#__dict__평평함` `#super().__init__` `#출처무관` `#이름충돌덮어쓰기` `#Java슬롯비교` `#private없음연결` `#Parameter상속` `#실수함정` `#린터` `#mypy` `#pylint` `#ruff` `#pyright` `#Pylance` `#정적분석` `#PEP20` `#관대한언어` `#도구선택가이드` `#ruff추천` `#uv와같은회사` `#결정트리`
+#### A.8.2 `typing` 모듈과 타입 힌트
+
+> 브로 질문: "typing이란 용어가 보였는데, 표준 모듈 같은 거?"
+> → **맞음! 파이썬 표준 모듈** (Python 3.5+, PEP 484). 타입 힌트용.
+
+##### 타입 힌트 — "표시용일 뿐, 런타임엔 영향 없음"
+
+```python
+def add(x: int, y: int) -> int:        # ← 타입 힌트
+    return x + y
+
+# 런타임엔 타입 검사 안 함!
+print(add("hello", "world"))   # "helloworld" ← 에러 안 남!
+```
+
+→ `int`라고 썼지만 문자열 넣어도 실행됨. 파이썬은 여전히 동적 타입.
+**진짜 역할**: pyright/mypy 같은 정적 분석 도구가 읽는 주석. (마치 `@override`, `@overload`와 같은 패턴!)
+
+##### 주요 도구들
+
+```python
+from typing import List, Dict, Optional, Tuple, Union, Callable, Any
+
+# 1. 컬렉션 타입
+def process(names: List[str]) -> None: ...   # 문자열 리스트
+def lookup(d: Dict[str, int]) -> int: ...    # 키 str, 값 int
+def coord(p: Tuple[float, float]) -> float: ...  # (x, y)
+
+# 2. Optional = "있거나 None"
+def find(name: str) -> Optional[int]: ...    # int 또는 None
+
+# 3. Union (여러 타입 가능)
+def foo(x: Union[int, str]) -> None: ...
+# Python 3.10+: x: int | str (더 간결)
+
+# 4. Callable (함수 타입)
+def apply(f: Callable[[int], int], x: int) -> int:
+    return f(x)
+
+# 5. Any (뭐든 됨, 타입 검사 포기)
+def debug(x: Any) -> None: ...
+```
+
+##### Python 3.9+: typing 없이 컬렉션 표현 가능
+
+```python
+# 이전 (3.5~3.8): typing 필수
+from typing import List, Dict
+def foo(x: List[int], y: Dict[str, int]): ...
+
+# Python 3.9+: 내장 타입 그대로!
+def foo(x: list[int], y: dict[str, int]): ...   # 같은 의미
+```
+
+→ 우리 프로젝트는 Python 3.13이라 `list[int]`, `dict[str, int]` 그대로 쓰면 됨.
+
+##### `typing`에서 자주 쓰는 것들 정리
+
+| 도구 | 의미 | 예 |
+|---|---|---|
+| `Optional[T]` | `T` 또는 `None` | `Optional[int]` |
+| `Union[A, B]` | `A` 또는 `B` | `Union[int, str]` (또는 `int \| str`) |
+| `Tuple[A, B]` | 고정 길이 튜플 | `Tuple[float, float]` |
+| `Callable[...]` | 함수 타입 | `Callable[[int], int]` |
+| `Any` | 뭐든 됨 | `Any` |
+| `TypeVar` | 제네릭 | `T = TypeVar('T')` |
+| `Protocol` | 구조적 타이핑 | (심화) |
+| `@overload` | 타입 힌트용 다중 시그니처 | exploration_01 C.1.4 참조 |
+| `@override` | 오버라이드 표시 (3.12+) | exploration_01 C.1.3 참조 |
+
+##### DeZero와 우리 프로젝트
+
+- DeZero 책은 **타입 힌트 안 씀** (학습 목적, 단순함)
+- 실전 프레임워크(PyTorch 등)는 타입 힌트 적극 사용
+  ```python
+  # PyTorch 실제 예시
+  def forward(self, x: Tensor) -> Tensor:
+      return self.linear(x)
+  ```
+- 우리 프로젝트 추천: 학습 단계에선 안 씀, 나중에 실험적으로 도입
+
+##### 핵심 — `typing`과 정적 분석 도구의 관계
+
+```
+typing 모듈 (타입 힌트 표현)
+       ↓ 읽음
+정적 분석 도구 (pyright/mpy)
+       ↓ 검증
+런타임 (파이썬 인터프리터) ← 영향 없음
+```
+
+→ `typing` + pyright/myq가 함께 쓰일 때 진짜 가치. 혼자선 의미 없음.
+
+**키워드**: `#typing` `#타입힌트` `#PEP484` `#런타임무시` `#Optional` `#Union` `#Callable` `#Any` `#TypeVar` `#Python39내장타입` `#pyright와함께` `#@overload` `#@override`
 
 ---
 
