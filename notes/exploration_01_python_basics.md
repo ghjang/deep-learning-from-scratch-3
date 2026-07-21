@@ -120,6 +120,53 @@ print(len(x))    # __len__ 호출
 
 **키워드**: `#dunder목록` `#연산자오버로딩` `#__repr__` `#__add__` `#__call__`
 
+#### 💡 1.4 보충: f-string `f"..."` 이 뭐예요? (질문에서 파생)
+
+**요약**: f는 **f**ormat의 약자. Python 3.6+ 도입. 중괄호 `{}` 안에 **파이썬 표현식**을 넣어 문자열에 값 끼워넣기. 현대 Python의 국룰.
+
+```python
+name = "브로"
+age = 30
+
+# ❌ 일반 문자열 — {name}이 그냥 문자로 출력
+"안녕 {name}"          # "안녕 {name}"
+
+# ✅ f-string — {name}이 파이썬 코드로 실행되어 값 치환
+f"안녕 {name}"         # "안녕 브로"
+
+# 변수, 연산, 메서드 호출 전부 가능
+x = 5
+f"x² = {x**2}"                   # "x² = 25"
+f"대문자: {name.upper()}"         # "대문자: 브로" (한글이라 변화 없음)
+f"{x = }"                        # "x = 5"  (Python 3.8+ 디버깅 모드)
+
+# 포맷 지정
+pi = 3.14159265
+f"π = {pi:.2f}"                  # "π = 3.14"          소수점 2자리
+f"π = {pi:>10.4f}"               # "π =     3.1416"    폭 10, 소수점 4자리
+```
+
+**역사적 순서** (왜 f-string이 국룰인지):
+```python
+# 1. %-formatting (C 스타일, 옛날)
+"이름: %s" % name
+
+# 2. str.format() (Python 2.6+)
+"이름: {}".format(name)
+
+# 3. f-string (Python 3.6+) ⭐ 현대 국룰, 가장 빠르고 읽기 쉬움
+f"이름: {name}"
+```
+
+**rezero 코드에서 쓴 곳** (`rezero/steps/step01.py`의 `inspect()`):
+```python
+print(f"[{label:>10}] data={x.data!s:>10}  ndim={x.data.ndim}")
+#     {label:>10}   → label 값, 우측 정렬, 폭 10
+#     {x.data!s}    → !s는 str()로 변환 (ndarray를 문자열로)
+```
+
+**키워드**: `#f-string` `#format` `#포맷팅` `#중괄호표현식` `#Python36` `#PEP498`
+
 ---
 
 ### 1.5 `@staticmethod`, `@classmethod`가 뭔가요? 🐍
@@ -149,6 +196,65 @@ x2 = Variable.class_method(np.array(1.0))
 - DeZero의 `Function.forward`는 종종 `@staticmethod`로 선언됨 (self 없이 입력만 받기 위해).
 
 **키워드**: `#staticmethod` `#classmethod` `#데코레이터` `#self없음` `#팩토리`
+
+#### 💡 1.5 보충: classmethod vs staticmethod — 오버라이드 관점 (질문에서 파생)
+
+**브로 질문**: "classmethod는 하위 클래스에서 오버라이드 가능, staticmethod는 접근은 가능하지만 오버라이드 안 되는 형태?"
+
+**요약**: 절반 맞고 절반 틀림. **둘 다 오버라이드 가능**. 핵심 차이는 **`cls`가 자동 교체되는지**. classmethod는 자식 클래스에서 호출 시 `cls`가 자식으로 자동 바뀜. staticmethod는 클래스 정보 자체를 모름.
+
+```python
+class Animal:
+    name = "Animal"
+
+    @classmethod
+    def whoami(cls):               # cls = 호출한 클래스
+        return f"나는 {cls.name}"
+
+    @staticmethod
+    def breathe():                 # 클래스 정보 안 받음
+        return "숨 쉼"
+
+
+class Dog(Animal):
+    name = "Dog"                   # 오버라이드 (클래스 속성)
+
+# Animal에서 호출
+print(Animal.whoami())   # "나는 Animal"
+print(Animal.breathe())  # "숨 쉼"
+
+# Dog에서 호출 (Dog은 whoami/breathe 오버라이드 안 함)
+print(Dog.whoami())      # "나는 Dog"  ← cls가 Dog로 자동 교체!
+print(Dog.breathe())     # "숨 쉼"      ← 여전히 Animal 것 (클래스 정보 无)
+```
+
+**결정적 차이**:
+| | classmethod | staticmethod |
+|---|---|---|
+| 오버라이드 가능? | ✅ | ✅ |
+| 자식 호출 시 `cls` 자동 교체? | ✅ `cls`가 자식 클래스 | ❌ 클래스 정보 자체 不知 |
+| 주 용도 | 팩토리 메서드, 서브클래스 인식 | 단순 유틸 함수 |
+
+**classmethod가 빛나는 순간** (팩토리 메서드):
+```python
+class Variable:
+    def __init__(self, data):
+        self.data = data
+
+    @classmethod
+    def from_list(cls, lst):       # cls가 핵심!
+        return cls(np.array(lst))  # 서브클래스여도 올바른 타입 생성
+
+class TensorVariable(Variable):
+    pass
+
+t = TensorVariable.from_list([1, 2, 3])
+print(type(t))   # <class 'TensorVariable'>  ← cls가 TensorVariable!
+```
+
+→ 만약 `from_list`가 `@staticmethod`였다면 항상 `Variable`만 만들었을 것.
+
+**키워드**: `#classmethod` `#staticmethod` `#cls자동교체` `#팩토리메서드` `#상속` `#오버라이드`
 
 ---
 
