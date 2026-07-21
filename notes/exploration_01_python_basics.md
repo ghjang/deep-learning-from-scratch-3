@@ -344,7 +344,109 @@ print(len(x))    # __len__ 호출
 - `__len__`/`__getitem__`은 step21
 - `__call__`은 step02에서 Function이 사용! (검증됨, step02.py:10에 실제 있음)
 
-**키워드**: `#dunder` `#매직메서드` `#__init__` `#__new__` `#__repr__` `#__add__` `#__call__` `#자동호출`
+#### A.3.1 왜 전역 함수(`len`, `print`, ...)가 매직 메서드를 대신 호출할까?
+
+> 브로 질문: "왜 `__len__` 같은 매직 메서드를 직접 안 부르고 전역 함수를 쓰나? 이게 편한가?"
+
+**요약**: **가독성 + 일관성 + 프로토콜**. 매직 메서드를 직접 부르기보다 전역 함수가 대신 호출해주는 구조. 이게 pythonic 국룰.
+
+##### 전역 함수 ↔ 매직 메서드 대응표
+
+```python
+len(x)        # x.__len__()
+print(x)      # x.__str__() 또는 x.__repr__()
+str(x)        # x.__str__()
+repr(x)       # x.__repr__()
+abs(x)        # x.__abs__()
+bool(x)       # x.__bool__()
+iter(x)       # x.__iter__()
+next(x)       # x.__next__()
+hash(x)       # x.__hash__()
+```
+
+→ 전부 "전역 함수가 매직 메서드를 대신 호출"하는 패턴.
+
+##### 이유 1: 가독성 (Readability Counts)
+
+```python
+# ❌ 매직 메서드 직접 호출 (못 생김)
+if x.__len__() == 0: ...
+print(x.__str__())
+total = x.__add__(y)
+
+# ✅ 전역 함수/연산자 (읽기 쉬움)
+if len(x) == 0: ...
+print(x)
+total = x + y
+```
+
+→ 파이썬 철학(PEP 20: Readability counts)의 핵심.
+
+##### 이유 2: 일관성 — "길이를 가진 모든 것"에 동일 문법
+
+```python
+# Python — 전부 같은 문법!
+len([1, 2, 3])          # 3
+len("hello")            # 5
+len({"a": 1})           # 1
+len(np.array([1,2,3]))  # 3
+
+# Java — 전부 다름 (혼란)
+list.size()             // List 인터페이스
+string.length()         // String
+array.length            // 배열 (속성! 메서드 아님)
+```
+
+→ 파이썬 `len()`은 **"길이를 가진 모든 것"** 에 동작하는 통일된 인터페이스.
+
+##### 이유 3: 프로토콜 (오리 타이핑)
+
+`__len__` 정의하면 `len()` 프로토콜에 참여. 타입 무관:
+```python
+class MyContainer:
+    def __len__(self):
+        return 42
+
+len(MyContainer())    # 42 — 다른 타입이어도 __len__ 있으면 동작
+```
+
+##### 이유 4: 연산자 오버로딩과의 일관성
+
+```python
+x + y        # x.__add__(y)
+x == y       # x.__eq__(y)
+x in y       # y.__contains__(x)
+len(x)       # x.__len__()     ← 같은 패턴!
+```
+
+→ 연산자도 매직 메서드 호출. `len()`은 기호가 없어서 전역 함수로 제공되는 것뿐.
+
+##### bonus: `len()`은 왜 빠른가?
+
+```python
+lst = [1] * 1000000
+len(lst)     # O(1) — 내부 길이 필드 읽기, 원소 세지 않음!
+```
+
+→ CPython 최적화로 리스트/문자열 등은 길이를 캐싱. 매직 메서드 호출 오버헤드마저 없이 C 구조체의 길이 필드 바로 읽음.
+
+##### DeZero에서의 실전 (step19+ 예고)
+
+```python
+class Variable:
+    def __len__(self):           # 매직 메서드 정의
+        return len(self.data)
+
+    def __repr__(self):          # 매직 메서드 정의
+        return f"Variable(data={self.data})"
+
+x = Variable(np.array([1, 2, 3]))
+print(x)        # Variable(data=[1 2 3]) — print가 __str__ 호출
+len(x)          # 3 — len이 __len__ 호출
+# x.__len__()   # 비pythonic
+```
+
+**키워드**: `#dunder` `#매직메서드` `#전역함수` `#len` `#print` `#str` `#repr` `#프로토콜` `#오리타이핑` `#pythonic` `#가독성` `#일관성` `#연산자오버로딩` `#PEP20`
 
 ---
 
