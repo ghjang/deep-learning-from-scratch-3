@@ -10,7 +10,7 @@
 
 - [A. CPython 내부 구조 — 딕셔너리 기반 객체 모델](#a-cpython-내부-구조--딕셔너리-기반-객체-모델)
 - [B. 런타임 클래스 검사 (리플렉션) — `__mro__`, `__bases__`, `__dict__`](#b-런타임-클래스-검사-리플렉션--__mro__-__bases__-__dict__)
-- [C. (향후 추가) Descriptor와 `@property` 내부](#c-향후-추가-descriptor와-property-내부)
+- [C. Descriptor와 `@property` 내부 — 속성 접근을 가로채는 메커니즘](#c-descriptor와-property-내부--속성-접근을-가로채는-메커니즘)
 - [D. `__new__` vs `__init__` — 생성과 초기화의 분리](#d-__new__-vs-__init__--생성과-초기화의-분리)
 - [E. 함수도 객체, 클래스도 객체 — "모든 것이 객체"의 진짜 의미](#e-함수도-객체-클래스도-객체--모든-것이-객체의-진짜-의미)
 
@@ -825,16 +825,150 @@ c.x                        # 단순 속성 룩업처럼 보이지만
 
 ---
 
-## C. (향후 추가) Descriptor와 `@property` 내부
+## C. Descriptor와 `@property` 내부 — 속성 접근을 가로채는 메커니즘
 
 > `@property`가 실제로 어떻게 동작하는지 (descriptor protocol: `__get__`, `__set__`).
 > exploration_01 B.2의 심화.
 
-예정 주제:
-- `property()` 함수의 정체 (descriptor 반환)
-- `__get__`, `__set__`, `__delete__` 프로토콜
-- 커스텀 descriptor 만들기
-- DeZero의 Layer가 `__dict__` 순회하는 원리와 연결
+### C.1 Descriptor란? — "속성 접근을 가로채는 객체"
+
+**요약**: Descriptor는 `__get__`, `__set__`, `__delete__` 중 하나 이상을 정의한 객체. 클래스 속성으로 배치되면, 인스턴스에서 그 속성에 접근할 때 **단순 딕셔너리 조회 대신 descriptor 메서드가 호출**됨.
+
+```python
+class TenFold:
+    """읽을 때 10배로 반환하는 descriptor."""
+    def __get__(self, obj, objtype=None):
+        return 10
+
+class Foo:
+    x = TenFold()       # 클래스 속성으로 descriptor 배치
+
+f = Foo()
+print(f.x)              # 10 — 단순 조회가 아니라 __get__ 호출!
+```
+
+→ `f.x`가 `TenFold.__get__(f, Foo)`를 호출. 이게 descriptor의 핵심.
+
+### C.2 `@property`의 정체 — descriptor 만들기
+
+`@property`는 사실 **descriptor를 만들어주는 데코레이터**:
+
+```python
+class Variable:
+    def __init__(self, data):
+        self._data = data
+
+    @property
+    def data(self):           # getter
+        return self._data
+
+    @data.setter
+    def data(self, value):    # setter
+        if not isinstance(value, np.ndarray):
+            raise TypeError("ndarray여야 함")
+        self._data = value
+
+# 실제로 property는 descriptor 객체
+print(type(Variable.data))    # <class 'property'>
+```
+
+**`property`의 내부 (단순화)**:
+```python
+class property:
+    def __init__(self, fget=None, fset=None, fdel=None):
+        self.fget = fget
+        self.fset = fset
+        self.fdel = fdel
+
+    def __get__(self, obj, objtype=None):
+        if obj is None: return self
+        if self.fget is None: raise AttributeError
+        return self.fget(obj)      # getter 호출
+
+    def __set__(self, obj, value):
+        if self.fset is None: raise AttributeError
+        self.fset(obj, value)      # setter 호출
+
+    def setter(self, fset):
+        return type(self)(self.fget, fset, self.fdel)
+```
+
+→ `@property`로 만든 `data`는 사실 `property` 객체(= descriptor)로, `__get__`/`__set__`이 getter/setter를 호출하는 구조.
+
+### C.3 메서드도 descriptor다 — 자동 self 바인딩의 비밀
+
+B.6에서 "메서드도 속성 룩업"이라고 했는데, 여기가 진짜 비밀:
+
+```python
+class Foo:
+    def bar(self):
+        return "hello"
+
+# 함수는 기본적으로 __get__을 가짐 (descriptor!)
+print(hasattr(Foo.bar, '__get__'))   # True
+
+f = Foo()
+# f.bar 접근 시:
+# 1. Foo.__dict__['bar']에서 함수 찾음
+# 2. 함수.__get__(f, Foo) 호출 → bound method 생성 (self=f)
+# 3. 결과적으로 self가 자동 바인딩
+
+print(f.bar)              # <bound method Foo.bar of ...>
+print(Foo.bar)            # <function Foo.bar> (클래스에서 접근 시 미바인딩)
+```
+
+→ **함수 = descriptor**. 이래서 메서드가 자동으로 `self` 바인딩되는 거야. descriptor 없었으면 수동으로 `Foo.bar(f)` 해야 했을 것.
+
+### C.4 `@staticmethod` / `@classmethod`도 descriptor
+
+```python
+class Foo:
+    @staticmethod
+    def static_method():           # __get__이 self 바인딩 안 함
+        return "static"
+
+    @classmethod
+    def class_method(cls):         # __get__이 cls 바인딩
+        return cls.__name__
+
+# staticmethod/classmethod도 descriptor의 특수 형태
+# 둘 다 __get__을 가짐
+```
+
+→ 이래서 `@staticmethod`/`@classmethod`가 "데코레이터"인 동시에 "descriptor"인 거야.
+
+### C.5 데이터 Descriptor vs 비데이터 Descriptor
+
+| 종류 | 정의 | 우선순위 |
+|---|---|---|
+| **데이터 descriptor** | `__get__` + (`__set__` 또는 `__delete__`) | 인스턴스 `__dict__`보다 **우선** |
+| **비데이터 descriptor** | `__get__`만 (예: 함수, `@property` 읽기 전용) | 인스턴스 `__dict__`가 **우선** |
+
+→ 이 우선순위 차이가 속성 룩업(B.6 5단계)의 핵심이야.
+
+### C.6 DeZero와의 연결
+
+DeZero의 `Layer` 클래스가 `__dict__` 순회하며 Parameter를 수집하는데, 이때 descriptor 이해가 도움:
+
+```python
+class Layer:
+    def params(self):
+        for name, attr in self.__dict__.items():
+            if isinstance(attr, Parameter):
+                yield attr
+```
+
+→ Parameter가 descriptor였다면 더 우아한 패턴 가능했을 거야. 하지만 DeZero는 학습 목적이라 단순한 `__dict__` 순회 방식 채택.
+
+### C.7 핵심 통찰 요약
+
+1. **Descriptor** = 속성 접근을 가로채는 객체 (`__get__`/`__set__`/`__delete__`)
+2. **`@property`의 정체** = descriptor를 만드는 도구
+3. **메서드도 descriptor** — 이래서 자동 `self` 바인딩이 됨
+4. **데이터 vs 비데이터** 우선순위 차이가 룩업 체계의 핵심
+5. **DeZero는 학습 목적이라 descriptor 안 씀** — `@property` 정도만
+
+**키워드**: `#descriptor` `#__get__` `#__set__` `#property정체` `#메서드자동바인딩` `#데이터descriptor` `#비데이터descriptor` `#staticmethod정체` `#룩업체계핵심` `#DeZero연결`
 
 ---
 
@@ -910,10 +1044,11 @@ print(x.__dict__)     # {'data': 42} — 내부 딕셔너리 노출
 
 #### 이유 1: "consenting adults" (어른들의 합의)
 
-파이썬 철학: **"숨길 수는 있지만, 막지는 않는다"**.
-- `_name` (밑줄 1개): "내부용이야, 건드리지 마" (관례)
-- `__name` (밑줄 2개): 이름을 좀 비틀어 (`_ClassName__name`) 접근 어렵게 함
-- 하지만 둘 다 **기술적으로는 접근 가능**
+파이썬 철학: **"숨길 수는 있지만, 막지는 않는다"**. 모든 게 기술적으로 접근 가능.
+
+> 💡 상세한 `public`/`protected`/`private` 관례와 밑줄 규칙은
+> [exploration_01 B.1 (접근 권한)](./exploration_01_python_basics.md#b1-publicprotectedprivate-관례-) 참조.
+> 여기서는 "개방성" 관점만 간단히.
 
 #### 이유 2: 리플렉션/메타프로그래밍의 힘
 
