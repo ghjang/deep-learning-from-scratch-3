@@ -11,14 +11,15 @@
 | 2 | [exploration_02_numpy_basics.md](./exploration_02_numpy_basics.md) | step01 직후 | NumPy 기본 (3권 중심) — ndarray 내부, shape/axis, 브로드캐스팅, 수학 함수, 난수 |
 | 3 | [exploration_03_backend_adapters.md](./exploration_03_backend_adapters.md) | step01 직후 | 백엔드 어댑터: Variable을 CuPy/MLX로 확장한다면 (autograd, Define-by-Run, xp 패턴) |
 | 4 | [exploration_04_symbolic_vs_numeric.md](./exploration_04_symbolic_vs_numeric.md) | step01 직후 | sympy vs PyTorch/DeZero: 심볼릭 vs 수치 계산 패러다임 (manim/Graphviz 시각화 비교) |
-| 5 | [exploration_05_python_object_model.md](./exploration_05_python_object_model.md) | step01 직후 | Python 객체 모델 — CPython 내부 (딕셔너리 기반), 향후 메타클래스/descriptor 등 확장 예정 |
+| 5 | [exploration_05_python_object_model.md](./exploration_05_python_object_model.md) | step01 직후 | Python 객체 모델 — CPython 내부, 리플렉션, 룩업 체계 5가지 (★공식 참조) |
+| 6 | [exploration_06_data_types.md](./exploration_06_data_types.md) | step01 직후 | Python 기본 자료형 — list/tuple/str, 레퍼런스 모델, 얕은/깊은 복사 |
 
 > 파일 번호 = **생성 순서** (탐구 역사 보존)
 > 아래 "추천 읽는 순서"는 처음 읽을 때 논리적 흐름 기준
 
 ## 🎯 추천 읽는 순서 (처음 읽을 때)
 
-현재 파일 번호 순서(1→2→3→4)가 곧 추천 순서와 일치함. 논리적 의존 관계:
+현재 파일 번호 순서(1→6)가 곧 추천 순서와 일치함. 논리적 의존 관계:
 
 ```
 [#1 Python 기본]
@@ -29,11 +30,56 @@
    ↓ 그 ndarray를 다른 백엔드(CuPy/MLX)로 교체하면? (Define-by-Run, autograd 개념 등장)
 [#4 sympy vs 수치]
    ↓ autograd vs 심볼릭 계산의 철학적 차이 (심화)
+[#5 Python 객체 모델]
+   ↓ 파이썬 객체의 내부 구조/리플렉션/룩업 체계 (★공식 참조, 필요시 독자적 참조도 가능)
+[#6 Python 기본 자료형]
+   ↓ list/tuple/str/레퍼런스 모델 (#5의 전제 지식)
 ```
 
-- **처음부터 끝까지 읽기**: 1 → 2 → 3 → 4 (기본)
+- **처음부터 끝까지 읽기**: 1 → 2 → 3 → 4 → 5 → 6 (기본)
 - **특정 주제만**: 각 탐구는 독립적으로도 읽을 수 있음 (필요시 다른 탐구 링크로 연결)
 - **키워드 검색**: 각 항목의 `#키워드` 태그로 검색해서 찾기
+
+## 📖 공통 용어 안내 (모든 탐구에서 인용)
+
+이 탐구 노트들에서 반복적으로 등장하는 용어/표준을 미리 정리. 각 탐구 첫 페이지엔 중복 안 함 (여기로 링크).
+
+### PEP (Python Enhancement Proposal)
+
+파이썬의 **"향상 제안서"**. 법률 발의안이나 RFC 같은 역할 — 파이썬을 어떻게 발전시킬지 공식 제안/토론/채택하는 문서. 누구나 쓸 수 있고, 번호가 붙어. 각 PEP는 보통 https://peps.python.org/pep-NNNN/ 형식으로 접근.
+
+| PEP | 제목 | 자주 인용되는 곳 |
+|---|---|---|
+| **PEP 8** | Style Guide for Python Code | self 관례, 전반적 코딩 스타일 |
+| **PEP 20** | The Zen of Python (`import this`) | 파이썬 철학 |
+| **PEP 227** | Nested Scopes — LEGB 규칙, 클래스 스코프 | 스코프와 룩업 |
+| **PEP 253** | C3 선형화 도입 (아래 참조) | MRO |
+| **PEP 318** | Decorators (`@staticmethod` 등) | 데코레이터 |
+| **PEP 498** | f-string (Python 3.6+) | f-string |
+
+→ "PEP N에 따르면..." 은 **"공식 표준이야"** 라는 뜻 (내 생각이 아니라).
+
+> 💡 **특히 PEP 8, PEP 20** 은 진짜 많이 인용되니 한 번 읽어보길 권장.
+
+### C3 선형화 (C3 Linearization)
+
+다중 상속에서 **MRO(메서드 결정 순서)를 계산하는 공식 알고리즘**. Dylan 언어에서 유래(1996), PEP 253으로 파이썬에 도입(Python 2.3+).
+
+**3가지 핵심 규칙**:
+1. 자식은 부모보다 먼저
+2. 상속 선언 순서 유지 (`class D(B, C)`면 B가 C보다 먼저)
+3. 부모의 MRO 보존
+
+세 규칙을 동시에 만족하는 순서가 하나일 때만 MRO 결정. 충돌하면 `TypeError`:
+```python
+class X(A, B): pass
+class Y(B, A): pass
+class Z(X, Y): pass   # ❌ TypeError — X는 A>B, Y는 B>A로 모순
+```
+
+→ **DeZero는 단일 상속만 쓰므로 C3 실질적으로 무관**. 다만 "`__mro__`가 어떻게 정해지나?" 호기심에 대한 답.
+
+**키워드**: `#PEP` `#PEP8` `#PEP20` `#PEP227` `#PEP253` `#PEP318` `#PEP498` `#C3선형화` `#MRO` `#다중상속` `#Python표준`
 
 ## 📝 새 탐구 노트 작성 규칙
 
