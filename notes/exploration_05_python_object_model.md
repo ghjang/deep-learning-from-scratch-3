@@ -158,16 +158,126 @@ print(hasattr(y, '__dict__'))    # False! ← 딕셔너리 자체가 없음
 
 → DeZero는 학습 목적이라 `__slots__` 안 씀. 하지만 실전 프레임워크는 다 최적화돼 있음.
 
-### A.8 핵심 통찰 요약
+### A.8 상속과 `__dict__` — "평평한 구조"의 함의
+
+> 브로 통찰에서 출발: "파이썬은 private 없다며? 그럼 상위 클래스의 인스턴스 변수는 하위 인스턴스의 `__dict__`에 다 들어 있나?"
+>
+> **결론: `super().__init__()` 호출하면 들어감.** 상속 자체가 아니라 `__init__` 실행 여부가 결정. 그리고 출처 구분 없이 **평평하게 한 dict에 몰빵.**
+
+#### 핵심: 상속 ≠ 자동 속성 복사
+
+```python
+class A:
+    def __init__(self):
+        self.x = 1       # A의 __init__이 self.x를 세팅하는 코드
+
+class B(A):
+    def __init__(self):
+        super().__init__()   # ← A의 __init__을 호출 → 이때 self.x = 1 실행
+        self.y = 2
+
+b = B()
+print(b.__dict__)
+# {'x': 1, 'y': 2}  ← 둘 다 b의 dict에 들어감
+```
+
+→ `b.x`가 생긴 건 **A의 `__init__`이 실행돼서**. "A를 상속하니까 자동으로"가 **아님**.
+
+#### `super().__init__()` 안 하면?
+
+```python
+class A:
+    def __init__(self):
+        self.x = 1
+
+class B(A):
+    def __init__(self):
+        self.y = 2
+        # super().__init__() 안 함!
+
+b = B()
+print(b.__dict__)        # {'y': 2} ← x 없음!
+print(hasattr(b, 'x'))   # False
+# b.x  # ❌ AttributeError
+```
+
+→ 상속만 하고 `__init__` 안 부르면 `b.x`는 안 생김. **실행 여부가 전부.**
+
+#### Python vs Java/C# — 평평함의 차이
+
+**Java/C# (슬롯 기반)**:
+```
+b → ┌─────────────────┐
+    │ A 영역: x = 1    │ ← 상위 클래스 영역 (private 접근 통제 가능)
+    ├─────────────────┤
+    │ B 영역: y = 2    │ ← 하위 클래스 영역
+    └─────────────────┘
+    (출처 구분 가능)
+```
+
+**Python (평평한 dict)**:
+```
+b → __dict__: { 'x': 1, 'y': 2 }
+    (출처 구분 없음, 다 같은 dict)
+```
+
+→ 이래서 파이썬엔 진짜 private가 없음. **"이 속성은 어느 클래스에서 왔나"를 안 추적**하니까.
+
+#### 이름 충돌? 그냥 덮어쓰기
+
+```python
+class A:
+    def __init__(self):
+        self.x = 1
+
+class B(A):
+    def __init__(self):
+        super().__init__()   # A가 self.x = 1
+        self.x = 999         # B가 self.x = 999 (덮어쓰기!)
+
+b = B()
+print(b.__dict__)   # {'x': 999} ← 하나뿐, 출처 흔적 없음
+```
+
+→ Java/C#이면 `A.x`와 `B.x`를 구분할 수 있지만, 파이썬은 **평평한 dict라서 그냥 덮어씀.**
+
+#### DeZero에서의 실전 (미래 예고)
+
+```python
+class Variable:
+    def __init__(self, data):
+        self.data = data
+        self.grad = None
+        self.creator = None
+
+class Parameter(Variable):    # step50+
+    def __init__(self, data):
+        super().__init__()    # Variable의 속성들이 self.__dict__로 옴
+        self.requires_grad = True
+
+p = Parameter(np.array(1.0))
+print(p.__dict__)
+# {'data': ..., 'grad': None, 'creator': None, 'requires_grad': True}
+# ← Variable 것이든 Parameter 것이든 한 평면에
+```
+
+→ 상속 구조가 복잡해져도 인스턴스 변수는 **하나의 dict**로 관리. 그래서 탐색도 단순하고 빠름.
+
+**키워드**: `#상속` `#__dict__평평함` `#super().__init__` `#출처무관` `#이름충돌덮어쓰기` `#Java슬롯비교` `#private없음연결` `#Parameter상속`
+
+---
+
+### A.9 핵심 통찰 요약
 
 1. **브로 통찰 정답** — 파이썬 객체는 딕셔너리 기반, `self.x`는 `__dict__['x']`의 sugar
 2. **CPython 내부** — `PyObject` 구조체가 `dict` 포인터 보유
 3. **다른 동적 언어와 동일** — JS, Ruby, Lua도 "객체 = 해시맵 + sugar" 패턴
 4. **동적 속성 추가** — 딕셔너리라서 언제든 새 키 추가 가능 (Java/C# 불가)
 5. **`__slots__` 예외** — 딕셔너리 안 쓰는 최적화 (성능 중요 클래스)
-6. **DeZero vs 실전 프레임워크** — DeZero는 dict 기반, 실전은 C 확장 최적화
+6. **상속도 평평하게** — 출처 구분 없이 한 dict에 몰빵 (`super().__init__` 실행 시)
+7. **DeZero vs 실전 프레임워크** — DeZero는 dict 기반, 실전은 C 확장 최적화
 
-**키워드**: `#CPython` `#PyObject` `#__dict__` `#딕셔너리기반` `#syntacticSugar` `#동적속성` `#__slots__` `#getattr` `#객체모델` `#JavaScript비교` `#성능함정`
+**키워드**: `#CPython` `#PyObject` `#__dict__` `#딕셔너리기반` `#syntacticSugar` `#동적속성` `#__slots__` `#getattr` `#객체모델` `#JavaScript비교` `#성능함정` `#상속평평함`
 
 ---
 
