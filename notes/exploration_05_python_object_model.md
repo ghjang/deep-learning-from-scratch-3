@@ -11,7 +11,7 @@
 - [A. CPython 내부 구조 — 딕셔너리 기반 객체 모델](#a-cpython-내부-구조--딕셔너리-기반-객체-모델)
 - [B. 런타임 클래스 검사 (리플렉션) — `__mro__`, `__bases__`, `__dict__`](#b-런타임-클래스-검사-리플렉션--__mro__-__bases__-__dict__)
 - [C. (향후 추가) Descriptor와 `@property` 내부](#c-향후-추가-descriptor와-property-내부)
-- [D. (향후 추가) `__new__` vs `__init__`](#d-향후-추가-__new__-vs-__init__)
+- [D. `__new__` vs `__init__` — 생성과 초기화의 분리](#d-__new__-vs-__init__--생성과-초기화의-분리)
 - [E. (향후 추가) 함수도 객체, 클래스도 객체](#e-향후-추가-함수도-객체-클래스도-객체)
 
 ---
@@ -728,14 +728,183 @@ c.x                        # 단순 속성 룩업처럼 보이지만
 
 ---
 
-## D. (향후 추가) `__new__` vs `__init__`
+## D. `__new__` vs `__init__` — 생성과 초기화의 분리
 
-> 진짜 인스턴스 생성 단계. `__init__`은 초기화일 뿐, 생성은 `__new__`.
+> 브로 통찰에서 출발: "private 없다며? 그럼 `__new__` 같은 내부 함수도 호출 가능?"
+> → **정답! 호출 가능.** "private 없다"와 "매직 메서드 접근 가능"은 같은 맥락.
 
-예정 주제:
-- `__new__`가 반환하는 것 (인스턴스)
-- 왜 보통 안 쓰는지 (immutable 타입 상속할 때만)
-- `Variable()` 호출 시 내부 순서: `__new__` → `__init__`
+### D.1 `__new__` 직접 호출 — 진짜 된다
+
+```python
+class Foo:
+    def __new__(cls, *args, **kwargs):
+        print("__new__ 호출됨")
+        instance = super().__new__(cls)   # 진짜 인스턴스 생성
+        return instance
+
+    def __init__(self, x):
+        print("__init__ 호출됨")
+        self.x = x
+
+# 1. 보통 방식
+f = Foo(42)
+# __new__ 호출됨
+# __init__ 호출됨
+
+# 2. __new__만 직접 호출!
+g = Foo.__new__(Foo)
+# __new__ 호출됨
+print(type(g))         # <class 'Foo'>  ← 인스턴스 생김!
+print(hasattr(g, 'x')) # False ← __init__ 안 돌아서 x 없음
+```
+
+→ **진짜 호출 가능**. `__new__`만 부르면 `__init__` 없이 인스턴스가 만들어짐.
+
+### D.2 생성 vs 초기화 — 역할 분담
+
+```python
+f = Foo(42)
+# 실제로 일어나는 일:
+# 1. Foo.__new__(Foo, 42) → 인스턴스 생성 (메모리 할당)
+# 2. Foo.__init__(f, 42)  → 인스턴스 초기화 (self.x = 42)
+```
+
+| 메서드 | 역할 | 반환 | 자주 쓰나? |
+|---|---|---|---|
+| `__new__` | **생성** (메모리 할당, 객체 만들기) | 인스턴스 객체 | ❌ 거의 안 오버라이드 |
+| `__init__` | **초기화** (속성 세팅 등) | None | ✅ 매번 오버라이드 |
+
+→ Java/C#의 `new ClassName()`이 **두 단계를 합친 것**. 파이썬은 명시적으로 분리.
+
+### D.3 "private 없다"의 극단적 예시 — 매직 메서드 전부 직접 호출
+
+```python
+class MyClass:
+    def __init__(self):
+        self.data = 42
+
+    def __str__(self):
+        return f"MyClass({self.data})"
+
+x = MyClass()
+print(x)              # MyClass(42) — 보통 호출 (print가 __str__ 자동 호출)
+print(x.__str__())    # MyClass(42) — 직접 호출도 가능!
+print(x.__init__())   # None — 다시 초기화 호출도 가능! (data 다시 42로)
+print(x.__class__)    # <class 'MyClass'> — 내부 속성 노출
+print(x.__dict__)     # {'data': 42} — 내부 딕셔너리 노출
+```
+
+→ **전부 접근 가능**. Java/C#이었다면 private/internal로 막혔을 내부가 다 열려있음.
+
+### D.4 왜 이렇게 개방적일까?
+
+#### 이유 1: "consenting adults" (어른들의 합의)
+
+파이썬 철학: **"숨길 수는 있지만, 막지는 않는다"**.
+- `_name` (밑줄 1개): "내부용이야, 건드리지 마" (관례)
+- `__name` (밑줄 2개): 이름을 좀 비틀어 (`_ClassName__name`) 접근 어렵게 함
+- 하지만 둘 다 **기술적으로는 접근 가능**
+
+#### 이유 2: 리플렉션/메타프로그래밍의 힘
+
+이 개방성이 진짜 유용할 때가 있음. DeZero의 `Layer` 클래스:
+
+```python
+class Layer:
+    def params(self):
+        """이 Layer가 가진 모든 Parameter 자동 수집."""
+        for name, attr in self.__dict__.items():    # __dict__ 직접 접근!
+            if isinstance(attr, Parameter):
+                yield attr
+```
+
+→ `__dict__` 같은 "내부"에 직접 접근할 수 있어서 **런타임에 객체 구조 검사/조작**이 가능. 이게 파이썬 메타프로그래밍의 기반.
+
+#### 이유 3: 데코레이터/컨텍스트 매니저의 동작
+
+```python
+@contextlib.contextmanager
+def using_config(name, value):
+    old_value = getattr(Config, name)        # getattr로 내부 접근
+    setattr(Config, name, value)             # setattr로 설정
+    try:
+        yield
+    finally:
+        setattr(Config, name, old_value)     # 복구
+```
+
+→ DeZero의 `no_grad` (step18+)가 이 패턴 사용. 개방성 없이는 불가능.
+
+### D.5 "할 수 있다" ≠ "해야 한다" — pythonic 관례
+
+```python
+obj._internal_method()    # ⚠️ 관례상 하지 말 것 (밑줄 1개)
+obj.__private_method()    # ❌ 직접 호출 안 됨 (이름 맹글링)
+obj._ClassName__private_method()   # 기술적으론 가능하지만 비권장
+
+# 매직 메서드는 보통 직접 호출 안 함:
+len(x)        # ✅ 이렇게 (len()이 __len__ 호출)
+x.__len__()   # ⚠️ 직접 호출은 비관용적
+```
+
+→ **"pythonic"한 코드는 매직 메서드를 직접 부르지 않음.** `len(x)`, `str(x)`, `repr(x)` 같은 내장 함수 쓰기.
+
+### D.6 파이썬 개방성 스펙트럼
+
+```
+완전 공개      권장하지 않음      기술적으로 막힘 (우회 가능)
+   │              │                    │
+ public      _protected          __private (네임 맹글링)
+data, x    _internal_var      __really_private
+__init__   _helper_method     __secret_method
+__new__
+__dict__
+```
+
+→ 전부 "호출/접근 가능"하지만, **관례**로 접근 자제를 합의한 것뿔.
+
+### D.7 언제 `__new__`를 직접 오버라이드할까?
+
+거의 안 함. 다음 예외적 상황에만:
+
+1. **불변(immutable) 타입 상속** — `int`, `str`, `tuple` 등
+   ```python
+   class PositiveInt(int):
+       def __new__(cls, value):
+           if value < 0:
+               raise ValueError("음수 안 됨")
+           return super().__new__(cls, value)   # int는 __init__ 못 쓰니 __new__에서 검증
+   ```
+   → `int`는 불변이라 `__init__`으로 값 못 바꿈. `__new__`에서 처리.
+
+2. **싱글톤 패턴** — 인스턴스 하나만 만들기
+   ```python
+   class Singleton:
+       _instance = None
+       def __new__(cls):
+           if cls._instance is None:
+               cls._instance = super().__new__(cls)
+           return cls._instance
+
+   a = Singleton()
+   b = Singleton()
+   print(a is b)   # True — 같은 인스턴스
+   ```
+
+3. **메타클래스** — 클래스 생성 가로채기 (심화)
+
+→ DeZero에선 **이런 거 안 함**. 학습 목적이라 `__init__`만 쓰는 단순 구조.
+
+### D.8 핵심 통찰 요약
+
+1. **`__new__`와 `__init__`은 분리됨** — 생성 vs 초기화
+2. **매직 메서드 전부 직접 호출 가능** (private 없음의 결과)
+3. **개방성의 이유**: consenting adults 철학 + 리플렉션/메타프로그래밍
+4. **하지만 pythonic 관례**: 매직 메서드는 내장 함수로 (`len(x)` 등)
+5. **`__new__` 오버라이드**: 불변 타입 상속/싱글톤 등 예외적 상황에만
+6. **DeZero는 안 씀** — 학습 목적이라 `__init__` 중심
+
+**키워드**: `#__new__` `#__init__` `#생성vs초기화` `#매직메서드직접호출` `#private없음` `#consentingadults` `#리플렉션` `#pythonic관례` `#싱글톤` `#불변타입상속` `#개방성스펙트럼`
 
 ---
 
