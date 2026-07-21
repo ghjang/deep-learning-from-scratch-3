@@ -9,7 +9,7 @@
 ## 목차
 
 - [A. CPython 내부 구조 — 딕셔너리 기반 객체 모델](#a-cpython-내부-구조--딕셔너리-기반-객체-모델)
-- [B. (향후 추가) `type()`과 메타클래스](#b-향후-추가-type과-메타클래스)
+- [B. 런타임 클래스 검사 (리플렉션) — `__mro__`, `__bases__`, `__dict__`](#b-런타임-클래스-검사-리플렉션--__mro__-__bases__-__dict__)
 - [C. (향후 추가) Descriptor와 `@property` 내부](#c-향후-추가-descriptor와-property-내부)
 - [D. (향후 추가) `__new__` vs `__init__`](#d-향후-추가-__new__-vs-__init__)
 - [E. (향후 추가) 함수도 객체, 클래스도 객체](#e-향후-추가-함수도-객체-클래스도-객체)
@@ -171,16 +171,192 @@ print(hasattr(y, '__dict__'))    # False! ← 딕셔너리 자체가 없음
 
 ---
 
-## B. (향후 추가) `type()`과 메타클래스
+## B. 런타임 클래스 검사 (리플렉션) — `__mro__`, `__bases__`, `__dict__`
 
-> 클래스 자체도 객체. `type()`은 클래스의 클래스 (메타클래스).
-> 브로가 관심 가지면 확장 예정.
+> 브로 통찰에서 출발: "`__mro__`의 반환값이 튜플? 내용이 클래스 리스트? 메타적인 느낌?"
+> → 정답! 런타임에 클래스 계층을 검사할 수 있는 능력 = **리플렉션(Reflection)**.
 
-예정 주제:
-- `type(X)` vs `type(X).__name__`
-- 메타클래스로 클래스 동적 생성
-- `__class__` 속성
-- DeZero에서 메타클래스 쓸 일 (거의 없음, 학습 목적)
+### B.1 보충: 리스트 vs 튜플 기본 (메타 속성 이해的前提)
+
+먼저 파이썬 시퀀스 자료형 3종 정리. 메타 속성들이 튜플/리스트로 돼 있어서 필수.
+
+```python
+# 1. 리스트 (list) — 대괄호 [], 가변 (mutable)
+lst = [1, 2, 3]
+lst[0] = 99           # ✅ 수정 가능
+lst.append(4)         # ✅ 추가 가능
+
+# 2. 튜플 (tuple) — 소괄호 (), 불변 (immutable)
+tup = (1, 2, 3)
+# tup[0] = 99        # ❌ TypeError! 수정 불가
+# tup.append(4)      # ❌ AttributeError!
+
+# 3. 문자열 (str) — 따옴표, 불변 (immutable)
+s = "hello"
+# s[0] = "H"         # ❌ TypeError!
+```
+
+| 자료형 | 문법 | 가변? | 용도 |
+|---|---|---|---|
+| **list** | `[1, 2, 3]` | ✅ mutable | 동적 데이터, 추가/삭제 |
+| **tuple** | `(1, 2, 3)` | ❌ immutable | 고정된 값, 다중 반환, **딕셔너리 키** |
+| **str** | `"hello"` | ❌ immutable | 텍스트 |
+
+**핵심 용어**:
+- **mutable (가변)**: 생성 후 내용 변경 가능 — list, dict, set
+- **immutable (불변)**: 생성 후 변경 불가 — tuple, str, int, float, bool
+
+**왜 튜플이 필요한가?** — 불변 = "안 바뀐다는 약속"
+1. **해시 가능** → 딕셔너리 키로 사용
+   ```python
+   d[(1, 2)] = "점"          # ✅ 튜플 키 OK
+   # d[[1, 2]] = "점"        # ❌ 리스트는 키 불가 (가변이라)
+   ```
+2. **안전한 전달**: 함수 인자로 넘겨도 수정 못 함
+3. **다중 반환**: 파이썬 함수는 사실 튜플 반환
+   ```python
+   def min_max(lst):
+       return min(lst), max(lst)   # (min, max) 튜플
+   low, high = min_max([3, 1, 4])  # 언패킹
+   ```
+
+→ `__mro__`, `shape`, `strides` 등이 튜플인 이유: **"이 값은 불변"이라는 약속**.
+
+### B.2 `__mro__` — Method Resolution Order (메서드 결정 순서)
+
+**다중 상속 시 어떤 부모 클래스부터 찾을지 결정하는 순서**. C3 알고리즘으로 계산.
+
+```python
+class A:
+    def hi(self): return "A"
+class B(A):
+    def hi(self): return "B"
+class C(A):
+    def hi(self): return "C"
+class D(B, C):       # 다중 상속
+    pass
+
+mro = D.__mro__
+print(mro)
+# (<class 'D'>, <class 'B'>, <class 'C'>, <class 'A'>, <class 'object'>)
+
+print(type(mro))     # <class 'tuple'>   ← 튜플!
+print(type(mro[0]))  # <class 'type'>    ← 요소는 클래스 객체!
+```
+
+→ 브로가 발견한 3가지 정답: 튜플이다 / 클래스를 담았다 / 메타적인 느낌 (순회 가능).
+
+**튜플인 이유**: MRO는 **클래스 정의 시점에 결정된 불변의 순서**. 런타임에 바뀌면 안 돼 (메서드 탐색이 흐트러짐).
+```python
+D.__mro__[0] = SomeOtherClass   # ❌ TypeError — MRO는 절대 바뀌면 안 됨
+```
+
+**C3 규칙**:
+- 자식이 부모보다 먼저, 부모는 선언 순서대로, 충돌 시 TypeError
+- DeZero는 단일 상속만 쓰므로 MRO 단순 (`Variable → object`)
+
+### B.3 리플렉션 — 런타임에 클래스 계층 순회
+
+`__mro__`를 순회하면 **런타임에 클래스 계층 검사** 가능. 이게 **리플렉션(Reflection)**.
+
+```python
+# 1. MRO 순회하며 모든 조상 클래스 이름 출력
+for cls in D.__mro__:
+    print(f"- {cls.__name__}")
+# - D
+# - B
+# - C
+# - A
+# - object
+
+# 2. 특정 조상이 있는지 확인
+print(any(cls.__name__ == 'A' for cls in D.__mro__))   # True
+
+# 3. 모든 조상의 메서드 수집
+all_methods = set()
+for cls in D.__mro__:
+    for name, attr in cls.__dict__.items():
+        if callable(attr):
+            all_methods.add(name)
+print(all_methods)
+```
+
+→ 브로의 "메타적인 느낌"이 진짜 정확했어. 이게 메타프로그래밍의 시작점.
+
+### B.4 다른 메타 속성들
+
+```python
+class D(B, C): pass
+
+# 1. 직계 부모들만 (튜플)
+print(D.__bases__)
+# (<class 'B'>, <class 'C'>)
+
+# 2. 클래스 이름 (문자열)
+print(D.__name__)        # 'D'
+print(D.__qualname__)    # 'D' (중첩 클래스면 경로 포함)
+
+# 3. 클래스가 정의된 모듈
+print(D.__module__)      # '__main__'
+
+# 4. 클래스의 모든 속성 (읽기 전용 딕셔너리)
+print(D.__dict__)
+# mappingproxy({...}) ← 읽기 전용 dict (수정 불가)
+
+# 5. 어떤 클래스의 서브클래스들
+print(A.__subclasses__())
+# [<class 'B'>, <class 'C'>]
+
+# 6. 인스턴스가 어느 클래스에서 왔는지
+x = D()
+print(x.__class__)       # <class '__main__.D'>
+print(x.__class__.__name__)  # 'D'
+```
+
+### B.5 리플렉션의 실전 활용 — getattr/setattr/hasattr
+
+속성 이름을 **문자열로** 다루는 내장 함수. 런타임에 속성 결정 가능.
+
+```python
+x = Variable(42)
+
+# 점 접근과 동일
+getattr(x, 'data')            # == x.data
+setattr(x, 'grad', 0.0)       # == x.grad = 0.0
+hasattr(x, 'data')            # == 'data' in dir(x) or hasattr
+
+# 동적 속성 이름 (런타임에 결정) — 메타프로그래밍 기초
+attr_name = "da" + "ta"       # 런타임에 문자열 조합
+print(getattr(x, attr_name))  # 42 — 동적 접근!
+```
+
+### B.6 DeZero에서의 실전 활용 (step49+ 예고)
+
+DeZero의 **Layer 클래스**가 리플렉션을 진짜로 활용:
+
+```python
+class Layer:
+    def params(self):
+        """이 Layer가 가진 모든 Parameter를 자동 수집."""
+        for name, attr in self.__dict__.items():    # 인스턴스 속성 순회
+            if isinstance(attr, Parameter):
+                yield attr
+            elif isinstance(attr, Layer):           # 중첩 Layer도 순회
+                yield from attr.params()
+```
+
+→ `__dict__`를 순회하며 Parameter를 자동 수집! 브로가 "순회할 수 있다"고 한 직관이 DeZero 핵심 코드에 실제로 쓰임.
+
+### B.7 핵심 통찰 요약
+
+1. **리스트 vs 튜플**: 가변/불변 차이. 튜플은 "안 바뀐다는 약속"
+2. **`__mro__`** = `tuple` of `class` objects (불변 순서)
+3. **리플렉션**: 런타임에 자기 구조를 검사하는 능력
+4. **메타 속성 모음**: `__mro__`, `__bases__`, `__dict__`, `__name__`, `__subclasses__()`, `__class__`
+5. **getattr/setattr/hasattr**: 문자열로 속성 다루는 메타프로그래밍 기초
+6. **DeZero Layer.params()**: 리플렉션의 실전 활용 (step49+)
+
+**키워드**: `#리플렉션` `#Reflection` `#__mro__` `#__bases__` `#__dict__` `#__name__` `#__subclasses__` `#__class__` `#getattr` `#setattr` `#hasattr` `#tuple` `#list` `#mutable` `#immutable` `#C3선형화` `#메타프로그래밍` `#Layerparams`
 
 ---
 

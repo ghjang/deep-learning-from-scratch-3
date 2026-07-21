@@ -287,6 +287,10 @@ class Variable:
 
 **키워드**: `#MRO` `#C3선형화` `#전역변수` `#LEGB` `#global키워드` `#네임스페이스` `#룩업체계차이`
 
+> 💡 **심화**: `__mro__`의 반환값(튜플), 리플렉션(`__bases__`/`__subclasses__` 등),
+> getattr/setattr 등 런타임 검사 도구는
+> [exploration_05 B (리플렉션)](./exploration_05_python_object_model.md) 참조.
+
 ---
 
 ### A.3 `__init__`과 dunder 메서드
