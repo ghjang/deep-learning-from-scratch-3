@@ -1,0 +1,17 @@
+# Issue template chooser configuration
+# Reference: https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/configuring-issue-templates-for-your-repository#configuring-the-template-chooser
+
+# 자유 양식(blank) 이슈는 비활성화. 모든 이슈를 위 템플릿 중 하나로 분류하도록 유도.
+blank_issue_enabled: false
+
+# 템플릿에 해당하지 않는 외부 링크들. New issue 화면 하단에 별도 버튼으로 표시됨.
+contact_links:
+  - name: 📚 원본 책 정오표
+    url: https://docs.google.com/document/d/1_qHrFCrfx5zNOdslAa9rY3Vv1KECLCToHWJNhvn2jDA
+    about: 책 본문의 오류는 이 레포가 아닌 출판사 정오표를 확인해주세요.
+  - name: 📖 원서 저장소 (oreilly-japan)
+    url: https://github.com/oreilly-japan/deep-learning-from-scratch-3
+    about: 원본(일본어) 관련 이슈는 원서 저장소로 가세요.
+  - name: 🔒 보안 이슈
+    url: https://github.com/ghjang/deep-learning-from-scratch-3/security/advisories/new
+    about: 보안 관련 사항은 공개 이슈가 아니라 Security Advisory로 신고해주세요.

@@ -1,0 +1,50 @@
+name: 💬 학습 질문 / 토론
+description: 책을 읽다 막힌 부분, 이해 안 가는 코드, 더 깊이 파고 싶은 개념에 대한 질문/토론.
+title: "[Q] "
+labels: ["question", "discussion"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        이 레포의 메인 목적은 **학습**입니다! 📖
+        책을 읽다가 "이 코드 왜 이렇게 짰지?", "이 수식이 코드에 어떻게 연결되지?" 같은 질문을 편하게 남겨주세요. 사소해 보여도 전부 좋습니다.
+
+  - type: input
+    id: step
+    attributes:
+      label: 관련 단계 (step 번호 / 책 페이지)
+      placeholder: "예: step31.py, p.123"
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: 질문 / 막힌 부분
+      description: 무엇이 이해가 안 가는지 구체적으로.
+      placeholder: |
+        예: step31의 Sin 함수 backward에서 xp.sin(x)를 왜 그대로 쓰는 건가요?
+        x는 Variable이 아니라 np.ndarray인 건가요?
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: 시도해본 것 / 내 생각
+      description: 이미 디버깅해보거나 나름대로 정리해본 게 있다면 적어주세요.
+      placeholder: |
+        - print(type(x)) 해보니 ndarray가 나왔어요.
+        - 하지만 왜 Variable이 아닌지 모르겠어요.
+
+  - type: dropdown
+    id: topic
+    attributes:
+      label: 주제 (선택)
+      options:
+        - 🧮 수학 / 미분 / 역전파
+        - 🏗️ 프레임워크 구조 (Variable, Function, Layer)
+        - 🐍 Python 기법 (메타프로그래밍, 연산자 오버로딩 등)
+        - 🔗 계산 그래프 / Define-by-Run
+        - 🎯 모델 / 학습 (VGG, LSTM 등)
+        - 📦 그 외
