@@ -156,6 +156,8 @@ class Parameter(Variable):
 
 파이썬 3.13이니 `@override` 바로 쓸 수 있음. 다만 DeZero 책에선 안 나옴 (3.12+ 기능이라). 학습 후 실험적으로 도입 가능.
 
+> 🔬 **심화**: step03에서 abc + `@override`를 함께 도입하며 강제력 차이를 실험함. `@override`(정적 분석) vs `@abstractmethod`(런타임) 비교 → [exploration_09 §9](./exploration_09_abc_abstract.md#override)
+
 #### C.1.4 메서드 오버로딩 — 파이썬은 미지원! (`@overload`는 타입 힌트용)
 
 > 브로 질문: "메서드 오버로딩을 파이썬이 지원하나?"
