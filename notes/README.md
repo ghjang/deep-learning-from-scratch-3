@@ -15,9 +15,19 @@
 | 6 | [exploration_06_data_types.md](./exploration_06_data_types.md) | step01 직후 | Python 기본 자료형 — list/tuple/str, 레퍼런스 모델, 얕은/깊은 복사 |
 | 7 | [exploration_07_syntax_idioms.md](./exploration_07_syntax_idioms.md) | step01 직후 | Python 문법과 이디엄 — 데코레이터, f-string, == vs is, lambda, @override/@overload |
 | 8 | [exploration_08_monkey_patching.md](./exploration_08_monkey_patching.md) | step01 직후 | 런타임 클래스 조작 (Monkey Patching), 네임스페이스, 객체→소스 역직렬화 |
+| 9 | [exploration_09_abc_abstract.md](./exploration_09_abc_abstract.md) | step02 직후 | Python 추상 클래스: `abc.ABC` vs `raise NotImplementedError()` (에러 시점, 강제력, 메타클래스) |
 
 > 파일 번호 = **생성 순서** (탐구 역사 보존)
 > 아래 "추천 읽는 순서"는 처음 읽을 때 논리적 흐름 기준
+
+## 🎨 디자인 패턴 노트 (횡단 관심사, 누적형)
+
+> 위 exploration_XX 시리즈와 다른 카테고리. 패턴은 여러 step에 걸쳐 재등장하는 **횡단 관심사**라서
+> 단일 파일에 누적하며 관리. step 진행 중 패턴 발견 시 이 파일에 추가.
+
+| 파일 | 시점 | 주제 |
+|---|---|---|
+| [design_patterns.md](./design_patterns.md) | step01~ 누적 | DeZero에 등장하는 디자인 패턴 (래퍼, 템플릿 메서드 등) |
 
 ## 🎯 추천 읽는 순서 (처음 읽을 때)
 
