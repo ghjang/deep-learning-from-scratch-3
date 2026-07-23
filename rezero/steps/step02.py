@@ -2,17 +2,65 @@
 rezero.steps.step02 — [1고지] 변수를 낳는 함수 (Function 도입)
 ===============================================
 
-이 파일은 책의 step02을 rezero로 직접 재구현하는 자리입니다.
+이 step에서 배운 것:
+  - Function 기반 클래스: Variable(상자)을 받아 새 Variable을 낳는 "변환기"
+  - Template Method 패턴: __call__이 뼈대, 자식의 forward()가 살
+  - Square 구상 클래스: forward()만 정의하면 Function처럼 쓸 수 있음
 
-참고 자료:
-  - 원본 구현: steps/step02.py
-  - 프레임워크 자료: dezero/ (필요한 모듈만 펴보기)
+이전 step과의 연결:
+  - step01의 Variable(래퍼 패턴)을 그대로 사용
+  - Function이 그 Variable을 입력/출력으로 다룸
 
-진행 순서 제안:
-  1. 책 본문 읽기 (이 단계가 무엇을 추가하는지 파악)
-  2. 이 파일에 직접 코드 짜기 (이해가 가는 만큼만)
-  3. 막히면 steps/step02.py 펴서 분석, 다시 내 손으로
-  4. 실행: uv run python rezero/steps/step02.py
+참고:
+  - 패턴 정리: notes/design_patterns.md (래퍼, 템플릿 메서드)
+
+실행: uv run python rezero/steps/step02.py
 """
 
-# TODO: 여기에 step02 코드를 직접 구현하세요.
+import numpy as np
+
+
+class Variable:
+    """DeZero의 변수. 데이터를 담는 '상자' (step01과 동일).
+
+    래퍼 패턴: ndarray를 감싸서 메타정보(grad, creator 등)를 붙일 토대.
+    상세: notes/design_patterns.md §1 Wrapper 패턴
+    """
+
+    def __init__(self, data):
+        self.data = data
+
+
+class Function:
+    """DeZero의 함수. Variable을 Variable로 변환하는 기반 클래스.
+
+    Template Method 패턴:
+      - __call__: "상자 까기 → forward → 상자 포장" 흐름을 고정 (뼈대)
+      - forward: 자식이 반드시 구현해야 하는 추상 메서드 (살)
+    상세: notes/design_patterns.md §2 Template Method
+    """
+
+    def __call__(self, input_var):
+        x = input_var.data              # ① 상자 까기 (ndarray 꺼냄)
+        y = self.forward(x)             # ② Template Method: 자식이 구현한 forward 호출
+        output = Variable(y)            # ③ 상자 포장 (결과를 다시 Variable로)
+        return output
+
+    def forward(self, in_data):
+        raise NotImplementedError()     # 자식이 반드시 구현해야 함
+
+
+class Square(Function):
+    """제곱 함수: x → x². Function을 상속해 forward만 정의."""
+
+    def forward(self, x):
+        return x ** 2
+
+
+# --- 동작 확인 ------------------------------------------------------
+x = Variable(np.array(10))
+f = Square()
+y = f(x)
+
+print(type(y))   # <class '__main__.Variable'> — 상자가 새로 만들어짐
+print(y.data)    # 100 — 10의 제곱
