@@ -40,6 +40,8 @@
 | 7 | step01 직후 | Python 문법/이디엄 (데코레이터, f-string, lambda, @override/@overload) | [notes/exploration_07_syntax_idioms.md](./notes/exploration_07_syntax_idioms.md) |
 | 8 | step01 직후 | 런타임 클래스 조작 (Monkey Patching, 네임스페이스, 역직렬화) | [notes/exploration_08_monkey_patching.md](./notes/exploration_08_monkey_patching.md) |
 | 9 | step02 직후 | Python 추상 클래스 (`abc.ABC` vs `NotImplementedError`) | [notes/exploration_09_abc_abstract.md](./notes/exploration_09_abc_abstract.md) |
+| 10 | step04 직후 | 도대체 미분이 뭔데? (수치 미분에서 깨달은 본질, 아하 모먼트) | [notes/exploration_10_what_is_derivative.md](./notes/exploration_10_what_is_derivative.md) |
+| 11 | step04 직후 | 자동 미분 두 모드 (포워드 vs 리버스, 왜 역전파인가) | [notes/exploration_11_autodiff_modes.md](./notes/exploration_11_autodiff_modes.md) |
 
 ### 🎨 디자인 패턴 (횡단 관심사, 누적형)
 
@@ -249,11 +251,11 @@ y = C(b)      # 1.2840² ≈ 1.6487
 **키워드**: `#함수연쇄` `#chain` `#계산그래프` `#Exp` `#np.exp` `#합성함수` `#TemplateMethod확장력` `#abc` `#abstractmethod` `#override` `#강제력차이` `#메서드` `#C++멤버함수`
 ---
 
-## Step 04 — [1고지] 수치 미분 (수치 미분 구현)
+## Step 04 — [1고지] 수치 미분
 
-**Issue**: (링크)
+**Issue**: [#5](https://github.com/ghjang/deep-learning-from-scratch-3/issues/5)
 **완료일**: -
-**상태**: ⏳
+**상태**: 🔄
 
 ### 📖 요약 (한 줄)
 

@@ -25,9 +25,9 @@
 ## 📈 전체 요약
 
 - **완료**: 3 / 60 (step01, step02, step03 ✅)
-- **진행 중**: 0
+- **진행 중**: 1 (step04)
 - **막힘**: 0
-- **마지막 업데이트**: 2026-07-23 — step03 완료
+- **마지막 업데이트**: 2026-07-23 — step04 시작
 
 ---
 
@@ -46,7 +46,7 @@
 | step01 | 상자로서의 변수 | ✅ | [#2](https://github.com/ghjang/deep-learning-from-scratch-3/issues/2) | 2026-07-21 | Variable 래퍼 패턴, ndarray 차원 |
 | step02 | 변수를 낳는 함수 (Function 도입) | ✅ | [#3](https://github.com/ghjang/deep-learning-from-scratch-3/issues/3) | 2026-07-23 | Function/Template Method, 패턴 노트 신설, abc 탐구 |
 | step03 | 함수 연결 | ✅ | [#4](https://github.com/ghjang/deep-learning-from-scratch-3/issues/4) | 2026-07-23 | Exp 추가, 함수 연쇄=계산그래프, abc+@override 실험 |
-| step04 | 수치 미분 (수치 미분 구현) | ⏳ | - | - | - |
+| step04 | 수치 미분 | 🔄 | [#5](https://github.com/ghjang/deep-learning-from-scratch-3/issues/5) | - | - |
 | step05 | 수치 미분 이론 [No code] | ⏳ | - | - | - |
 | step06 | 역전파 이론 (계산 그래프, 국소적 미분) | ⏳ | - | - | - |
 | step07 | 역전파 구현 - Variable.backward() | ⏳ | - | - | - |
