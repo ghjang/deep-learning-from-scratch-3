@@ -51,7 +51,7 @@
 
 ---
 
-## Step 01 — [1고지] 테니스 공 같은 '상자' (Variable 도입)
+## Step 01 — [1고지] 상자로서의 변수
 
 **Issue**: [#2](https://github.com/ghjang/deep-learning-from-scratch-3/issues/2)
 **완료일**: 2026-07-21
@@ -183,27 +183,71 @@ class Function:
 **키워드**: `#Function` `#TemplateMethod` `#관심사분리` `#SoC` `#NotImplementedError` `#Wrapper패턴협력` `#PyTorch스타일` `#__call__` `#parameter_vs_argument` `#input_var`
 ---
 
-## Step 03 — [1고지] 함수와 연산자 (연산자 오버로딩 입문)
+## Step 03 — [1고지] 함수 연결
 
-**Issue**: (링크)
-**완료일**: -
-**상태**: ⏳
+**Issue**: [#4](https://github.com/ghjang/deep-learning-from-scratch-3/issues/4)
+**완료일**: 2026-07-23
+**상태**: ✅
 
 ### 📖 요약 (한 줄)
 
-
-### ❓ 질문 / 막힌 점
-
+`Exp` 구상 클래스 추가 + `Square → Exp → Square` 함수 연쇄 구현. step02의 Template Method 패턴 확장력 체감, "함수 연쇄 = 계산 그래프" 직감 획득.
 
 ### 💡 통찰 / 배운 점
 
+**Template Method의 확장력 체감** — `Exp` 추가는 `forward` 한 줄(`np.exp(x)`)로 끝남. 기반 클래스(`Function`) 설계가 좋으면 새 함수 추가가 거의 공짜. 이게 패턴의 힘.
+
+**"함수 연쇄 = 계산 그래프"** — `x → A(Square) → a → B(Exp) → b → C(Square) → y` 이 선형 연쇄가 곧 **계산 그래프(computational graph)**. step06+ 역전파에서 이 그래프를 거꾸로 타고 미분값이 흐를 거라는 예고만 체감.
+
+**합성 함수** — `y = (e^(x²))²`. 미적분 chain rule이 다음 step들에서 컴퓨터 구현될 예정. 수학적으로 `y = C(B(A(x)))`.
+
+### 📝 결정 기록: abc + @override 도입 실험
+
+**쟁점**: 책 원본(step02/03)은 `raise NotImplementedError()`. 브로가 step03에서 변형 실험으로 `abc.ABC` + `@abstractmethod` + `@override`를 도입해봄.
+
+**후보**:
+- `raise NotImplementedError()` (책 원본) — 단순, 학습 명확성
+- `abc.ABC` + `@abstractmethod` (Python 공식) — 런타임 강제력 (인스턴스 생성 시 검사)
+- 추가로 `@override` (Python 3.12+) — 자식 재정의 명시, 정적 분석 도구(mypy/pyright)로 검증
+
+**결정**: step03에선 **abc + @override 도입** (변형 실험)
+**이유**: "강제력 차이"를 직접 체감하기 위함. 특히 `@override`는 런타임 강제력이 없고 정적 분석 도구가 필요하다는 핵심 통찰을 코드로 확인.
+
+**핵심 발견 — 강제력 차이**:
+| 데코레이터 | 런타임 강제 | 정적 분석 필요 |
+|---|---|---|
+| `@abstractmethod` | ✅ 강제 (인스턴스 생성 거부) | ❌ |
+| `@override` | ❌ 없음 (조용히 통과) | ✅ mypy/pyright 필수 |
+
+→ 자세한 건 exploration_09 §9에서 심화 정리.
+
+> 📌 step02 노트에선 "학습 스크립트는 NotImplementedError 유지"라 했으나, step03에선 변형 허용. 단, `rezero/core.py`(향후 프레임워크 코드)로 모을 시점엔 정적 분석 도구 설정(pyproject.toml mypy/pyright) 여부에 따라 @override 의미 달라짐.
 
 ### 🔗 관련 링크
 
+- Issue: https://github.com/ghjang/deep-learning-from-scratch-3/issues/4
+- 구현: `rezero/steps/step03.py`
+- 정답지: `steps/step03.py`
+- 🎨 디자인 패턴: [notes/design_patterns.md](./notes/design_patterns.md) §2 Template Method (Exp가 확장력 예시)
+- 🧪 탐구 #9: [notes/exploration_09_abc_abstract.md](./notes/exploration_09_abc_abstract.md) §9 `@override` 심화 (강제력 차이)
 
 ### 📝 코드 / 수식 메모
 
+```python
+A = Square()
+B = Exp()
+C = Square()
 
+x = Variable(np.array(0.5))
+a = A(x)      # 0.5² = 0.25
+b = B(a)      # e^0.25 ≈ 1.2840
+y = C(b)      # 1.2840² ≈ 1.6487
+```
+
+- `np.exp`: 자연대수 밑 e(≈2.718)의 거듭제곱. sigmoid/softmax 활성화 함수의 핵심. step27에서 `Exp`/`Log` 재등장 예정
+- `**` 연산자: 파이썬 내장 거듭제곱. 정수/실수 operand 모두 가능 (`x ** 0.5` = 제곱근). step22에서 `__pow__` 매직 메서드로 다시 만남
+
+**키워드**: `#함수연쇄` `#chain` `#계산그래프` `#Exp` `#np.exp` `#합성함수` `#TemplateMethod확장력` `#abc` `#abstractmethod` `#override` `#강제력차이` `#메서드` `#C++멤버함수`
 ---
 
 ## Step 04 — [1고지] 수치 미분 (수치 미분 구현)
