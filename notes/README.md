@@ -18,6 +18,7 @@
 | 9 | [exploration_09_abc_abstract.md](./exploration_09_abc_abstract.md) | step02 직후 | Python 추상 클래스: `abc.ABC` vs `raise NotImplementedError()` (에러 시점, 강제력, 메타클래스) |
 | 10 | [exploration_10_what_is_derivative.md](./exploration_10_what_is_derivative.md) | step04 직후 | 도대체 미분이 뭔데? — 수치 미분에서 깨달은 본질 (수포자 학습 궤적, 블랙박스 미분, autograd 기반) |
 | 11 | [exploration_11_autodiff_modes.md](./exploration_11_autodiff_modes.md) | step04 직후 | 자동 미분의 두 모드: 포워드 vs 리버스 (왜 신경망은 역전파인가, 수치 미분 캐싱 한계, 비용 비교) |
+| 12 | [exploration_12_language_binding.md](./exploration_12_language_binding.md) | step04 직후 | 언어 바인딩/타이핑: early vs late binding, 정적 vs 동적 타이핑, C/C++/Java/Python/JS 비교 (step04 `f` 재사용에서 출발) |
 
 > 파일 번호 = **생성 순서** (탐구 역사 보존)
 > 아래 "추천 읽는 순서"는 처음 읽을 때 논리적 흐름 기준

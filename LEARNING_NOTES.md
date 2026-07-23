@@ -42,6 +42,7 @@
 | 9 | step02 직후 | Python 추상 클래스 (`abc.ABC` vs `NotImplementedError`) | [notes/exploration_09_abc_abstract.md](./notes/exploration_09_abc_abstract.md) |
 | 10 | step04 직후 | 도대체 미분이 뭔데? (수치 미분에서 깨달은 본질, 아하 모먼트) | [notes/exploration_10_what_is_derivative.md](./notes/exploration_10_what_is_derivative.md) |
 | 11 | step04 직후 | 자동 미분 두 모드 (포워드 vs 리버스, 왜 역전파인가) | [notes/exploration_11_autodiff_modes.md](./notes/exploration_11_autodiff_modes.md) |
+| 12 | step04 직후 | 언어 바인딩/타이핑 (early/late binding, 정적/동적 타이핑, 언어 비교) | [notes/exploration_12_language_binding.md](./notes/exploration_12_language_binding.md) |
 
 ### 🎨 디자인 패턴 (횡단 관심사, 누적형)
 
@@ -254,24 +255,72 @@ y = C(b)      # 1.2840² ≈ 1.6487
 ## Step 04 — [1고지] 수치 미분
 
 **Issue**: [#5](https://github.com/ghjang/deep-learning-from-scratch-3/issues/5)
-**완료일**: -
-**상태**: 🔄
+**완료일**: 2026-07-24
+**상태**: ✅
 
 ### 📖 요약 (한 줄)
 
-
-### ❓ 질문 / 막힌 점
-
+`numerical_diff` 함수로 중앙 차분(central difference) 수치 미분 구현. `Function.__call__`에 `self.input`/`self.output` 추가 — step07 역전파의 복선. 수치 미분의 "느림"이 역전파를 필요로 하는 이유 체감.
 
 ### 💡 통찰 / 배운 점
 
+**★ 미분의 본질에 대한 아하 모먼트** — 이번 step의 진짜 수확은 코드 자체보다 **개념적 깨달음**.
+- "미분 = 공식 외우기"라는 오해에서 벗어남 → "미분 = 순간 변화율(변화를 측정하는 도구)"
+- **코드로 짠 함수(신경망)도 미분 가능** → autograd의 철학적 기반 체감
+- 3Blue1Brown 영상 시청(수동) vs 코드 구현(능동)의 차이 — Feynman technique
+→ 상세: exploration_10 "도대체 미분이 뭔데?"
+
+**중앙 차분 공식**: `f'(x) ≈ [f(x+h) - f(x-h)] / 2h`
+- 왜 전진 차분 안 쓰고 2h로 나누나 → 오차 O(h²)로 감소 (step05 심화)
+
+**★ Function.__call__ 복선** — `self.input`/`self.output` 저장은 "왜?" 의문에서 시작.
+- 이유: step07+ 역전파에서 "어떤 입력이 들어왔는지" 알아야 backward 계산 가능
+- 미리 저장해두는 것 = Define-by-Run 패턴의 핵심 (순전파 시점에 그래프 기록)
+
+**수치 미분의 한계 체감** — N개 파라미터 → 2N회 순전파. 백만 파라미터 신경망이면 백만 배 느림.
+→ 역전파(리버스 모드 autodiff)가 왜 필요한지 실감. 상세: exploration_11
+
+### 📝 결정 기록: `f` 변수 재사용 수정
+
+**쟁점**: 책 원본 step04.py에서 `f = Square()` 후 `def f(x):`로 같은 이름 재사용 → IDE 빨간줄.
+
+**후보**:
+- 그대로 유지 (책 충실성)
+- 이름 분리 (`sq`, `composite_f`) — name shadowing 악취 제거
+
+**결정**: 이름 분리 (`sq`, `composite_f`)
+**이유**: name shadowing은 버그는 아니지만 "실행 순서 의존적"이라 순서 바꾸면 깨짐. 학습용 스크립트라도 나쁜 패턴은 피하는 게 교육적. 원본은 steps/에 보존되어 있으니 rezero는 깔끔하게.
+**파생 탐구**: 이 문제에서 "왜 파이썬은 후방 참조 OK?" → C/C++과 비교 → early/late binding, 정적/동적 타이핑까지 확장 → exploration_12
 
 ### 🔗 관련 링크
 
+- Issue: https://github.com/ghjang/deep-learning-from-scratch-3/issues/5
+- 구현: `rezero/steps/step04.py`
+- 정답지: `steps/step04.py`
+- 🧪 탐구 #10: [notes/exploration_10_what_is_derivative.md](./notes/exploration_10_what_is_derivative.md) — 미분 본질 (아하 모먼트 서사)
+- 🧪 탐구 #11: [notes/exploration_11_autodiff_modes.md](./notes/exploration_11_autodiff_modes.md) — 포워드/리버스 모드 (수치 미분의 한계)
+- 🧪 탐구 #12: [notes/exploration_12_language_binding.md](./notes/exploration_12_language_binding.md) — 언어 바인딩/타이핑 (`f` 재사용에서 출발)
 
 ### 📝 코드 / 수식 메모
 
+```python
+def numerical_diff(f, x, eps=1e-4):
+    x0 = Variable(x.data - eps)
+    x1 = Variable(x.data + eps)
+    y0 = f(x0)                          # 블랙박스: f 내부 몰라도 호출만 하면 됨
+    y1 = f(x1)
+    return (y1.data - y0.data) / (2 * eps)
+```
 
+**검증 결과**:
+- `Square(x=2)` 미분: 4.000000 (정답 2x=4 ✅)
+- 합성 `y=(e^(x²))²`, x=0.5: 3.297443 (해석적 정답 e^0.5·2≈3.2974 ✅, 오차 0.00004)
+
+**eps=1e-4 트레이드오프**: 너무 작으면 부동소수점 오차, 너무 크면 근사 오차. 1e-4가 적절한 타협점 (step05에서 심화).
+
+**수식**: `y = (e^(x²))² = e^(2x²)`, `y' = e^(2x²)·4x`
+
+**키워드**: `#수치미분` `#중앙차분` `#central-difference` `#numerical_diff` `#eps` `#1e-4` `#블랙박스미분` `#autograd철학` `#self.input` `#self.output` `#역전파복선` `#DefineByRun` `#name-shadowing` `#아하모먼트` `#미분본질` `#Feynman-technique`
 ---
 
 ## Step 05 — [1고지] 수치 미분 이론 [No code]
