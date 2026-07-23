@@ -24,10 +24,10 @@
 
 ## 📈 전체 요약
 
-- **완료**: 2 / 60 (step01, step02 ✅)
+- **완료**: 3 / 60 (step01, step02, step03 ✅)
 - **진행 중**: 0
 - **막힘**: 0
-- **마지막 업데이트**: 2026-07-23 — step02 완료
+- **마지막 업데이트**: 2026-07-23 — step03 완료
 
 ---
 
@@ -43,9 +43,9 @@
 
 | Step | 주제 | 상태 | Issue | 완료일 | 메모 |
 |---|---|---|---|---|---|
-| step01 | 테니스 공 같은 '상자' (Variable 도입) | ✅ | [#2](https://github.com/ghjang/deep-learning-from-scratch-3/issues/2) | 2026-07-21 | Variable 래퍼 패턴, ndarray 차원 |
+| step01 | 상자로서의 변수 | ✅ | [#2](https://github.com/ghjang/deep-learning-from-scratch-3/issues/2) | 2026-07-21 | Variable 래퍼 패턴, ndarray 차원 |
 | step02 | 변수를 낳는 함수 (Function 도입) | ✅ | [#3](https://github.com/ghjang/deep-learning-from-scratch-3/issues/3) | 2026-07-23 | Function/Template Method, 패턴 노트 신설, abc 탐구 |
-| step03 | 함수와 연산자 (연산자 오버로딩 입문) | ⏳ | - | - | - |
+| step03 | 함수 연결 | ✅ | [#4](https://github.com/ghjang/deep-learning-from-scratch-3/issues/4) | 2026-07-23 | Exp 추가, 함수 연쇄=계산그래프, abc+@override 실험 |
 | step04 | 수치 미분 (수치 미분 구현) | ⏳ | - | - | - |
 | step05 | 수치 미분 이론 [No code] | ⏳ | - | - | - |
 | step06 | 역전파 이론 (계산 그래프, 국소적 미분) | ⏳ | - | - | - |
