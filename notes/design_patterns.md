@@ -16,6 +16,8 @@
 | 1 | Wrapper (래퍼 / 박싱) | step01 | 구조 (GoF: Decorator/Adapter 근원) |
 | 2 | Template Method | step02 | 행동 (GoF) |
 
+> 📖 하단에 [용어집(Glossary)](#📖-용어집-glossary--번역이-어색한-oop패턴-용어-모음) 섹션 있음 — 한국어 OOP/패턴 용어 중 원어 모르면 이해 어려운 것들.
+
 ---
 
 ## 1. Wrapper 패턴 (래퍼 / 박싱)
@@ -118,5 +120,38 @@ class Square(Function):                 # 자식은 forward()만 정의하면 OK
 | **GoZ 분류** | 구조 (Decorator/Adapter 근원) | 행동 |
 
 → `Variable`(래퍼)을 `Function.__call__`(템플릿)이 다루는 구조. 두 패턴이 **협력**해서 DeZero의 기본 골격을 이룸.
+
+---
+
+## 📖 용어집 (Glossary) — 번역이 어색한 OOP/패턴 용어 모음
+
+> 한국어 OOP/패턴 용어 중 **원어를 모르면 이해하기 어려운** 것들 정리.
+> 일상어와 의미가 충돌하거나, 번역이 어색해 헷갈리는 경우 위주.
+
+| 한국어 | 원어 | 실제 의미 | 비고 |
+|---|---|---|---|
+| **구상 클래스** | Concrete class | "구체화된 클래스" — 실제 구현을 가진 자식 클래스 | ⚠️ 일상어 "구상(구상하다=생각하다)"과 충돌. OOP에선 "abstract(추상) ↔ concrete(구체)" 대척 개념 |
+| **추상 클래스** | Abstract class | "추상적인 클래스" — 구현 없이 개념만 정의한 부모 클래스 | 비교적 직관적이라 헷갈림 적음 |
+| **래퍼** | Wrapper | "감싸는 것" — 객체를 다른 객체로 감싸는 구조 | 일상어와 일치, 헷갈림 없음 |
+| **데코레이터** | Decorator | (1) **패턴**: 기능 추가를 위해 객체를 감쌈. (2) **파이썬 기능**: `@` 구문으로 함수/클래스 장식 | ⚠️ 두 의미 혼동 주의. GoF 패턴 vs 파이썬 `@decorator` |
+| **디스크립터** | Descriptor | 속성 접근을 커스터마이징하는 객체 (`__get__`, `__set__`) | 번역 없이 음차. `property`가 대표적 디스크립터 |
+| **메타클래스** | Metaclass | "클래스의 클래스" — 클래스 생성을 커스터마이징 | `type`이 최상위 메타클래스. abc.ABCMeta 등 |
+| **인스턴스** | Instance | 클래스로부터 생성된 구체적 객체 | 번역 없이 음차. 일상어 혼동 적음 |
+| **인스턴스화** | Instantiation | 클래스 → 인스턴스를 만드는 행위 | "instantiation"의 번역. "객체 생성"과 거의 동의어 |
+| **상속** | Inheritance | 부모 클래스의 속성/메서드를 자식이 물려받음 | 직관적 |
+| **오버로딩** | Overloading | 같은 이름의 함수/연산자를 여러 정의로 쓰는 것 | ⚠️ 파이썬에선 진짜 오버로딩 없음. 연산자 오버로딩은 `__add__` 등 매직 메서드 정의 |
+| **오버라이딩** | Overriding | 부모의 메서드를 자식이 **재정의**하는 것 | Square.forward가 Function.forward를 오버라이딩 |
+| **매직 메서드** | Magic method (dunder) | `__init__`, `__call__` 등 밑줄 2개로 둘러싼 특수 메서드 | "dunder" = double underscore. "스페셜 메서드"라고도 |
+| **메서드** | Method | 클래스 내부에 정의된 함수 | ⚠️ C++에서는 "멤버 함수(member function)"라 부름. Python/Java/C#/Ruby 등은 "메서드". 사실상 동일 개념, 언어 전통만 다름 (C++: 함수 중심 / Smalltalk: 메시지 전달 패러다임) |
+| **@override** | Override 데코레이터 (Python 3.12+) | 부모 메서드를 재정의함을 명시 | ⚠️ 런타임 강제력 ❌ (정적 분석 도구 mypy/pyright 필수). C++ `override`/Java `@Override`와 비슷하지만 강제력 약함. 상세: exploration_09 §9 |
+
+### 💡 자주 헷갈리는 쌍
+
+- **추상(abstract) ↔ 구상(concrete)**: 개념 ↔ 구현. GoF 책의 기본 대척.
+- **오버로딩(overloading) ↔ 오버라이딩(overriding)**: 이름 같은 여러 함수 ↔ 부모 메서드 재정의. **파이썬에선 오버라이딩만 진짜 기능**.
+- **인스턴스(instance) ↔ 객체(object)**: 거의 동의어. 엄밀히는 "클래스로부터 만든 객체"가 인스턴스.
+- **매개변수(parameter) ↔ 인자(argument)**: 정의부 변수 ↔ 호출부 값 (step02 결정 기록에서 정리)
+- **메서드(method) ↔ 함수(function)**: 클래스 내부 정의 ↔ 독립 함수. C++ "멤버 함수" = "메서드". 파이썬에선 실제로 "첫 인자 self 자동 바인딩" 설명자로 함수를 감싼 것뿐
+- **@override ↔ @abstractmethod**: 재정의 명시 (정적 분석) ↔ 구현 강제 (런타임). 강제력과 검사 시점이 다름. 상세: exploration_09 §9
 
 ---
