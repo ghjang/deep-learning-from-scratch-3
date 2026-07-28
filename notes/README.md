@@ -19,6 +19,9 @@
 | 10 | [exploration_10_what_is_derivative.md](./exploration_10_what_is_derivative.md) | step04 직후 | 도대체 미분이 뭔데? — 수치 미분에서 깨달은 본질 (수포자 학습 궤적, 블랙박스 미분, autograd 기반) |
 | 11 | [exploration_11_autodiff_modes.md](./exploration_11_autodiff_modes.md) | step04 직후 | 자동 미분의 두 모드: 포워드 vs 리버스 (왜 신경망은 역전파인가, 수치 미분 캐싱 한계, 비용 비교) |
 | 12 | [exploration_12_language_binding.md](./exploration_12_language_binding.md) | step04 직후 | 언어 바인딩/타이핑: early vs late binding, 정적 vs 동적 타이핑, C/C++/Java/Python/JS 비교 (step04 `f` 재사용에서 출발) |
+| 13 | [exploration_13_derivative_notation.md](./exploration_13_derivative_notation.md) | step05 진행 중 | 미분 표기법의 두 얼굴: `dy/dx` vs `df/dx` (Leibniz/Lagrange, 국소적 미분, 역전파 수학) |
+| 14 | [exploration_14_derivative_terminology.md](./exploration_14_derivative_terminology.md) | step05 진행 중 | "미분" 용어 7중 혼돈과 해독 전략 (미분값/도함수/미분연산, 한영 대조, 밑시딥 실전 해독) |
+| 15 | [exploration_15_math_symbol_origins.md](./exploration_15_math_symbol_origins.md) | step05 진행 중 | 수학 기호의 어원과 역사 (√/∫/d/∂/∇/∞ 왜 이런 모양인가, radix/summa/differentia) |
 
 > 파일 번호 = **생성 순서** (탐구 역사 보존)
 > 아래 "추천 읽는 순서"는 처음 읽을 때 논리적 흐름 기준

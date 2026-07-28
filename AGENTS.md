@@ -581,6 +581,105 @@ GitHub 웹 UI(특히 Safari)의 이슈 목록엔 **바로 나타나지 않는** 
 > 작업 흐름(progress/notes 링크 등)엔 영향 없음. 기다리면 해결됨.
 > "Issues 탭 클릭하면 보인다"는 **오해** — 클릭이 아니라 **시간**이 해결책.
 
+### 9. Markdown 수식 렌더링 — Markdown Preview Enhanced (MPE)
+
+`notes/` 학습 노트(exploration_13_derivative_notation.md 등)는 **LaTeX 수학 수식**을
+사용한다. 인라인 `$...$` 와 블록 `$$...$$` 모두 활용.
+
+VSCode 기본 Markdown Preview는 수식을 렌더링하지 않기 때문에,
+**Markdown Preview Enhanced (MPE)** 확장을 설치해야 노트가 제대로 보인다.
+
+**설정**:
+
+| 항목 | 값 |
+|---|---|
+| 확장 ID | `shd101wyy.markdown-preview-enhanced` |
+| 추천 등록 | `.vscode/extensions.json` 에 명시 → 레포 열 때 VSCode가 자동 권장 |
+| `previewTheme` 설정 | `github-dark.css` (사용자 전역 settings.json) — 다크 테마 친화적 |
+
+**브로가 선택한 세팅** (2026-07-28 기준):
+- 확장: Markdown Preview Enhanced
+- 테마: `github-dark.css` (VSCode 다크 테마와 톤 일치)
+
+**설치/변경 가이드**:
+1. VSCode 확장 탭에서 "Markdown Preview Enhanced" 검색/설치
+   - 또는 `.vscode/extensions.json` 덕분에 레포 열면 자동 권장 팝업
+2. `Cmd+,` → `markdown-preview-enhanced previewTheme` 검색 → `github-dark.css` 선택
+3. (자동으로 사용자 전역 settings.json에 저장됨)
+4. `Cmd+Shift+P` → "Markdown Preview Enhanced: Open Preview" 로 미리보기
+
+**Gotcha — 인용구 안 `$$` 블록 렌더링 깨짐**:
+
+MPE는 **인용 블록(`>`) 안에 `$$...$$` 블록 수식이 들어가면 제대로 렌더링하지 못함**.
+(수식이 그냥 텍스트로 보이거나 `>` 기호가 노출되는 현상)
+
+→ **해결**: 블록 수식은 인용구 바깥으로 빼서 작성. 인용구 안에서는 인라인 `$...$` 만 사용.
+
+```markdown
+<!-- ❌ 이렇게 쓰면 깨짐 -->
+> 결론:
+>
+> $$
+> \frac{dy}{dx} = f'(x)
+> $$
+
+<!-- ✅ 이렇게 써야 함 -->
+> 결론: 아래 수식 참고.
+
+$$
+\frac{dy}{dx} = f'(x)
+$$
+```
+
+**Gotcha — 분수 렌더링**:
+
+인라인에서 `$dy/dx$` 라고 쓰면 슬래시가 그대로 보임(진짜 분수로 렌더링 안 됨).
+분수로 보이려면 `$\dfrac{dy}{dx}$` 또는 `$\frac{dy}{dx}$` 사용.
+
+→ `notes/` 작성 시 처음부터 `\dfrac{}{}` 사용 권장. (탐구 #13 참고)
+
+**Gotcha — 레텍 수식 안에는 따옴표/한국어 기호 쓰지 말 것 (MathJax 내부 한계)**:
+
+MPE의 수식 렌더링 엔진(MathJax/KaTeX)은 **수식 안 `\text{}` 안에서 한국어/직선 따옴표의
+여는/닫는 구분을 안 함**. 양쪽이 모두 같은 기호로 렌더링되는 현상 발생.
+
+```
+❌ 깨짐:  \text{"제곱하라"}   →  양쪽이 같은 닫는 따옴표로 보임
+❌ 깨짐:  \text{"제곱하라"}   →  MathJax가 한국어 타이포그래픽 따옴표 미지원
+✅ OK:   \text{제곱하라}      →  따옴표 없이 작성
+✅ OK:   \textit{제곱하라}    →  이탤릭으로 강조 (필요 시)
+```
+
+**원인**: MPE(또는 그 아래 MathJax)의 내부 한계. 일반 텍스트(마크다운 본문)에서는
+MPE가 smart quote를 잘 적용하지만, **수식 모드 안에서는 LaTeX 문법만 해석**하기 때문.
+
+→ `notes/` 작성 시 **수식 안 `\text{}` 안에 따옴표 넣지 말 것**.
+강조가 필요하면 따옴표 없이 작성하거나, `\textit{}` 사용하거나, 수식 밖으로 빼서
+마크다운 본문에서 따옴표 처리할 것.
+
+**Gotcha — 마크다운 볼드 안쪽에 괄호/따옴표 넣지 말 것 (파서 깐깐함)**:
+
+MPE가 쓰는 markdown-it 계열 파서는 **닫는 괄호/따옴표 다음 `**`가 오면 볼드 닫기로 안 인식**하는 경우가 있음. `**`가 그대로 노출되는 현상 발생.
+
+```
+❌ 깨짐:  **함수(규칙)**인데    →  닫는 괄호 + ** 인접 → 볼드 안 닫힘
+❌ 깨짐:  "표현"**처럼**         →  닫는 따옴표 + ** 인접 → 볼드 안 닫힘
+✅ OK:   **함수**(규칙)인데    →  괄호를 볼드 밖으로
+✅ OK:   **"표현"처럼**         →  따옴표를 볼드 안쪽으로
+```
+
+**안전 규칙**:
+- `**A(B)**` 금지 → `**A**(B)` 권장 (괄호 밖으로)
+- `**"A"**B` 금지 → `**"A" B**` 또는 `**"A"** B` 권장
+- 일반적으로 **볼드 경계 `**` 바로 옆에 다른 닫는 기호(`)`, `"`, `]`)가 오지 않게** 배치
+
+→ `notes/` 작성 시 볼드 안쪽에 괄호/따옴표를 넣어야 하면, **괄호/따옴표를 밖으로 빼서 볼드 경계를 깔끔하게** 유지할 것.
+
+**관련 파일**:
+- `.vscode/extensions.json` — 추천 확장 목록
+- `notes/exploration_13_derivative_notation.md` — LaTeX 수식 본격 도입된 첫 노트
+- `notes/exploration_14_derivative_terminology.md` — 인라인 수식만 사용한 모범 사례
+
 ---
 
 ## 🔄 워크플로

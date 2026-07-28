@@ -24,10 +24,10 @@
 
 ## 📈 전체 요약
 
-- **완료**: 4 / 60 (step01~04 ✅)
+- **완료**: 5 / 60 (step01~05 ✅)
 - **진행 중**: 0
 - **막힘**: 0
-- **마지막 업데이트**: 2026-07-24 — step04 완료
+- **마지막 업데이트**: 2026-07-28 — step05 완료
 
 ---
 
@@ -47,8 +47,8 @@
 | step02 | 변수를 낳는 함수 (Function 도입) | ✅ | [#3](https://github.com/ghjang/deep-learning-from-scratch-3/issues/3) | 2026-07-23 | Function/Template Method, 패턴 노트 신설, abc 탐구 |
 | step03 | 함수 연결 | ✅ | [#4](https://github.com/ghjang/deep-learning-from-scratch-3/issues/4) | 2026-07-23 | Exp 추가, 함수 연쇄=계산그래프, abc+@override 실험 |
 | step04 | 수치 미분 | ✅ | [#5](https://github.com/ghjang/deep-learning-from-scratch-3/issues/5) | 2026-07-24 | numerical_diff 중앙차분, self.input/output 복선, 탐구 3종 (#10/#11/#12) |
-| step05 | 수치 미분 이론 [No code] | ⏳ | - | - | - |
-| step06 | 역전파 이론 (계산 그래프, 국소적 미분) | ⏳ | - | - | - |
+| step05 | 역전파 이론 [No code] | ✅ | [#6](https://github.com/ghjang/deep-learning-from-scratch-3/issues/6) | 2026-07-28 | 역전파=chain rule, 계산그래프, 국소적 미분; 탐구 3종 (#13 표기법+fold 통찰 / #14 용어 / #15 기호 어원) |
+| step06 | 수동 역전파 (Variable.grad, Function.backward) | ⏳ | - | - | - |
 | step07 | 역전파 구현 - Variable.backward() | ⏳ | - | - | - |
 | step08 | Function.backward() 구현 | ⏳ | - | - | - |
 | step09 | 함수를 더 편하게 (Function 기반 클래스화) | ⏳ | - | - | - |

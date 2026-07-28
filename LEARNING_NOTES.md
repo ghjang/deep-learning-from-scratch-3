@@ -43,6 +43,9 @@
 | 10 | step04 직후 | 도대체 미분이 뭔데? (수치 미분에서 깨달은 본질, 아하 모먼트) | [notes/exploration_10_what_is_derivative.md](./notes/exploration_10_what_is_derivative.md) |
 | 11 | step04 직후 | 자동 미분 두 모드 (포워드 vs 리버스, 왜 역전파인가) | [notes/exploration_11_autodiff_modes.md](./notes/exploration_11_autodiff_modes.md) |
 | 12 | step04 직후 | 언어 바인딩/타이핑 (early/late binding, 정적/동적 타이핑, 언어 비교) | [notes/exploration_12_language_binding.md](./notes/exploration_12_language_binding.md) |
+| 13 | step05 진행 중 | 미분 표기법의 두 얼굴 (`dy/dx` vs `df/dx`, Leibniz/Lagrange, 국소적 미분, 역전파 수학) | [notes/exploration_13_derivative_notation.md](./notes/exploration_13_derivative_notation.md) |
+| 14 | step05 진행 중 | "미분" 용어 7중 혼돈과 해독 전략 (미분값/도함수/미분연산, 한영 대조, 밑시딥 실전) | [notes/exploration_14_derivative_terminology.md](./notes/exploration_14_derivative_terminology.md) |
+| 15 | step05 진행 중 | 수학 기호의 어원과 역사 (√/∫/d/∂/∇/∞ 모양의 진짜 이유) | [notes/exploration_15_math_symbol_origins.md](./notes/exploration_15_math_symbol_origins.md) |
 
 ### 🎨 디자인 패턴 (횡단 관심사, 누적형)
 
@@ -324,25 +327,72 @@ def numerical_diff(f, x, eps=1e-4):
 **키워드**: `#수치미분` `#중앙차분` `#central-difference` `#numerical_diff` `#eps` `#1e-4` `#블랙박스미분` `#autograd철학` `#self.input` `#self.output` `#역전파복선` `#DefineByRun` `#name-shadowing` `#아하모먼트` `#미분본질` `#Feynman-technique`
 ---
 
-## Step 05 — [1고지] 수치 미분 이론 [No code]
+## Step 05 — [1고지] 역전파 이론 [No code]
 
-**Issue**: (링크)
-**완료일**: -
-**상태**: ⏳
+**Issue**: [#6](https://github.com/ghjang/deep-learning-from-scratch-3/issues/6)
+**완료일**: 2026-07-28
+**상태**: ✅
 
 ### 📖 요약 (한 줄)
 
+역전파 = 연쇄법칙(chain rule)을 계산 그래프에 역방향으로 흘려보내는 시스템. 각 노드는 **자기 국소적 미분 ($df/dx$)만 계산**하고, 전체는 chain rule이 조립. 역전파 = **right fold ($\prod$ 곱하기 누적)** 패턴.
 
 ### ❓ 질문 / 막힌 점
 
+- ✅ 진도표/노트 제목 정정 (수치 미분 이론 → 역전파 이론)
+- 🎬 브로 유튜브 영상 발견: [합성함수 미분 규칙 증명 (연쇄법칙)](https://youtu.be/BUCUMmm-GQQ) — 엄밀성 검증은 마님 프로젝트 별도 세션
+- ❓ df/dx vs dy/dx → 탐구 #13에서 해명
+- ❓ "미분" 용어 다의성 → 탐구 #14에서 해독 휴리스틱 정리
 
 ### 💡 통찰 / 배운 점
 
+**★ 역전파 = right fold (`foldr`)** — 브로가 책 읽으며 자연스럽게 도달한 통찰. 최종 출력 $y$에서 출발해 오른쪽→왼쪽으로 $\prod$(곱) 누적. step07(재귀) → step08(반복문) 구조를 미리 잡은 사고방식.
+
+**★ 국소적 미분 = $df/dx$ 관점** — 각 노드는 자기 함수만 미분 (`Square.backward()`의 `2*x` = Square의 $df/dx$). 전체 $dy/dx$는 chain rule이 조립. 이게 역전파 설계와 완벽히 일치.
+
+**★ `gy`/`gx` 변수명** — `gy` = upstream gradient (fold 누적값), `gx` = downstream gradient (다음 노드로 전달). 책 원서 변수명은 짧지만 의미가 투명하지 않음. step06 구현에서 변수명 변형 실험 후보 (upstream_grad/downstream_grad).
+
+**★ 미분 연산자 $\dfrac{d}{dx}$** = 고차 함수 (lazy evaluation). 브로의 제곱근/lazy 비유($\sqrt{4}$는 "구하라"는 명령)가 수학 기호 일반의 패턴으로 확장.
+
+**★ 그래디언트 정의 조건** — 출력이 스칼라(1개)인 함수만. 출력 다변수 벡터면 야코비안(Jacobian, Jacobi 1841)이 필요.
 
 ### 🔗 관련 링크
 
+- 🎬 [합성함수의 미분 규칙 증명 (연쇄법칙/체인룰) — 브로 유튜브](https://youtu.be/BUCUMmm-GQQ)
+  - 25초 숏폼 애니메이션 (파이썬 마님 + Suno BGM)
+  - 역전파의 수학적 기반인 연쇄법칙 시각화 → step05 본문과 직결
+  - > 엄밀한 증명 검증은 마님/VSCode 확장 프로젝트(별도 세션)에서 수행
+- 🧪 탐구 #13: [notes/exploration_13_derivative_notation.md](./notes/exploration_13_derivative_notation.md) — `dy/dx` vs `df/dx`, 역전파 수학 (★ step05 핵심 헷갈림, fold 통찰)
+- 🧪 탐구 #14: [notes/exploration_14_derivative_terminology.md](./notes/exploration_14_derivative_terminology.md) — "미분" 용어 7중 혼돈 해독 (미분값/도함수 구분)
+- 🧪 탐구 #15: [notes/exploration_15_math_symbol_origins.md](./notes/exploration_15_math_symbol_origins.md) — 수학 기호 어원/역사 (√, ∫, d, ∂, ∇ 모양의 진짜 이유)
+
 
 ### 📝 코드 / 수식 메모
+
+**chain rule (연쇄법칙)** — 합성함수 $y = f(g(x))$:
+
+$$
+\frac{dy}{dx} \;=\; \underbrace{f'(g(x))}_{\text{노드 } f \text{의 국소적 미분}} \cdot \underbrace{g'(x)}_{\text{노드 } g \text{의 국소적 미분}}
+$$
+
+**역전파 = right fold ($\prod$)**:
+
+$$
+\frac{dy}{dx} \;=\; \prod_{\text{모든 노드}} (\text{국소적 미분})
+$$
+
+**DeZero 의사코드** (step06 예고):
+```python
+# 수동 right fold (한 스텝씩 손으로 호출)
+y.grad = 1.0              # fold 시작 (최종 출력에서)
+b.grad = C.backward(y.grad)   # fold step 1
+a.grad = B.backward(b.grad)   # fold step 2
+x.grad = A.backward(a.grad)   # fold step 3 (입력에 도달)
+```
+
+→ `gy` = upstream gradient (fold 누적값), `gx` = downstream gradient (다음 노드로 전달).
+
+**키워드**: `#역전파이론` `#연쇄법칙` `#chain-rule` `#국소적미분` `#df/dx` `#right-fold` `#foldr` `#upstream-gradient` `#downstream-gradient` `#gy/gx` `#미분연산자` `#고차함수` `#lazy` `#그래디언트` `#야코비안` `#아하모먼트`
 
 
 ---
