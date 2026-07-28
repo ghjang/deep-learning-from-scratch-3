@@ -697,7 +697,10 @@ fork 레포에서의 동작:
 
 즉 **이 레포 이슈가 우선**이지만, 없는 번호는 상위 fork 체인을 타고 올라가 원본(oreilly-japan)까지 연결된다.
 
-참고: [GitHub 공식 — Autolinked references and URLs](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/autolinked-references-and-urls)
+> 📌 **근거에 대하여**: 이 동작은 GitHub 공식 문서에 명시적 설명이 없다.
+> [Autolinked references and URLs](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/autolinked-references-and-urls) 문서는 `#N` 기본 형식과 `owner/repo#N` 명시적 형식만 다룰 뿐, fork에서 없는 번호의 동작은 다루지 않는다.
+> 위 룰은 **2026-07-28 우리 레포에서 실증적으로 확인**한 것이다 (oreilly-japan #10/#11 이슈로 실제 연결 + referenced 이벤트 영구 잔류 확인).
+> 일반적으로 "fork에 없는 번호는 404"라는 설명도 인터넷에 흩어져 있으나, 우리 경험으로는 **상위 fork로 연결되며 referenced 이벤트까지 박힌다**. 스펙과 실제 동작이 다를 수 있으니 주의.
 
 #### ② 핵심: 잘못된 참조는 "양방향" 부작용을 낳는다
 
