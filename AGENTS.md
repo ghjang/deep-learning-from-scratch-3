@@ -685,23 +685,34 @@ MPE가 쓰는 markdown-it 계열 파서는 **닫는 괄호/따옴표 다음 `**`
 이 레포는 **fork** (`parent: WegraLee/deep-learning-from-scratch-3`, 그 상위 `oreilly-japan`)이다.
 GitHub는 커밋 메시지/이슈 본문에 `#N` 형태가 보이면 **이슈 자동 링크**로 렌더링한다.
 
-**문제**: 이 레포엔 없는 번호(#7 이상)를 쓰면, GitHub가 **상위 fork 네트워크**(WegraLee → oreilly-japan)에서
-해당 번호 이슈를 찾아 연결해버림. 클릭하면 **일본어 원본 레포 이슈**로 튕김.
+#### GitHub의 fork 자동 링크 동작 (정확한 룰)
 
-**사례** (2026-07-28 발견):
+| 상황 | 어디로 연결? |
+|---|---|
+| fork(이 레포)에 해당 번호 이슈 **있음** | **이 레포 이슈로 연결** ✅ |
+| fork에 해당 번호 이슈 **없음** | **상위 fork 네트워크에서 찾음** → WegraLee → oreilly-japan 순서 ❌ |
+
+→ 핵심: **이 레포 이슈가 우선이지만, 없는 번호는 상위 fork로 튕김**.
+이슈 번호가 늘어나면(앞으로 #7, #8… 생성 시) 그 번호는 이 레포 이슈가 되어 안전.
+하지만 **탐구 노트 번호(15, 16, ...)는 이슈로 생성 안 하므로** 계속 위험.
+
+참고: [GitHub 공식 — Autolinked references and URLs](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/autolinked-references-and-urls)
+
+#### 사례 (2026-07-28 발견)
+
 - 커밋 메시지에 `탐구 #10`, `탐구 #11` 식으로 탐구 노트 번호를 `#N`으로 씀
-- 우리 레포엔 #10/#11 이슈가 없음 (현재 최대 #6)
+- 이 레포엔 #10/#11 이슈가 없었음 (당시 최대 #6)
 - GitHub가 상위 fork에서 #10/#11을 찾아 연결 → 클릭 시 오라일리 원본 일본어 레포로 이동
-- → "이슈 본문에 일본어 링크가 왜 있지?" 혼란 발생
+- → "이슈 본문에 일본어 링크가 왜 있지?" 혼란 발생 (브로가 GitHub UI에서 발견)
 
-**★ 규칙 (정확한 버전)**:
+#### ★ 규칙 — "이슈가 아닌 번호에 `#N` 쓰지 말 것"
 
 `#N` 표기 자체를 금지하는 게 아니라, **"이슈가 아닌 번호에 `#N`을 쓰지 말 것"** 이 핵심.
 
 | 상황 | 표기 | 비고 |
 |---|---|---|
-| **이슈 번호 참조** (#1~#6 등 실제 이슈) | `#N` ✅ 허용 | 자연스러운 GitHub 링크 |
-| **탐구 노트 번호** (exploration_NN) | `#N` ❌ 금지 | 깨진 링크(일본어) 유발 |
+| **이슈 번호 참조** (이 레포 실제 이슈) | `#N` ✅ 허용 | 자연스러운 GitHub 링크 |
+| **탐구 노트 번호** (exploration_NN) | `#N` ❌ 금지 | 깨진 링크(상위 fork) 유발 |
 | **AGENTS.md/노트 섹션 번호** (§N, #N) | `#N` ❌ 금지 | 같은 이유 |
 | **탐구 노트 참조 (올바른 방식)** | 문서 링크 + (선택)섹션 앵커 | 아래 패턴 참고 |
 
@@ -718,14 +729,38 @@ GitHub는 커밋 메시지/이슈 본문에 `#N` 형태가 보이면 **이슈 �
 [exploration_13_derivative_notation.md](./notes/exploration_13_derivative_notation.md) 참고
 
 <!-- ✅ 올바름 3: 링크 + 섹션 앵커 -->
-[탐구 #13 §7 역전파 연결](./notes/exploration_13_derivative_notation.md#역전파연결) 참고
+[exploration_13 §7 역전파 연결](./notes/exploration_13_derivative_notation.md#역전파연결) 참고
 ```
 
-→ 핵심: **이슈 번호(#1~#6)엔 `#N` 자유롭게 쓰고, 문서/섹션 번호엔 `#N` 대신 텍스트나 링크 사용.**
+→ 핵심: **이슈 번호엔 `#N` 자유롭게 쓰고, 문서/섹션 번호엔 `#N` 대신 텍스트나 링크 사용.**
 
-**참고**: 명시적 레포 지정(`ghjang/deep-learning-from-scratch-3#N`)도 가능하지만,
-우리 레포 이슈는 짧은 `#N` 형태가 자연스러움. fork 레포에서 `#N` 자동 링크 자체는
-GitHub 기본 동작이라 레포 설정으로 끌 수 없음. **작성 습관**으로만 방지.
+#### 참고: 명시적 레포 지정
+
+명시적 레포 지정(`ghjang/deep-learning-from-scratch-3#N`)도 가능. 이 레포 이슈는 짧은 `#N`이 자연스럽지만,
+상위 fork를 명시적으로 참조할 일이 생기면 `WegraLee/deep-learning-from-scratch-3#N` 또는
+`oreilly-japan/deep-learning-from-scratch-3#N` 형태 사용.
+
+#### 복구 이력 (2026-07-28)
+
+사태 발견 후 다음과 같이 복구함 (참고용):
+
+1. **AGENTS.md 본 절(#10) 신설** — 재발 방지 가이드
+2. **Issue 6 본문/코멘트 정정** — 깨진 `#N`을 exploration_NN 링크로 교체 (`gh issue edit` + `gh api PATCH`)
+3. **과거 커밋 메시지 일괄 치환** — `git filter-branch --msg-filter`로 66개 커밋의 `#N` 패턴을 텍스트로 치환
+4. **force push** (`--force-with-lease`) — 히스토리 재작성 반영
+5. **백업 브랜치 유지** — `backup-before-rebase` 브랜치로 원본 보존 (이상 없으면 며칠 뒤 삭제 가능)
+
+복구에 사용한 `sed` 치환 패턴 (필요 시 참고):
+- `탐구 #N` → `탐구 노트 N번`
+- `Known Gotchas #N` → `Known Gotchas 섹션 N`
+- `  - #N 미분/용어/수학` → `  - exploration_N 미분/용어/수학`
+
+#### 주의: 원 저자 레포(oreilly-japan)에 흔적 남지 않음
+
+브로가 우려한 "원 저자 레포에 참조 코멘트가 달렸을 것"은 **발생하지 않음**. 확인 결과:
+- oreilly-japan 레포에 ghjang 계정이 작성한 이슈/코멘트: 0건
+- GitHub UI가 우리 이슈 화면에 oreilly-japan 링크를 **렌더링만** 했을 뿐, 원 저자쪽엔 아무 것도 달리지 않음
+- 즉 **제거할 게 없음** — 우리쪽 링크만 고치면 끝
 
 ---
 
