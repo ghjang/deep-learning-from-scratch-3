@@ -8,6 +8,11 @@ tmp/
 
 *.dot
 *.json
+
+# 예외: .vscode/extensions.json은 추천 확장 목록이라 버전 관리 대상
+!.vscode/
+!.vscode/extensions.json
+
 src/.idea/*
 .idea/*
 

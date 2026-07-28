@@ -1,0 +1,13 @@
+{
+  // 이 저장소에서 작업할 때 권장하는 VSCode 확장.
+  // VSCode로 레포를 열면 우측 하단에 "권장 확장 설치" 팝업이 뜸.
+  //
+  // Markdown Preview Enhanced (MPE)
+  //   - notes/ 학습 노트의 LaTeX 수학 수식($...$, $$...$$) 렌더링용
+  //   - 설치 후 previewTheme 설정 (아래 AGENTS.md #9 참고)
+  {
+    "recommendations": [
+      "shd101wyy.markdown-preview-enhanced"
+    ]
+  }
+}
