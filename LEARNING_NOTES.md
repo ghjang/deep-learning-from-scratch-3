@@ -24,6 +24,15 @@
 
 ---
 
+## 🔧 rezero 개선 회계
+
+> 책 원본(`dezero/`) 대비 **rezero에서 적용/고려하는 개선사항** (타입 힌트, 네이밍, 추상화 강제력 등).
+> 생각나는 대로 append → step23(패키지화) 시점에 회수해서 `rezero/core.py`에 반영.
+
+👉 [REZERO_CHANGES.md](./REZERO_CHANGES.md)
+
+---
+
 ## 🧪 보충 탐구 노트 인덱스
 
 > step 진도 외에 깊이 파고 싶은 주제들은 `notes/` 디렉터리에 **주제별 개별 파일**로 정리.
@@ -397,25 +406,94 @@ x.grad = A.backward(a.grad)   # fold step 3 (입력에 도달)
 
 ---
 
-## Step 06 — [1고지] 역전파 이론 (계산 그래프, 국소적 미분)
+## Step 06 — [1고지] 수동 역전파 (Variable.grad, Function.backward)
 
-**Issue**: (링크)
-**완료일**: -
-**상태**: ⏳
+**Issue**: [#7](https://github.com/ghjang/deep-learning-from-scratch-3/issues/7)
+**완료일**: 2026-07-29
+**상태**: ✅
 
 ### 📖 요약 (한 줄)
 
+step05의 역전파 이론(chain rule, right fold)을 **코드로 구현**. `Variable.grad` 속성 + `Function.backward()` 메서드 도입. step04에서 깔아둔 `self.input` 복선이 회수되는 순간. 수동으로 한 스텝씩 backward 호출 = right fold를 손으로 unfold.
 
 ### ❓ 질문 / 막힌 점
 
+- ✅ `gy`/`gx` 변수명 → `upstream_grad`/`downstream_grad` + `local_deriv` 분리 변형 채택 (step05 통찰 반영)
+- ✅ `backward()` 추상화 → step04 스타일 유지, `@abstractmethod` + 자식에 `@override`
+- ✅ `Function.__call__`의 `self.output` → step06 정답지에선 미사용, step07+ 자동 역전파 복선
+- ✅ `Variable.grad` 정적 분석 경고 → `Optional[np.ndarray]` 타입 힌트로 해결
+- ⏭ `Variable.data: np.ndarray` 타입 힌트 → 선반영 시도했다 **취소** (forward 반환 타입 미정의로 Pyright 오류). 다음 step에서 Variable/Function 시그니처 **세트로** 도입 예정 → [REZERO_CHANGES.md](./REZERO_CHANGES.md) #001
 
 ### 💡 통찰 / 배운 점
 
+**★ 역전파 = right fold (foldr)의 코드 구현** — step05 통찰이 코드로 펼쳐짐.
+- 수동 역전파 `y.grad → C.backward → B.backward → A.backward` = 최종 출력에서 오른쪽→왼쪽으로 ∏ 누적
+- 각 `backward()` = fold accumulator step (받은 누적값에 자기 몫을 곱해 다음 타자에게 전달)
+
+**★ step04 복선 회수** — `self.input` 저장 이유가 드디어 밝혀짐.
+- 순전파 시점에 입력을 기억해둬야 backward에서 `x = self.input.data`로 회수 가능
+- 이게 Define-by-Run의 핵심 (순전파 시점에 그래프 기록)
+
+**★ 역전파가 수치 미분보다 정확하고 빠르다** — 코드로 체감.
+- 수치 미분(step04): 3.297443 (오차 0.00004, 입력 개수만큼 순전파 반복)
+- 역전파(step06): 3.297442541400256 (오차 0, 해석적 정답, 순전파 1회 분량)
+
+**★ `local_deriv` 분리의 힘** — 책 원본 한 줄(`gx = 2 * x * gy`)을 두 단계로 쪼개니, "자기 도함수 계산"과 "fold step"이 코드 구조로 드러남. 역전파 본질(각 노드는 자기 도함수만 계산)이 가독성으로 연결.
+
+### 📝 결정 기록: 변형 실험 3종 (step04 ABC 스타일 연장)
+
+**1. `gy`/`gx` → `upstream_grad`/`downstream_grad` + `local_deriv` 분리**
+
+정답지 한 줄을 의미 단위로 분해:
+```python
+# 정답지: gx = 2 * x * gy  (도함수와 fold step이 한 줄에 섞임)
+# rezero:
+local_deriv = 2 * x                          # ① 자기 도함수 (df/dx) 평가
+downstream_grad = local_deriv * upstream_grad # ② fold step (곱해서 누적)
+```
+→ step05 통찰("국소적 미분 = df/dx", "역전파 = fold")이 코드에 구현.
+상세: [notes/exploration_13_derivative_notation.md](./notes/exploration_13_derivative_notation.md) §8 (gy/gx 헷갈림 분석)
+
+**2. `Variable.grad: Optional[np.ndarray]` 타입 힌트**
+
+책 원본 `self.grad = None`은 정적 분석(VSCode Pylance)에서 `y.grad = np.array(1.0)` 시 경고.
+→ `Optional[np.ndarray]`로 해결 + **라이프사이클 명시** (역전파 전 None → 후 ndarray). PyTorch `grad: Optional[Tensor]`와 같은 패턴.
+
+**3. `backward()`도 `@abstractmethod` + `@override`**
+
+step04에선 forward만 ABC화. step06에선 backward도 추가 → 일관성. 자식 Square/Exp의 backward에 `@override` 부착.
+
+> 📌 변수명 변형(`x`/`y` 유지 vs `in_data`/`out_data`)은 검토 후 **`x`/`y` 유지** 결정. 이유: 수학 y=f(x)와 일치 + PyTorch 표준 + 행렬/텐서 확장성 (브로 통찰 "나중엔 행렬 올 텐데").
 
 ### 🔗 관련 링크
 
+- Issue: https://github.com/ghjang/deep-learning-from-scratch-3/issues/7
+- 구현: `rezero/steps/step06.py`
+- 정답지: `steps/step06.py`
+- 이전 step: step05 역전파 이론 (right fold 통찰)
+- 🎨 디자인 패턴: [notes/design_patterns.md](./notes/design_patterns.md) §2 Template Method (backward로 패턴 확장)
+- 🧪 탐구 #13: [notes/exploration_13_derivative_notation.md](./notes/exploration_13_derivative_notation.md) §8 역전파 연결 (gy/gx + fold 통찰, ★ step06 변형의 이론적 기반)
+- 🔧 rezero 개선 회계: [REZERO_CHANGES.md](./REZERO_CHANGES.md) #007~#009 (step06 변형 3종)
 
 ### 📝 코드 / 수식 메모
+
+**chain rule 전개** (합성 `y = (e^(x²))²`, `x = 0.5`):
+
+$$
+\frac{dy}{dx} = \underbrace{2b}_{C'} \cdot \underbrace{e^a}_{B'} \cdot \underbrace{2x}_{A'} = 2 \cdot 1.6487 \cdot e^{0.25} \cdot 1.0 = 3.2974\ldots
+$$
+
+**수동 역전파 (right fold unfold)**:
+```python
+y.grad = np.array(1.0)                  # fold 시작점 (최종 출력 y에서, upstream = 1)
+b.grad = C.backward(y.grad)             # fold step 1: C 노드 (y → b)
+a.grad = B.backward(b.grad)             # fold step 2: B 노드 (b → a)
+x.grad = A.backward(a.grad)             # fold step 3: A 노드 (a → x, 입력에 도달)
+```
+
+**검증 결과**: `x.grad = 3.297442541400256` (step04 수치 미분 3.297443과 일치, 해석적 정답에 오차 0)
+
+**키워드**: `#수동역전파` `#Variable.grad` `#Function.backward` `#right-fold` `#foldr` `#upstream-gradient` `#downstream-gradient` `#local_deriv` `#국소적미분` `#df/dx` `#chain-rule` `#step04복선회수` `#self.input` `#DefineByRun` `#Optional타입힌트` `#abc` `#@override` `#PyTorch스타일` `#변형실험`
 
 
 ---

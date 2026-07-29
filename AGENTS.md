@@ -137,18 +137,20 @@ rezero/
 > **새 AI 세션에서 가장 먼저 읽을 것**: `LEARNING_PROGRESS.md`
 > 그 파일에 현재 학습 진척도(어디까지 했는지)가 step별로 정리되어 있습니다.
 
-### 핵심 문서 (4종)
+### 핵심 문서 (5종)
 
 | 파일 | 역할 |
 |---|---|
 | `LEARNING_PROGRESS.md` | 📊 **목차/상태 추적**. step01~60 체크리스트 + 이슈 링크 + 상태 이모지 |
 | `LEARNING_NOTES.md` | 📝 **step 요약 노트**. step별 핵심 통찰/코드 메모 (가벼움) |
+| `REZERO_CHANGES.md` | 🔧 **rezero 개선 회계**. 책 원본 대비 적용/고려하는 개선(타입 힌트, 네이밍 등) 추적. step23(패키지화) 시점에 회수 |
 | `notes/` | 🧪 **탐구 노트 디렉터리**. 주제별 개별 파일 (Python/NumPy/수학 등 깊이 파는 주제) |
 | GitHub Issues | 📌 **세부 토론**. 각 step 진행 추적 + 막힌 질문 영구 기록 |
 
-이 구조는 **"목차 = LEARNING_PROGRESS.md, step 요약 = LEARNING_NOTES.md, 탐구 = notes/, 본문 = Issues"** 인 하이브리드.
+이 구조는 **"목차 = LEARNING_PROGRESS.md, step 요약 = LEARNING_NOTES.md, 개선 추적 = REZERO_CHANGES.md, 탐구 = notes/, 본문 = Issues"** 인 하이브리드.
 - 어디까지 했는지는 progress에서
 - step 핵심은 LEARNING_NOTES.md에서
+- rezero 개선 아이디어는 REZERO_CHANGES.md에서 (step23 패키지화 때 회수)
 - 깊이 탐구는 notes/에서 (개별 파일, LEARNING_NOTES.md에서 링크)
 - 세부 맥락은 Issues에서
 
@@ -452,6 +454,7 @@ uv.lock        의존성 버전 고정
 .python-version  (gitignored) Python 3.13 고정
 LEARNING_PROGRESS.md  📊 학습 진척도 추적 (목차)
 LEARNING_NOTES.md     📝 학습 step 요약 노트 (가벼움)
+REZERO_CHANGES.md     🔧 rezero 개선 회계 (책 대비 변형 추적, step23 회수)
 notes/                🧪 보충 탐구 노트 (주제별 개별 파일, 깊이 파는 주제)
 ```
 
@@ -697,6 +700,20 @@ fork 레포에서의 동작:
 
 즉 **이 레포 이슈가 우선**이지만, 없는 번호는 상위 fork 체인을 타고 올라가 원본(oreilly-japan)까지 연결된다.
 
+> 💡 **적용 범위 명확화 — 어디서 자동 링크가 작동하나?**
+>
+> 위 자동 링크는 **"이슈 트래커 컨텍스트"**에서만 작동한다. 즉:
+>
+> | 위치 | `#N` 자동 링크 작동? | 비고 |
+> |---|---|---|
+> | 이슈/PR **본문** (body), 코멘트 | ✅ 작동 | "본문" = 이슈 객체의 body 필드 |
+> | 커밋 메시지 | ✅ 작동 (+ referenced 이벤트) | |
+> | **repo에 커밋된 파일 내용** (`.md`, `.py` 등) | ❌ **작동 안 함** | 파일 텍스트는 GitHub가 건드리지 않음 |
+>
+> 즉 `REZERO_CHANGES.md`, `LEARNING_NOTES.md`, `notes/*.md` 등 **파일 안의 `#NNN`은 안전**.
+> GitHub 웹에서 그 파일을 봐도 `#NNN`이 링크로 변하지 않고 그냥 텍스트로 보인다.
+> 위험한 건 **이슈/코멘트/커밋 메시지**에 `#N`을 쓸 때뿐.
+
 > 📌 **근거에 대하여**: 이 동작은 GitHub 공식 문서에 명시적 설명이 없다.
 > [Autolinked references and URLs](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/autolinked-references-and-urls) 문서는 `#N` 기본 형식과 `owner/repo#N` 명시적 형식만 다룰 뿐, fork에서 없는 번호의 동작은 다루지 않는다.
 > 위 룰은 **2026-07-28 우리 레포에서 실증적으로 확인**한 것이다 (oreilly-japan #10/#11 이슈로 실제 연결 + referenced 이벤트 영구 잔류 확인).
@@ -759,7 +776,7 @@ fork 레포에서의 동작:
 [exploration_13_derivative_notation.md](./notes/exploration_13_derivative_notation.md) 참고
 
 <!-- ✅ 올바름 3: 링크 + 섹션 앵커 -->
-[exploration_13 §7 역전파 연결](./notes/exploration_13_derivative_notation.md#역전파연결) 참고
+[exploration_13 §8 역전파 연결](./notes/exploration_13_derivative_notation.md#역전파연결) 참고
 ```
 
 → 핵심: **이슈 번호엔 `#N` 자유롭게 쓰고, 문서/섹션 번호엔 `#N` 대신 텍스트나 링크 사용.**
