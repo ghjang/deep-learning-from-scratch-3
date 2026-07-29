@@ -55,6 +55,7 @@
 | 13 | step05 진행 중 | 미분 표기법의 두 얼굴 (`dy/dx` vs `df/dx`, Leibniz/Lagrange, 국소적 미분, 역전파 수학) | [notes/exploration_13_derivative_notation.md](./notes/exploration_13_derivative_notation.md) |
 | 14 | step05 진행 중 | "미분" 용어 7중 혼돈과 해독 전략 (미분값/도함수/미분연산, 한영 대조, 밑시딥 실전) | [notes/exploration_14_derivative_terminology.md](./notes/exploration_14_derivative_terminology.md) |
 | 15 | step05 진행 중 | 수학 기호의 어원과 역사 (√/∫/d/∂/∇/∞ 모양의 진짜 이유) | [notes/exploration_15_math_symbol_origins.md](./notes/exploration_15_math_symbol_origins.md) |
+| 16 | step08 진행 중 | "부작용" 번역 비판 + side effect 재프로그래밍 (번역어 감정색 왜곡, 순수함수, 최적화 충돌) | [notes/exploration_16_side_effect.md](./notes/exploration_16_side_effect.md) |
 
 ### 🎨 디자인 패턴 (횡단 관심사, 누적형)
 
@@ -63,6 +64,22 @@
 | 파일 | 시점 | 주제 |
 |---|---|---|
 | 🎨 | step01~ 누적 | DeZero에 등장하는 디자인 패턴 (래퍼, 템플릿 메서드 등) | [notes/design_patterns.md](./notes/design_patterns.md) |
+
+### 🐛 디버깅 (횡단 관심사, 누적형)
+
+> 디자인 패턴과 같은 구조. 파이썬 런타임 검증/디버깅 메커니즘(assert, 예외, 재귀 한계 등)을 여러 step에 걸쳐 누적 정리.
+
+| 파일 | 시점 | 주제 |
+|---|---|---|
+| 🐛 | step08~ 누적 | 파이썬 런타임 검증/디버깅 (assert + `-O` 모드, RecursionError, fail-fast 등) | [notes/debugging.md](./notes/debugging.md) |
+
+### 📐 코딩 스타일 (횡단 관심사, 누적형)
+
+> 디자인 패턴/디버깅과 같은 구조. PEP 8 기반 코드 스타일(빈 줄, 주석, 네이밍, 함수 길이 등)을 여러 step에 걸쳐 누적 정리.
+
+| 파일 | 시점 | 주제 |
+|---|---|---|
+| 📐 | step08~ 누적 | 코드 스타일/가독성 (논리 블록 빈 줄, PEP 8 의무 vs 관행 등) | [notes/coding_style.md](./notes/coding_style.md) |
 
 ---
 
@@ -586,25 +603,135 @@ backward(y)                                # 한 줄이면 역전파 완료
 
 ---
 
-## Step 08 — [1고지] Function.backward() 구현
+## Step 08 — [1고지] 재귀에서 반복문으로 역전파 고속화
 
-**Issue**: (링크)
-**완료일**: -
-**상태**: ⏳
+**Issue**: [#9](https://github.com/ghjang/deep-learning-from-scratch-3/issues/9)
+**완료일**: 2026-07-29
+**상태**: ✅
 
 ### 📖 요약 (한 줄)
 
+step07의 재귀적 `backward()`를 **반복문(명시적 스택)**으로 전환. 깊은 계산 그래프에서의 스택 오버플로 위험 회피가 핵심 동기. 수학적 구조(right fold)는 동일 — 단지 펼치는 방식이 재귀 호출 스택 → 리스트 스택으로 바뀔 뿐.
 
 ### ❓ 질문 / 막힌 점
 
+- ✅ 재귀 깊어지면 RecursionError? → **맞음, 파이썬 예외**. 기본 한계 1000. 상세: debugging.md 항목 2.
+- ✅ `assert`는 디버그 모드 전용 아닌가? 파이썬엔 그 구분이? → **있다, `-O` 플래그가 스위치**. 상세: debugging.md 항목 1.
+- ✅ rezero 변형 항목 14번(전역 backward) 반복문 전환에서 외부 API 유지? → **유지됨** (`backward(y)` 호출 동일).
+- ✅ step07 `upstream_grad` 3단계 우선순위, 반복문에선? → **루프 진입 전 한 번으로 단순화** (부수 효과).
+- ✅ assert로 제약 체크가 맞냐? 위치도 맞냐? → ★ **둘 다 적중**. (A)는 사용자 오용이라 if/raise로, 위치도 초기화 시점으로. 상세: 항목 16번.
+- ✅ 전역 함수명 backward가 맞냐? → ★ **아니다**, `fill_grad`로 개명. "grad 채우기"가 핵심 동작 명시. 상세: 항목 15번.
 
 ### 💡 통찰 / 배운 점
 
+**★ "진짜 별거 없다" 자체가 step07 변형의 가치 증명** — 브로가 짚은 대로 step08은 전역 `backward()` 내부만 고치면 끝.
+Variable/Function/Square/Exp는 한 줄도 안 바뀜. 관심사 분리(SoC, 항목 14번)가 다음 step으로의 확장 비용까지 낮춘 실증.
+
+**★ 반복문 단순화 부수 효과** — 재귀의 복잡했던 upstream 3단계 우선순위 로직이 반복문에선 자연스럽게 사라짐.
+재귀: 매 호출마다 upstream 결정. 반복문: 루프 진입 전 한 번 (직전 반복이 다음 y.grad를 미리 채워둠).
+→ "자료구조가 알고리즘을 지배한다" — 명시적 스택이 로직까지 단순화시킨 사례.
+
+**★ step07 복선 회수** — `Function.__call__`의 `self.output` 저장이 드디어 실사용.
+재귀에선 y를 호출 컨텍스트로 넘겼지만, 반복문에선 `y = f.output; f.backward(y.grad)`로 저장해둔 출력에서 grad를 읽어와야 함.
+
+**★ assert + RecursionError → 디버깅 탐구로 확장** — 브로의 두 질문에서 파생. 파이썬에도 디버그/릴리스 구분이 있다는
+발견 (`-O` 플래그) + RecursionError 실증. 누적형 디버깅 노트(`notes/debugging.md`) 신설 계기.
+
+**★ 브로 2연타 질문 → 변형 2종 추가 (#015, #016)** — step08 코드를 본 브로가 "assert가 디버깅 도구면 지금 하는 게 맞냐?
+위치도 맞냐?" + "함수 이름이 backward가 맞냐?" 두 질문. 둘 다 정곡 → fill_grad 개명 + assert→RuntimeError 전환.
+**방금 만든 debugging.md "교훈 2"를 우리 코드가 위반하고 있었다**는 자기반영적 통찰 (메타적 가치).
+
+**★ funcs 리스트 복선 발견 — "점진적 설계" 패턴** — 브로 3연타 질문: *"funcs가 리스트인 이유? 현재는 최대 1개만 있는 구조 아닌가?"*
+정확한 관찰. step08에선 선형 체인이라 스택 길이 1. 리스트인 이유는 **step14(같은 변수 반복)/step16(DAG)에서 분기 그래프 등장 시 복수 노드 push 때문**.
+→ 책이 미래 step 확장을 대비해 미리 리스트로 깔아둔 "복선". set_creator(step07→step16 generation 복선)과 같은 패턴.
+상세: design_patterns.md 패턴 3 "점진적 설계 / 미래 복선" (브로 질문에서 파생된 새 패턴 등록).
+
+**★ 논리 블록 사이 빈 줄 — "코딩 스타일" 횡단 노트 신설** — 브로 4연타 질문: *"의미구분 위해 빈 줄 넣는 걸 금지하는 컨벤션인 거 아니냐?"*
+→ 아님. PEP 8은 최상위 2줄/메서드 1줄은 **의무**, 함수 내부 논리 블록은 **"가끔 1줄" 권장**. 금지 아님.
+fill_grad 본문을 논리 섹션(검증 / upstream 설정 / 메인 루프)마다 빈 줄 + 섹션 헤더 주석으로 분리.
+누적형 코딩 스타일 노트(`notes/coding_style.md`) 신설 — 앞으로 주석 밀도, 네이밍, 함수 길이 등 계속 누적 예정.
+
+**★ funcs → worklist 리네임 — CS 학술 패턴 "Worklist Algorithm" 인식** — 브로 5연타 질문:
+*"funcs 변수명을 의미에 맞게 리팩터링 가능할까? 좀 느낌있게?"*
+→ 단순 리네임인 줄 알았더니, 이 구조(`while worklist: pop → 처리 → push`)가 **CS 학술 정식 패턴 "Worklist Algorithm"**의 인스턴스.
+Dragon Book(컴파일러 데이터플로우), GC handbook(mark phase), CLRS(그래프 순회) 등 CS 전반 골격.
+변수명을 `worklist`로 바꾸면 **코드의 학술적 뿌리 인식** (#017, design_patterns 패턴 4 등록).
+★ 브로의 "왜 리스트?"(패턴 3 복선) + "funcs 말고 worklist로?"(패턴 4 학술 패턴) 두 질문이 같은 코드의 두 층위를 파냄.
+
+**★★ Worklist 타입 힌트 — 변형 3종의 emergent design 시너지** — 브로 7연타 질문:
+*"work item이 Function 인스턴스 → 타입 힌트로 명확히할 수 있지 않나?"*
+→ `type Worklist = list[Function]` (Python 3.12+). work item = Function 인스턴스가 타입 수준에서 명시.
+★ **시너지 발견**: `start_var.creator: Optional[Function]`인데 `list[Function]`에 넣으면 에러 →
+근데 도입부 guard(#016)가 **타입 좁히기** 수행 → 그 아래부턴 `Function` (Optional 풀림) → 안전.
+→ **#015(fill_grad) + #016(guard) + #017(worklist)가 독립이 아니라 서로 강화하는 세트**.
+guard가 "빠른 실패"뿐 아니라 "타입 안전성"까지 보너스로. 좋은 설계 결정들은 emergent하게 강화됨.
+실증: guard 없음 pyright 에러 / guard 있음 ★ 에러 없음.
+
+### 📝 결정 기록: 변형 3종 추가 (#015, #016, #017) — 브로 코드 리뷰에서 파생
+
+**#015 전역 함수명 backward → fill_grad** (브로 작명 통찰):
+- 브로: *"전역 backward 함수는 계산 그래프 순회하며 각 노드 변수에 누적미분값 저장하는 건데,
+  함수 이름이 좀 거시기하지 않냐? fill_grad 따위가 더 나은 작명 아닌지?"*
+- → `backward`는 방향(역방향)만, `fill_grad`는 "grad 채우기" 핵심 동작 명시.
+- 역방향은 grad 연산의 유일한 방식이라 이름에 안 넣어도 암시 (JAX `jax.grad`와 정신적 유사).
+- 부수 이점: step07의 "전역 backward vs Function.backward 이름 같고 역할 다름" 혼란 자동 해소.
+
+**#016 assert → RuntimeError 전환 (검증 A)** — debugging.md 교훈 2 적용:
+- 브로: *"assert가 디버깅 언어 도구라면 저런 제약 체크를 지금 assert로 하는 게 맞냐? 점검 위치도 맞아?"*
+- 분석 결과 — 3개 검증 중 (A)만 assert 부적절:
+  - (A) start_var.creator None → **사용자 오용** (런타임 케이스) → if/raise RuntimeError ★
+  - (B)(C) f.input/output, y.grad None → **불변조건** (프로그래먘 논리 버그) → assert 유지
+- ★★ **브로 2차 지적 — 위치를 함수 도입부 맨 앞으로** (fail-fast / guard clause):
+  - 처음엔 upstream 설정 **뒤에** 검증 → 에러 내기 전에 `start_var.grad`를 변경하는 부작용
+  - 도입부로 옮기니 **fail-fast**(wasted work 없이 즉시 실패) + **부작용 회피**(transactional) 동시 달성
+  - 실증: 잘못된 `fill_grad(x)` 호출이 `x.grad`를 None→None 유지 (이전 위치였으면 ones_like로 채워졌을 것)
+  - 상세: debugging.md 항목 3 (fail-fast + guard clause)
+- ★ **-O 모드 실증**: assert였으면 사라질 검증이 RuntimeError로 살아있음. debugging.md 교훈 2의 코드 증명.
+- 친절한 에러 메시지: "왜 잘못됐는지" + "어떻게 고치는지" 둘 다.
 
 ### 🔗 관련 링크
 
+- Issue: https://github.com/ghjang/deep-learning-from-scratch-3/issues/9
+- 구현: `rezero/steps/step08.py`
+- 정답지: `steps/step08.py`
+- 이전 step: step07 역전파 자동화 (재귀) — Issue 8
+- 🔧 REZERO_CHANGES.md: **step08 변형 3종(#015 fill_grad 개명, #016 assert→RuntimeError + 도입부, #017 funcs→worklist 리네임 + Worklist 타입 별칭)** + #014 검증 완료. ★ 변형 3종의 emergent design 시너지(guard가 타입 좁히기 제공)
+- 🐛 디버깅 노트: [notes/debugging.md](./notes/debugging.md) 항목 1 (assert + `-O` 모드), 항목 2 (RecursionError), 항목 3 (fail-fast + 부작용 회피)
+- 🧪 탐구 노트 16번: [notes/exploration_16_side_effect.md](./notes/exploration_16_side_effect.md) — "부작용" 번역 비판 (assert 부작용 논의에서 파생)
+- 🎨 디자인 패턴: [notes/design_patterns.md](./notes/design_patterns.md) 패턴 3 "점진적 설계 / 미래 복선", 패턴 4 "Worklist Algorithm"
+- 📐 코딩 스타일: [notes/coding_style.md](./notes/coding_style.md) 항목 1 "빈 줄 — 논리 블록 시각적 분리"
+
 
 ### 📝 코드 / 수식 메모
+
+**반복문 fill_grad 구조** (책 step08 + rezero 전역 함수 + 개명 변형):
+```python
+def fill_grad(start_var, upstream_grad=None):
+    if upstream_grad is not None:           # 루프 진입 전 한 번만
+        start_var.grad = upstream_grad
+    elif start_var.grad is None:
+        start_var.grad = np.ones_like(start_var.data)
+
+    if start_var.creator is None:           # ★ #016: 사용자 오용 → RuntimeError (-O에서도 살아남음)
+        raise RuntimeError("역전파할 계산 그래프가 없습니다...")
+
+    funcs = [start_var.creator]             # 명시적 스택 (힙)
+    while funcs:
+        f = funcs.pop()
+        x, y = f.input, f.output            # ★ y = f.output 회수 (step07 복선)
+        assert x is not None and y is not None   # 불변조건 (B) — 프로그래먘 논리 가정
+        assert y.grad is not None                # 불변조건 (C)
+        x.grad = f.backward(y.grad)         # 단일 노드 fold step
+        if x.creator is not None:
+            funcs.append(x.creator)         # 다음 노드 push
+```
+
+**검증 (3케이스)**:
+- 정상: `fill_grad(y)` → `x.grad = 3.297442541400256` (step07 재귀와 동일, 해석적 정답) ✅
+- 오용: `fill_grad(x)` [입력 변수] → RuntimeError 정상 발생 ✅
+- ★ `-O` 모드: `fill_grad(x)` → RuntimeError **여전히 발생** (assert였으면 사라졌을 것!) ✅
+
+**키워드**: `#재귀에서반복문` `#명시적스택` `#while루프` `#funcs.pop` `#스택오버플로회피` `#RecursionError` `#fill_grad` `#개명` `#의미투명성` `#항목14번검증` `#upstream단순화` `#부수효과` `#자료구조가알고리즘을지배` `#step07복선회수` `#self.output실사용` `#assert` `#-O모드` `#__debug__` `#RuntimeError` `#사용자오용vs불변조건` `#debugging.md교훈2적용` `#SoC가치증명` `#디버깅노트신설` `#JAX스타일` `#자기반영적통찰` `#funcs리스트복선` `#점진적설계` `#미래복선` `#DAG복선` `#step14/16대비`
 
 
 ---

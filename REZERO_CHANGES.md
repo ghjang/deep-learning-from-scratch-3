@@ -403,9 +403,162 @@
 - **검증**: `pyright rezero/steps/step07.py` → `0 errors, 0 warnings` ✅
 - **회수**: step23 → `rezero/core.py` 또는 `rezero/__init__.py`에 전역 backward 승격 (★★★ rezero 정체성)
 
----
+### #015 — ★★★ 전역 함수명 `backward` → `fill_grad` (브로 작명 통찰 — 의미 투명성)
+- **위치**: step08
+- **상태**: ✅ 반영 (2026-07-29)
+- **종류**: 🔵 라이브러리성 ★★★ (#014의 자연스러운 연장, 작명 정제)
+- **브로 통찰**:
+  > "전역 backward 함수는 계산 그래프를 순회하면서 각 노드의 변수에 누적국소미분값을 저장해주는 것인데,
+  >  함수 이름이 좀 거시기 하지 않냐? `fill_grad` 따위가 좀 더 나은 작명 아닌지?"
+  → `backward`는 **방향**(역방향)만 말하고 **결과**(grad 채움)는 암시만 됨.
+  실제 하는 일이 이름에 안 드러남. `fill_grad`가 의미 투명.
+- **내용**:
+  ```python
+  # 이전 (step07, 책/PyTorch 관례)
+  def backward(start_var): ...        # 방향만 이름에
+  backward(y)
 
-## 💡 대기 중 아이디어 (구체화 안 됨)
+  # 이후 (step08, 의미 투명)
+  def fill_grad(start_var): ...       # ★ "grad 채우기" = 핵심 동작 명시
+  fill_grad(y)
+  ```
+- **★ 왜 fill_grad인가** (후보 비교):
+  | 이름 | 평가 |
+  |---|---|
+  | `backward` | 방향만. 결과 암시. 책/PyTorch 관례 |
+  | `fill_grad` ★ | "grad 채우기" 명시. 역방향은 grad의 유일한 방식이라 암시돼도 OK. JAX `jax.grad`와 정신적 유사 |
+  | `fill_grad_backward` | 방향+결과 둘 다 명시하나 verbose (브로 원안) |
+  | `compute_grads` | 복수형, 어색 |
+- **★ 부수 이점 — 혼란 해소**: step07에선 "전역 backward vs Function.backward(단일 노드) 이름 같고 역할 다름"
+  혼란이 있었음. fill_grad로 개명하면 이름이 다르게 되어 혼란 자동 해소.
+  (Function.backward는 단일 노드의 국소적 미분 역할이라 이름 유지 — 이건 PyTorch 관례와도 일치.)
+- **★ JAX 철학 강화**: #014에서 "전역 함수 = JAX 스타일"이라 했는데, JAX는 `jax.grad(f)(x)`로
+  "grad 계산"이 이름에 드러남. `fill_grad`도 같은 결 — "grad"가 이름에 들어가 JAX 정신과 더 가까워짐.
+- **★ 패키지화 후 호출**: step23 이후 `from rezero import fill_grad` 또는 `rezero.fill_grad(y)`.
+  `jax.grad(f)(x)`와 같은 패턴 (Define-by-Run 버전).
+- **⚠️ 최종 반영 여부 보류 (#014와 동일)**:
+  - PyTorch/DeZero 표준에서 더 벗어남 (backward → fill_grad). 학습용 실험으로 명시.
+  - step09+ 에서 책이 `backward`를 계속 쓰면, 우리 문서가 책과 용어 안 맞을 수 있음
+  - 하지만 **의미 투명성** 가치가 큼 — "하는 일이 이름에 드러나야"라는 브로 철학 반영
+  - step13/step34 진입 시점에서 #014와 함께 재평가
+- **검증**:
+  - `pyright rezero/steps/step08.py` → 환경성 에러 2개만 (step07과 동일, 코드 결함 아님) ✅
+  - 실행: `fill_grad(y)` → `x.grad = 3.297442541400256` (step07 backward와 동일) ✅
+- **회수**: step23 → `rezero/core.py` 또는 `rezero/__init__.py`에 `fill_grad` 승격 (#014와 함께 유지)
+- **관련**: debugging.md 항목 1 (assert + `-O`), 항목 2 (RecursionError) — step08 검증 설계 맥락
+
+### #016 — assert → RuntimeError 전환 (검증 A: 사용자 오용 구분) — debugging.md 교훈 2 적용
+- **위치**: step08
+- **상태**: ✅ 반영 (2026-07-29)
+- **종류**: 🔵 라이브러리성 (검증 설계 원칙 적용)
+- **브로 질문**:
+  > "assert가 다분히 디버깅 상황의 언어 제공 도구라면, 저런 제약 체크를 지금 저렇게 assert로 하는 게 맞냐?
+  >  그리고 점검 위치가 저기가 맞아?"
+  → 두 부분 모두 적중. (1) assert 종류 잘못됨, (2) 위치도 잘못됨.
+- **내용**: step08 fill_grad의 검증 3종 중 **(A)만 if/raise로 전환**, 위치도 초기화 시점으로 이동:
+  | 검증 | 상황 | 이전(step08 초안) | 이후(step08 개선) |
+  |---|---|---|---|
+  | (A) start_var.creator None | 입력 변수에 fill_grad 호출 = **사용자 오용** | pop 후 assert | **if/raise RuntimeError**, 초기화 시점 ★ |
+  | (B) f.input/f.output None | __call__ 미실행 = 프로그래먘 논리 버그 | assert | assert 유지 |
+  | (C) y.grad None | 이전 반복 미충족 = 프로그래먘 논리 버그 | assert | assert 유지 |
+- **★ 핵심 원칙 (debugging.md 교훈 2 직접 적용)**:
+  - **사용자 오용 / 런타임 데이터** → `if ...: raise` (★ `-O` 모드에서도 살아남아야)
+  - **프로그래먘 불변조건** → `assert` (`-O`에서 사라져도 로직 안전)
+  - (A)는 "creator 없는 변수에 역전파 호출" — 이건 프로그래먘 논리 버그가 아니라 **사용자 오용**.
+    따라서 assert 부적절. RuntimeError가 맞음.
+- **★ 위치 개선**: pop **이후**에 검사하면 이미 None을 스택에 넣은 뒤. 더 근본 위치는 **함수 도입부 맨 앞**.
+  → (A)를 맨 앞으로 옮김 (fail-fast / guard clause). **브로 2차 지적** — upstream 설정 후 검사하면
+  에러 내기 전에 `start_var.grad`를 변경하는 부작용이 발생. 도입부에서 검사하면
+  **실패한 연산은 부작용을 남기지 않음**(transactional semantics)까지 보장.
+- **★ fail-fast + 부작용 회피 실증** (도입부 이동 후):
+  ```
+  정상:    fill_grad(y) → x.grad = 3.2974...  ✅
+  오용:    fill_grad(x) [입력 변수]
+           호출 전 x.grad = None
+           RuntimeError 발생 (fail-fast)
+           호출 후 x.grad = None  ← ★ 부작용 없음 (transactional)
+  ```
+- **★ -O 모드 실증** (debugging.md 교훈의 코드 증명):
+  ```
+  정상:    fill_grad(y) → x.grad = 3.2974...  ✅
+  오용:    fill_grad(x) [입력 변수] → RuntimeError ✅
+  -O 모드: fill_grad(x) → ★ RuntimeError 여전히 발생 ✅ (assert였으면 사라졌을 것!)
+  ```
+  → assert였다면 `-O` 모드에서 조용히 통과했을 위험을 RuntimeError로 방어.
+- **★ 친절한 에러 메시지**:
+  ```
+  RuntimeError: <Variable>에 creator가 없습니다 — 역전파할 계산 그래프가 없습니다.
+  입력 변수(원점)가 아닌, 함수의 출력에 대해 fill_grad를 호출하세요.
+  ```
+  (책의 assert 메시지보다 훨씬 친절 — "왜 잘못됐는지" + "어떻게 고치는지" 둘 다.)
+- **검증**:
+  - 정상/오용/-O 3케이스 전부 의도대로 동작 ✅
+  - 도입부 이동 후: 잘못된 호출이 `x.grad`를 변경시키지 않음(transactional) 실증 ✅
+  - `pyright` → 환경성 에러만 ✅
+- **회수**: step23 → `rezero/core.py` fill_grad 승격 시 검증 로직 함께 유지
+
+### #017 — ★★ `funcs` → `worklist` 리네임 (브로 작명 통찰 — CS 학술 패턴 인식)
+- **위치**: step08
+- **상태**: ✅ 반영 (2026-07-29)
+- **종류**: 🔵 라이브러리성 ★★ (#015 fill_grad 개명과 같은 결 — 의미 투명성)
+- **브로 질문**:
+  > "funcs란 변수명을 이것이 의미하는 것에 맞도록 변수명 리팩터링 가능할까? 좀 느낌있게?"
+  → `funcs`는 "functions" 축약이라 **무엇의 스택인지** 안 드러남. 단순 리네임인 줄 알았더니
+  **CS 학술 패턴 "Worklist Algorithm"** 인식으로 이어짐 (브로 "이게 학술 용어야?" 놀람).
+- **내용**:
+  ```python
+  # 이전 (step08 초안, 책 관례)
+  funcs = [start_var.creator]     # "functions" 축약 — 무슨 함수들인지 암시만
+  while funcs: ...
+      funcs.append(x.creator)
+
+  # 이후 (step08 개선)
+  worklist = [start_var.creator]  # ★ "역전파 처리 대기 Function 스택" 의미 명시
+  while worklist: ...
+      worklist.append(x.creator)
+  ```
+- **★ 왜 worklist인가** (후보 비교):
+  | 이름 | 평가 |
+  |---|---|
+  | `funcs` (책 관례) | 축약만. 의미 안 드러남 |
+  | `worklist` ★ | CS 학술 용어. 그래프 순회/데이터플로우/GC 등 정확한 패턴 이름 |
+  | `func_stack` | 직관적이나 학술적 깊이 없음 |
+  | `pending` | 제네릭. 무엇이 pending인지 안 드러남 |
+- **★ 핵심 — 코드가 속한 학술 전통 인식**:
+  `while worklist: pop → 처리 → push` 구조는 **Worklist Algorithm**이라는 정식 CS 패턴.
+  Dragon Book(컴파일러 데이터플로우), GC handbook(mark phase), CLRS(그래프 순회) 등
+  CS 전반에 깔린 "처리 대기열 + while pop" 골격. 우리 역전파는 이 패턴의 인스턴스.
+  → 변수명 worklist는 **단순 리네임이 아니라 코드의 학술적 뿌리 인식**.
+  상세: design_patterns.md 패턴 4 "Worklist Algorithm" (브로 질문에서 파생된 새 패턴 등록).
+- **★ 매핑 (DeZero 역전파 ↔ 일반 worklist 골격)**:
+  | 일반 골격 | DeZero 역전파 |
+  |---|---|
+  | 초기 노드 | `start_var.creator` |
+  | 처리(n) | `f.backward(y.grad)` (fold step) |
+  | 후속(n) | `x.creator` |
+  | 종료 | worklist 빈 경우 (원점 도달) |
+  | 방향 | 역방향 + LIFO(pop) = **DFS** |
+- **★ 패턴 3(점진적 설계)과의 시너지**:
+  브로의 연달은 두 질문 ("왜 리스트?", "funcs 말고 worklist로?")이 **같은 코드의 두 층위**를 파냄:
+  - 패턴 3: worklist가 리스트형인 이유 (step14/16 DAG 복선)
+  - 패턴 4: 그 리스트가 worklist algorithm 골격을 따름
+- **★ 연장 — Worklist 타입 별칭 (브로 2차 통찰)**:
+  브로: *"work item이 Function 인스턴스면 타입 힌트로 명확히할 수 있지 않나?"*
+  → `type Worklist = list[Function]` (Python 3.12+ `type` 문) + `worklist: Worklist = [...]`
+  → work item = Function 인스턴스가 **타입 수준에서 명시**됨.
+- **★★ 시너지 — guard clause(#016)와 타입 힌트 협력 (emergent design)**:
+  - `start_var.creator: Optional[Function]` → 그냥 `list[Function]`에 넣으면 pyright 에러
+  - 근데 도입부 guard(`if creator is None: raise`)가 **타입 좁히기** 수행 → 아래부턴 `Function` (Optional 풀림)
+  - → #016(fail-fast)이 #017(worklist 타입)에 타입 안전성을 제공
+  - 실증: guard 없음 `error "list[Function | None]" is not assignable`, guard 있음 ★ 에러 없음
+  - **★ 교훈**: step08 변형 3종(#015/#016/#017)이 독립이 아니라 서로 강화하는 세트.
+    guard clause가 단순 "빠른 실패"가 아니라 "타입 좁히기"까지 보너스. 좋은 결정들은 강화된다.
+- **검증**:
+  - `fill_grad(y)` 실행 → `x.grad = 3.297442541400256` (리네임/타입 힌트 전후 동일) ✅
+  - pyright → 환경성 에러 2개(override/numpy) + type 문 버전 에러 1개 (Python 3.12+ 기능, step23 설정 시 해결 예정)
+- **회수**: step23 → `rezero/core.py` fill_grad 내부 worklist + Worklist 타입 별칭 함께 유지
+
+---
 
 > 생각나는 대로 한 줄씩. 구체화되면 위 항목으로 승격.
 

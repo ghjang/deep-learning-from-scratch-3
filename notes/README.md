@@ -22,6 +22,7 @@
 | 13 | [exploration_13_derivative_notation.md](./exploration_13_derivative_notation.md) | step05 진행 중 | 미분 표기법의 두 얼굴: `dy/dx` vs `df/dx` (Leibniz/Lagrange, 국소적 미분, 역전파 수학) |
 | 14 | [exploration_14_derivative_terminology.md](./exploration_14_derivative_terminology.md) | step05 진행 중 | "미분" 용어 7중 혼돈과 해독 전략 (미분값/도함수/미분연산, 한영 대조, 밑시딥 실전 해독) |
 | 15 | [exploration_15_math_symbol_origins.md](./exploration_15_math_symbol_origins.md) | step05 진행 중 | 수학 기호의 어원과 역사 (√/∫/d/∂/∇/∞ 왜 이런 모양인가, radix/summa/differentia) |
+| 16 | [exploration_16_side_effect.md](./exploration_16_side_effect.md) | step08 진행 중 | "부작용"이라는 번역이 사고를 지배한다: side effect 재프로그래밍 (번역어 감정색 왜곡, 순수 함수, 최적화 충돌) |
 
 > 파일 번호 = **생성 순서** (탐구 역사 보존)
 > 아래 "추천 읽는 순서"는 처음 읽을 때 논리적 흐름 기준
@@ -43,6 +44,24 @@
 | 파일 | 시점 | 주제 |
 |---|---|---|
 | [design_patterns.md](./design_patterns.md) | step01~ 누적 | DeZero에 등장하는 디자인 패턴 (래퍼, 템플릿 메서드 등) |
+
+## 🐛 디버깅 노트 (횡단 관심사, 누적형)
+
+> 디자인 패턴과 같은 구조. 파이썬의 런타임 검증/디버깅 메커니즘(`assert`, 예외 계층, 재귀 한계 등)을
+> 여러 step에 걸쳐 누적 정리. step 진행 중 검증/에러 메커니즘 마주치면 이 파일에 추가.
+
+| 파일 | 시점 | 주제 |
+|---|---|---|
+| [debugging.md](./debugging.md) | step08~ 누적 | 파이썬 런타임 검증/디버깅 (assert + `-O` 모드, RecursionError, fail-fast 등) |
+
+## 📐 코딩 스타일 노트 (횡단 관심사, 누적형)
+
+> 디자인 패턴/디버깅과 같은 구조. PEP 8 기반 코드 스타일(빈 줄, 주석, 네이밍, 함수 길이 등)을
+> 여러 step에 걸쳐 누적 정리. rezero 구현 중 스타일 결정이 생기면 이 파일에 추가.
+
+| 파일 | 시점 | 주제 |
+|---|---|---|
+| [coding_style.md](./coding_style.md) | step08~ 누적 | 코드 스타일/가독성 (논리 블록 빈 줄, PEP 8 의무 vs 관행 등) |
 
 ## 🎯 추천 읽는 순서 (처음 읽을 때)
 
