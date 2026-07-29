@@ -19,6 +19,11 @@
 | # | 주제 | 최초 등장 | 분류 |
 |---|---|---|---|
 | 1 | 빈 줄 (blank line) — 논리 블록 사이 시각적 분리 | step08 | 레이아웃 (PEP 8) |
+| 2 | 삼항 연산자 — 단순 2-way 분기 압축 | step09 | 제어 흐름 (Pythonic) |
+| 3 | `and` 결합 + 단축 평가 — 중첩 if 평평하게 | step09 | 제어 흐름 (Pythonic) |
+| 4 | ★ Pythonic ≠ 짧게 — "의도 투명성"이 진짜 기준 | step09 | 철학 (메타 원칙) |
+| 5 | 튜플 언패킹 — 짝인 값 한 줄로 회수 | step09 | 제어 흐름 (Pythonic, 항목 4 양면) |
+| 6 | import 위치 (모듈 최상단 vs 함수 지역) + 순환 참조 | step09 | 모듈 시스템 (Pythonic) |
 
 ---
 
@@ -150,6 +155,409 @@ while funcs:
 - [PEP 8 — Blank Lines](https://peps.python.org/pep-0008/#blank-lines) — 공식 규칙 (최상위 2줄, 메서드 1줄)
 - step08 `rezero/steps/step08.py` — `fill_grad` 섹션 분리 적용
 - Refactoring (Fowler) — "Extract Function" (빈 줄로 나뉜 섹션 → 함수 추출 후보)
+
+---
+
+## 2. 삼항 연산자 — "단순 2-way 분기 압축"
+
+### 📖 일반 규칙
+
+**단순 2-way 분기 + 각 갈래가 한 표현식** → `if/return` 2번 대신 **삼항 연산자** (`A if cond else B`) 사용.
+Python 커뮤니티 합의: 이런 케이스엔 삼항이 더 Pythonic.
+
+```python
+# ❌ 보일러플레이트 (if/return 2번 반복)
+if np.isscalar(x):
+    return np.array(x)
+return x
+
+# ✅ 삼항 — 한 줄로 의미 응축
+return np.array(x) if np.isscalar(x) else x
+```
+
+### 🎯 언제 삼항을 쓰나 — 가이드라인
+
+| 상황 | 삼항? |
+|---|---|
+| 2-way 분기 + 각 갈래가 한 표현식 | ✅ |
+| 분기마다 여러 문장 (블록) | ❌ (if/else) |
+| 조건이 복잡 (and/or 조합) | ⚠️ 가독성 떨어지면 if/else |
+| "기본값 + 예외" 패턴 | ✅ (`default if not cond else special`) |
+
+→ 핵심: **"한 줄에 A if cond else B 가 읽히는가?"** 안 읽히면 if/else로.
+
+### 🎯 DeZero/rezero 등장 지점
+
+#### step09 — `as_array()` 스칼라 변환 (★ 이 항목의 계기)
+
+브로 제안: *"as_array의 3줄, 1줄로 줄이는 게 더 읽기 쉽지 않나?"*
+→ 맞음. 단순 "스칼라면 np.array(x), 아니면 x" 분기라 삼항이 Pythonic.
+
+```python
+# step09 as_array — 삼항 1줄
+def as_array(x: object) -> np.ndarray:
+    return np.array(x) if np.isscalar(x) else x  # type: ignore[return-value]
+```
+
+★ 디테일 — `# type: ignore`는 유지:
+- pyright가 "스칼라 갈래(np.array→ndarray) / ndarray 갈래(x 그대로)" 두 리턴 타입을
+  단일 타입으로 못 좁혀서 경고. type: ignore로 의도 표시.
+- 상세 설명은 docstring으로 이동 (1줄화하면서 주석 정보 손실 방지).
+
+### 🔑 핵심 키워드
+
+`#삼항연산자` `#ternary` `#Pythonic` `#2-way분기` `#보일러플레이트제거` `#조건표현식` `#A-if-cond-else-B` `#PEP8`
+
+### 🔗 관련
+
+- [PEP 308 — Conditional Expressions](https://peps.python.org/pep-0308/) — 삼항 연산자 도입 PEP
+- step09 `rezero/steps/step09.py` `as_array()` — 적용 사례
+
+---
+
+## 3. `and` 결합 + 단축 평가 — "중첩 if 평평하게"
+
+### 📖 일반 규칙
+
+**중첩 if가 "조건 A and 조건 B" 형태** → 중첩 대신 `and`로 한 줄 결합. 들여쓰기 감소 + Pythonic.
+
+```python
+# ❌ 중첩 if (들여쓰기 2단계)
+if data is not None:
+    if not isinstance(data, np.ndarray):
+        raise TypeError(...)
+
+# ✅ and 결합 (평평, 1단계)
+if data is not None and not isinstance(data, np.ndarray):
+    raise TypeError(...)
+```
+
+### 🎯 핵심 메커니즘 — 단축 평가 (short-circuit)
+
+`and`의 왼쪽이 False면 **오른쪽 평가 안 함**. 그래서 중첩 if와 동일한 안전성:
+
+```python
+# data가 None이면 "data is not None"이 False → isinstance(None, ...) 호출 안 됨 ★
+if data is not None and not isinstance(data, np.ndarray):
+    #                                ↑ data가 None면 여기 도달 안 함 (안전)
+    raise TypeError(...)
+```
+
+- 중첩 if의 "바깥 if가 False면 안쪽 if 안 실행"과 **논리적으로 동일**
+- 단, 평평한 1단계 구조라 가독성 향상 (guard clause와 같은 철학)
+
+### 🎯 왜 and가 더 나은가 (3가지 이유)
+
+1. **단축 평가** — 왼쪽 False면 오른쪽 미평가. 중첩과 동일 안전성 (위 예시)
+2. **들여쓰기 감소** — 2단계 → 1단계. 평평한 구조 = 읽기 쉬움
+3. **논리적 조건 자연스러움** — "data가 None이 아니고 AND ndarray가 아니면"은 하나의 조건이라 `and`가 자연스러움
+
+### 🎯 언제 and 결합을 쓰나 — 가이드라인
+
+| 상황 | and 결합? |
+|---|---|
+| 두 조건이 하나의 논리적 조건을 이룸 | ✅ |
+| 두 조건이 서로 다른 관심사 (순차적 단계) | ❌ (중첩 또는 순차 if) |
+| 바깥 조건이 안쪽의 **전제 조건** (가드) | ⚠️ 케이스 바이 케이스 |
+| 조건이 3개 이상 (and/and/and) | ⚠️ 가독성 떨어지면 분리 |
+
+→ 핵심: **"두 조건이 하나의 의미를 이루는가?"** 그러면 `and`, 아니면 분리.
+
+### 🎯 DeZero/rezero 등장 지점
+
+#### step09 — `Variable.__init__` 타입 체크 (★ 이 항목의 계기)
+
+브로 제안: *"중첩 if 말고 `and` 쓰면 안 돼? 파이썬에 and 같은 거 없어?"*
+→ 맞음. "data가 None이 아니고 AND ndarray가 아니면"은 하나의 조건이라 and 결합이 Pythonic.
+
+```python
+# step09 Variable.__init__
+def __init__(self, data: Optional[np.ndarray]):
+    if data is not None and not isinstance(data, np.ndarray):
+        raise TypeError(f"{type(data)}는 지원하지 않습니다. ndarray만 허용.")
+    self.data = data
+    ...
+```
+
+★ 실증 (단축 평가 정상 작동):
+```
+Variable(None)   → OK (data is None → isinstance 호출 안 됨, TypeError 안 남)
+Variable(ndarray) → OK
+Variable(1.0)    → TypeError 정상 (방어막 2번 작동)
+```
+
+### ⚠️ 주의 — 중첩이 나은 경우도 있음
+
+**안쪽 if가 바깥 if에 의존하는 복잡한 로직**이면 중첩이 더 명확할 수 있음:
+```python
+# 이런 건 and 결합이 오히려 산만
+if data is not None:
+    if not isinstance(data, np.ndarray):
+        raise TypeError(...)
+    # ★ 여기서 data.ndim 체크 등 추가 로직 — and로는 표현 안 됨
+    if data.ndim != 0:
+        ...
+```
+→ 이런 케이스는 중첩 유지. 핵심은 **"두 조건이 하나의 의미인가"** 로 판단.
+
+### 🔑 핵심 키워드
+
+`#and결합` `#단축평가` `#short-circuit` `#중첩if회피` `#평평한구조` `#Pythonic` `#guard-clause철학` `#들여쓰기감소`
+
+### 🔗 관련
+
+- 항목 2 (삼항 연산자) — 같은 "제어 흐름 압축" 시리즈
+- step09 `rezero/steps/step09.py` `Variable.__init__` — 적용 사례
+- debugging.md 항목 3 (guard clause) — "평평한 구조" 철학의 원류
+
+---
+
+## 4. ★ Pythonic ≠ 짧게 — "의도 투명성"이 진짜 기준
+
+### 📖 메타 원칙 — 항목 2-3의 안티테제스
+
+항목 2(삼항), 항목 3(and)에서 "평평하게/짧게"가 Pythonic 가치를 보여줬다면,
+이 항목은 **역설**을 짚는다: **짧다고 무조건 Pythonic이 아니다.**
+
+### 🎯 핵심 — "Pythonic"의 진짜 의미
+
+Pythonic은 **"코드 길이"가 아니라 "의도 투명성(intention transparency)"** 이 기준.
+
+> 코드를 읽는 사람이 **"이 코드가 무엇을 하려는지"** 한눈에 파악할 수 있는가?
+
+- 삼항/and: 의도를 더 명확히 해서 Pythonic ✅
+- 의미 담긴 변수명/반복: 의도를 더 명확히 해서 이미 Pythonic ✅
+- 무리한 1줄 압축: 의도를 가려서 **안티 Pythonic** ❌
+
+### 🎯 "짧게 하면 안 좋은" 케이스들
+
+#### 케이스 1: 의미 담긴 변수명을 희생하며 압축
+
+```python
+# ❌ 1줄 압축 (의도 가려짐)
+return self.derivative()(self.input.data) * upstream_grad
+
+# ✅ 3줄 (변수명이 의도 전달 — 더 Pythonic)
+x = self.input.data           # "입력 데이터"
+df = self.derivative()        # "도함수 객체"
+local_deriv = df(x)           # "국소적 미분값"
+return local_deriv * upstream_grad
+```
+
+- 중간 변수 `x`, `df`, `local_deriv`는 **의도를 담은 이름** — 디버깅/가독성에 유용
+- 1줄 압축하면 이 의미가 사라짐 → "짧게 = 안 좋음"
+
+#### 케이스 2: 반복을 무리게 루프로 묶기
+
+```python
+# ❌ 루프로 묶기 (오히려 안 읽힘)
+cases = [(np.array(1.0), "ndarray"), (None, "None 허용")]
+for val, desc in cases:
+    v = Variable(val)
+    print(f"Variable({val}): OK ({desc}) → data={v.data}")
+
+# ✅ 반복 print (데모의 본질 — 각 케이스 명시)
+x_ok = Variable(np.array(1.0))
+print(f"Variable(np.array(1.0)): OK (ndarray) → x_ok.data = {x_ok.data}")
+x_none = Variable(None)
+print(f"Variable(None): OK (None 허용) → x_none.data = {x_none.data}")
+```
+
+- 데모는 **각 케이스가 무엇을 실증하는지** 명시가 핵심 → 반복이 의도 전달
+- 루프로 묶으면 "각 케이스의 의미"가 묻힘 → "짧게 = 안 좋음"
+
+### 🎯 판단 휴리스틱 — "짧게" vs "그대로"
+
+질문: **"더 짧게 만들면 의도가 더 잘 드러나는가, 가려지는가?"**
+
+| 답 | 행동 |
+|---|---|
+| 더 잘 드러남 | ✅ 짧게 (삼항, and 등) |
+| 가려짐 | ❌ 그대로 (의미 변수, 반복) |
+| 모호함 | ⚠️ 취향 영역 — 팀 합의 or 주석으로 보강 |
+
+### 🎯 핵심 키워드
+
+`#Pythonic` `#파이써닉` `#의도투명성` `#intention-transparency` `#짧게≠좋음` `#가독성` `#메타원칙` `#항목2-3안티테제스` `#변수명의미` `#PEP20`
+
+### 🔗 관련
+
+- 항목 2 (삼항), 항목 3 (and) — "짧게가 좋은" 케이스 (이 항목의 대척점)
+- [PEP 20 — The Zen of Python](https://peps.python.org/pep-0020/) — "Readability counts"
+- step09 `rezero/steps/step09.py` — 스캔 결과 "이미 Pythonic" 4곳 발견의 계기
+
+---
+
+## 5. 튜플 언패킹 — "짝인 값 한 줄로 회수"
+
+### 📖 일반 규칙
+
+**같은 맥락의 짝인 값들을 동시에 회수** → 튜플 언패킹(`a, b = x, y`)으로 한 줄 표현.
+두 값이 "짝"이라는 구조가 코드에 드러남.
+
+```python
+# ❌ 2줄 — 같은 맥락인데 분리된 것처럼 보임
+x = f.input
+y = f.output
+
+# ✅ 튜플 언패킹 — "input/output을 한 쌍으로 회수" 의도가 구조로 드러남
+x, y = f.input, f.output
+```
+
+### 🎯 왜 Pythonic한가 — 항목 4 (Pythonic ≠ 짧게)의 양면 예시
+
+항목 4에서 "짧게 ≠ 좋음"이라 했지만, **이 케이스는 "짧게 = 의도 더 명확"** 인 예시:
+- 2줄: "input 할당, output 할당" — 별개 연산처럼 보임
+- 1줄: **"input/output을 짝으로 회수"** — 같은 맥락(현재 Function의 입출력)이라는 구조 전달
+
+→ 항목 4의 휴리스틱("짧게 하면 의도가 더 잘 드러나는가?")에 정확히 부합하는 "짧게 = 좋음" 사례.
+**양면성**: Pythonic은 줄 수가 아니라 "의도 투명성"이 기준이라는 걸 더 명확히 함.
+
+### 🎯 언제 튜플 언패킹을 쓰나
+
+| 상황 | 언패킹? |
+|---|---|
+| 같은 맥락의 짝 (input/output, key/value) | ✅ |
+| 여러 값 동시 회수 (`a, b, c = func()`) | ✅ |
+| 서로 다른 관심사의 값 | ❌ (분리) |
+| 짝이지만 각각 후속 처리가 길면 | ⚠️ 케이스 바이 케이스 |
+
+### 🎯 DeZero/rezero 등장 지점
+
+#### step09 — `fill_grad` 루프 내 input/output 회수 (★ 이 항목의 계기)
+
+브로 제안: *"책에서 스트럭처드 바인딩 스럽게 한 줄로 표기했던 것 같은데?"*
+→ 정확함. 튜플 언패킹 (구조화 바인딩). 책 원본 step08/step09 모두 `x, y = f.input, f.output` 한 줄.
+
+```python
+# step09 fill_grad 루프
+while worklist:
+    f = worklist.pop()
+    x, y = f.input, f.output          # ★ 튜플 언패킹 — 짝 회수
+    ...
+```
+
+cf. JavaScript의 구조 분해 할당(`const {a, b} = obj`)과 같은 철학 — "여러 값을 구조적으로 바인딩".
+
+### 🔑 핵심 키워드
+
+`#튜플언패킹` `#tuple-unpacking` `#구조화바인딩` `#structured-binding` `#짝회수` `#한줄표현` `#Pythonic` `#항목4양면`
+
+### 🔗 관련
+
+- 항목 4 (Pythonic ≠ 짧게) — "짧게 = 좋음" 양면 예시
+- JavaScript 구조 분해 할당 (destructuring assignment) — 같은 철학
+- step09 `rezero/steps/step09.py` `fill_grad` — 적용 사례
+
+---
+
+## 6. import 위치 (모듈 최상단 vs 함수 지역) + 순환 참조
+
+### 📖 기본 규칙 — 모듈 최상단이 기본 (PEP 8)
+
+PEP 8: **모든 import는 파일 최상단에** (모듈 docstring 직후, 다른 코드 이전).
+
+```python
+"""모듈 docstring"""
+
+from abc import ABC              # ★ 최상단 — 표준 라이브러리
+from functools import reduce
+import numpy as np               # 서드파티
+
+# 그 다음에 코드
+```
+
+### 🎯 예외 — 함수 지역 import (local import)
+
+특정 상황에선 **함수 내부**에서 import. 언제?
+
+#### 1. ★ 순환 참조 (circular import) 회피 — 가장 흔한 이유
+
+A와 B가 서로 import할 때, 모듈 최상단에 두면 **부분 초기화 에러** 발생:
+
+```python
+# a.py
+from b import b_func      # ← a 로드 중 b 로드 → b 로드 중 a 로드 시도
+                          #   근데 a는 아직 다 안 끝남 → b_func 정의 안 됨 → ImportError
+
+def a_func():
+    from b import b_func  # ★ 지역 import — 함수 호출 시점엔 a/b 다 로드됨. 안전.
+    b_func()
+```
+
+**★ 순환 참조는 "무한 루프"가 아니다**:
+- 파이썬은 모듈 import 시작 즉시 `sys.modules`에 (빈) 모듈 객체 등록
+- b에서 `from a import` 시도 → `sys.modules['a']` 존재 → **재귀 안 하고 캐시 객체 사용**
+- 근데 그 객체엔 아직 `a_func`이 없음 → `ImportError: cannot import name 'a_func'`
+- 즉 **sys.modules 캐시가 무한 루프를 막지만, "부분 초기화로 인한 미묘한 ImportError"** 발생
+
+#### 2. 무거운 모듈 선택적 로딩
+
+```python
+def export_pdf(data):
+    import matplotlib         # ← PDF 내보낼 때만 로딩 (다른 기능엔 불필요)
+    ...
+```
+
+#### 3. 이름 충돌 회피 / 스코프 제한
+
+모듈 네임스페이스에 노출시키지 않고 함수 내에서만 이름 사용.
+(브로 짐작 "모듈 범위 아닌 함수 지역 범위에서 이름 룩업 유지" — 이 케이스)
+
+### 🎯 정적 언어 vs 동적 언어 (Python) — 결정적 차이
+
+브로 통찰: *"정적 로딩이면 컴파일러/링커가 순환 끊어주지 않나?"* → ★ 맞음.
+
+| 언어 | 순환 참조 처리 |
+|---|---|
+| **C/C++ (정적)** | 컴파일러/링커가 **빌드 시점** 감지 → 에러 또는 자동 해결 (전방 선언 등) |
+| **Java** | 컴파일러가 클래스 의존성 그래프 분석. 순환 허용하지만 JVM 로딩 순서로 해결 |
+| **Python (동적)** | **런타임에만 import 실행** → 순환 발생 시 부분 초기화 모듈 사용 → 미묘한 `ImportError` |
+
+→ 정적 언어는 빌드 타임에 순환 처리, Python은 런타임이라 **미리 알기 어렵고 발생하면 미묘한 에러**.
+그래서 Python 개발자가 **지역 import로 수동 대처**해야 하는 경우가 생김.
+
+### 🎯 DeZero/rezero 등장 지점
+
+#### step09 — `pipe()` 헬퍼의 functools import (★ 이 항목의 계기)
+
+브로 질문: *"함수 안에서 import 하는 이유? 모듈 범위 아닌 함수 지역 범위에서 이름 룩업 유지?"*
+→ 답: 위 예외 상황 1~3이 주 이유. 근데 ★ **step09 pipe엔 이유 중 어느 것도 해당 안 함**:
+- 순환 참조 없음 (functools는 표준 라이브러리)
+- 무거운 모듈 아님
+- 이름 충돌 위험 없음
+
+→ 결론: **모듈 최상단으로 이동** (PEP 8 기본 + 일반적 관례).
+원래 코드는 "관례적으로" 지역 import 썼으나, 이유 없는 관례는 항목 4("Pythonic ≠ 짧게")와 같은 결로 제거.
+
+```python
+# step09 — 최상단으로 이동
+from functools import reduce    # ← 모듈 최상단 (PEP 8)
+
+def pipe(value, *funcs):
+    return reduce(lambda val, f: f(val), funcs, value)   # 본문은 순수 알고리즘만
+```
+
+### 🎯 판단 가이드라인 — 지역 import를 쓸까?
+
+| 상황 | 지역 import? |
+|---|---|
+| 순환 참조 발생/우려 | ✅ (주된 해결책) |
+| 무거운 모듈, 조건부 사용 | ✅ |
+| 이름 충돌 위험 | ✅ |
+| 일반적인 경우 (위 해당 없음) | ❌ 모듈 최상단 (PEP 8) |
+
+→ 핵심: **"왜 지역 import하는가?" 이유가 명확하지 않으면 모듈 최상단이 기본**.
+
+### 🔑 핵심 키워드
+
+`#import위치` `#지역import` `#local-import` `#순환참조` `#circular-import` `#부분초기화` `#sys.modules` `#무한루프아님` `#정적vs동적` `#PEP8` `#선택적로딩` `#이름충돌`
+
+### 🔗 관련
+
+- [PEP 8 — Imports](https://peps.python.org/pep-0008/#imports) — "Imports are always put at the top of the file"
+- [Python docs — The import system](https://docs.python.org/3/reference/import.html) — sys.modules 캐싱 메커니즘
+- step09 `rezero/steps/step09.py` `pipe()` — 지역→최상단 이동 사례
 
 ---
 

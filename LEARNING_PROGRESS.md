@@ -24,10 +24,10 @@
 
 ## 📈 전체 요약
 
-- **완료**: 8 / 60 (step01~08 ✅)
+- **완료**: 9 / 60 (step01~09 ✅)
 - **진행 중**: 0
 - **막힘**: 0
-- **마지막 업데이트**: 2026-07-29 — step08 완료
+- **마지막 업데이트**: 2026-07-29 — step09 완료
 
 ---
 
@@ -51,7 +51,7 @@
 | step06 | 수동 역전파 (Variable.grad, Function.backward) | ✅ | [#7](https://github.com/ghjang/deep-learning-from-scratch-3/issues/7) | 2026-07-29 | 수동 역전파=right fold unfold; step04 복선 회수; 변형 3종(gy/gx→upstream/downstream+local_deriv, grad Optional 힌트, backward @abstractmethod); REZERO_CHANGES.md 신설 |
 | step07 | 역전파 자동화 (재귀적 right fold) | ✅ | [#8](https://github.com/ghjang/deep-learning-from-scratch-3/issues/8) | 2026-07-29 | 역전파 자동화=재귀 right fold; Define-by-Run 완성; 변형 5종(#010~#014: apply/derivative hook 대칭, derivative callable, backward 전역 함수 JAX 스타일); #001 회수(타입 힌트 세트); Known Gotcha 10 재발+방어망 강화; RESEARCH_QUEUE 6 등록 |
 | step08 | 재귀에서 반복문으로 역전파 고속화 | ✅ | [#9](https://github.com/ghjang/deep-learning-from-scratch-3/issues/9) | 2026-07-29 | 반복문(worklist) 전환; 변형 3종(#015 fill_grad 개명, #016 assert→RuntimeError+도입부, #017 worklist 리네임+타입); 패턴 2종(점진적 설계 복선, Worklist Algorithm); debugging/coding_style 노트 신설; 탐구 16번(side effect 번역 비판); 브로 코드 리뷰 7연타 |
-| step09 | 함수를 더 편하게 (Function 기반 클래스화) | ⏳ | - | - | - |
+| step09 | 함수를 더 편리하게 (Function 클래스 사용성 개선) | ✅ | [#10](https://github.com/ghjang/deep-learning-from-scratch-3/issues/10) | 2026-07-29 | as_array+wrapper(square/exp)+isinstance 방어막3겹 도입; pipe 헬퍼(FP 합성); coding_style.md 6항목(Pythonic 시리즈); RESEARCH_QUEUE #6 거의 완벽 가이드로 자람(Define-by-Run 본질, 가중치 매핑, 그래프 비용, torch.compile); AGENTS.md "책 vs rezero+AI" 학습 철학 추가; 브로 코드 리뷰 12연타 |
 | step10 | 테스트 (unittest로 동작 검증) | ⏳ | - | - | - |
 
 ## 🏔 제 2 고지 — 자연스러운 코드로 (step11 ~ 24)

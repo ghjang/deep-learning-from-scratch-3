@@ -736,25 +736,85 @@ def fill_grad(start_var, upstream_grad=None):
 
 ---
 
-## Step 09 — [1고지] 함수를 더 편하게 (Function 기반 클래스화)
+## Step 09 — [1고지] 함수를 더 편리하게 (Function 클래스 사용성 개선)
 
-**Issue**: (링크)
-**완료일**: -
-**상태**: ⏳
+**Issue**: [#10](https://github.com/ghjang/deep-learning-from-scratch-3/issues/10)
+**완료일**: 2026-07-29
+**상태**: ✅
 
 ### 📖 요약 (한 줄)
 
+`Function` 클래스를 더 허들 없이 쓰기 위한 사용성 개선. `Square()(x)` 2단계 → `square(x)` 1단계 wrapper 함수 도입으로 합성 표현을 수학적 표기에 가깝게 (`square(exp(square(x)))`). 부가로 `as_array` 헬퍼(스칼라→ndarray 정규화) + `Variable.__init__` isinstance 런타임 체크 + ★ pipe 헬퍼(브로 제안, FP 합성).
+
+★ 브로 통찰: "여기서 함수는 `Function` 클래스 — 더 편하게 = Function을 허들 없이 쓰자는 취지."
+번역 "함수를 더 편하게"는 애매 — "Function 클래스 사용성 개선"이 원 의미에 가까움.
 
 ### ❓ 질문 / 막힌 점
 
+- ✅ 브로 직감 "이미 처리한 것 같기도, 구식 같기도" → 검증: 정적(힌트)은 있었으나 동적(isinstance)은 없었음 / 역순 — 책 원본이 구식, 우리 step08이 더 진보됨.
+- ✅ Pylance 127줄 `forward(x)` 빨간줄 → Optional 가드 부재. None 가드 3곳 + `# type: ignore` 의도 표시로 해결.
+- ✅ "방어막 두 겹" → 실제론 3겹 (정적/동적타입/동적None). as_array와 isinstance가 협력.
+- ✅ Pythonic 스캔 4곳 → 전부 "이미 Pythonic" (짧게 하면 오히려 안 좋음 — 항목 4 통찰).
+- ✅ abstractmethod 죽은 import → 제거 (브로 제보).
 
 ### 💡 통찰 / 배운 점
 
+**★ "코드 양 ≠ 학습 가치"** — step09 코드는 가벼웠지만 브로 코드 리뷰 12연타가 산출물 폭발:
+- Pythonic 5종 (삼항, and, 튜플 언패킹, pipe, Pythonic≠짧게)
+- coding_style.md 6항목 (레이아웃/제어흐름/철학/모듈시스템)
+- 방어막 3겹 (layered defense) + as_array와의 협력
+- AGENTS.md "AI 코드 작성 시 빈 줄 자동 적용" 원칙 신설
+
+**★ Define-by-Run 본질 심화** (RESEARCH_QUEUE 6번 거의 완벽 가이드로 자람):
+- 브로 혼란 "만들어진 그래프에 신규 입력?" = Define-and-Run 상상 (TF 1.x 직관)
+- Define-by-Run = 매 입력마다 새 그래프 = FP 철학 (불변성, pipe와 같은 결)
+- 가중치 매핑: W도 Variable (그래프 원점), 역전파가 원점에 grad 채움
+- 그래프 구축 비용: 작은 모델에선 병목, 큰 모델+GPU에선 "껌" (조건부)
+- 유연성 > 비용 트레이드오프. torch.compile/jax.jit이 "둘 다 잡기" 시도.
+- ★ 브로 자가 도달 통찰 3종 (가중치 재사용/Optimizer 순회/그래디언트 순간성)
+
+**★ 책 vs rezero+AI 학습 철학** — 일방향 매체(책)의 본질적 한계 (대화불가/순서고정/메타질문불가/사전지식가정/개인화불가). rezero+AI의 쌍방향 질문-응답이 극복. AGENTS.md에 프로젝트 존재 이유로 천명.
 
 ### 🔗 관련 링크
 
+- Issue: https://github.com/ghjang/deep-learning-from-scratch-3/issues/10
+- 구현: `rezero/steps/step09.py`
+- 정답지: `steps/step09.py`
+- 이전 step: step08 역전파 반복문 — Issue 9
+- 🔧 REZERO_CHANGES.md 항목 1번 정정 (isinstance step37→step09 도입)
+- 📐 코딩 스타일: [notes/coding_style.md](./notes/coding_style.md) 항목 2~6 (Pythonic 시리즈 + import 위치)
+- 🔬 RESEARCH_QUEUE 6번: Define-by-Run 본질 심화 (가중치 매핑, 그래프 비용, torch.compile 등)
+
 
 ### 📝 코드 / 수식 메모
+
+**step09 새 기능 4종**:
+```python
+# 1. as_array 헬퍼 (삼항 1줄화 — 항목 2)
+def as_array(x: object) -> np.ndarray:
+    return np.array(x) if np.isscalar(x) else x  # type: ignore[return-value]
+
+# 2. square/exp wrapper — Function 1단계 사용 (★ 사용성 핵심)
+def square(x: Variable) -> Variable: return Square()(x)
+def exp(x: Variable) -> Variable: return Exp()(x)
+
+# 3. Variable.__init__ isinstance (방어막 2번, and 결합 — 항목 3)
+if data is not None and not isinstance(data, np.ndarray):
+    raise TypeError(...)
+
+# 4. ★ pipe 헬퍼 (브로 제안, Haskell/Elixir 스타일)
+def pipe(value, *funcs):
+    return reduce(lambda val, f: f(val), funcs, value)
+# pipe(x, square, exp, square) = square(exp(square(x)))
+```
+
+**방어막 3겹 (layered defense)**: 정적(타입힌트) + 동적타입(isinstance) + 동적None(가드).
+as_array가 스칼라→ndarray 정규화로 isinstance 통과 보조 → 3겹이 협력.
+
+**검증**: `square(exp(square(0.5)))` → `x.grad = 3.297442541400256` (step08과 동일, 해석적 정답).
+`Variable(1.0)` → TypeError 정상. pipe 비교 → 두 스타일 결과 동일 (True).
+
+**키워드**: `#함수사용성개선` `#as_array` `#square-wrapper` `#isinstance` `#방어막3겹` `#layered-defense` `#pipe` `#FP합성` `#Pythonic` `#삼항` `#and결합` `#튜플언패킹` `#Pythonic≠짧게` `#import위치` `#순환참조` `#죽은import` `#Define-by-Run` `#가중치매핑` `#그래디언트순간성` `#그래프구축비용` `#torch.compile` `#책vs-rezero+AI` `#코드양≠학습가치`
 
 
 ---
