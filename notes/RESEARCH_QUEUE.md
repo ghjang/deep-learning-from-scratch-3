@@ -66,6 +66,34 @@
   - step33 "행렬의 미분 이론" (야코비안 본격 등장)
   - step35 "행렬의 미분 구현 (MatMul)" (행렬곱 미분 공식 직접 다룸)
 
+### #6. ★ 계산 그래프(DAG) 자료구조 vs Variable/Function "흡수" — 프레임워크 설계 철학
+
+- **출처**: step07 학습 중 브로의 설계 철학 질문 4연타 (2026-07-29)
+- **브로 불편감 4종**:
+  1. `set_creator` 굳이 메서드로? → 단순 속성 할당인데 포장 (캡슐화 의미도 없고 `creator` public)
+  2. 최신 파이썬 속성 피처? → `@property`/`@dataclass` 검토 (현재는 오버엔지니어링, 단순 속성이 나음)
+  3. ★ DAG가 Variable/Function에 **흡수**된 거 불편 → 자료구조적 측면 명확히 분리 불가?
+  4. ★ `backward`가 Variable 메서드로 붙은 거 불편 → 전역 함수가 낫지 않나?
+- **핵심: 3가지 autograd 패러다임 비교** (이 탐구의 중심):
+
+  | 프레임워크 | 방식 | 철학 | DAG 위치 |
+  |---|---|---|---|
+  | **PyTorch/DeZero** | `y.backward()` (Variable 메서드) | Define-by-Run + OOP | Variable/Function에 **흡수** |
+  | **JAX** | `jax.grad(f)(x)` (전역 함수) | 함수형 — Variable 자체 없음 | 별도 함수 (`jax.grad`) |
+  | **TF 1.x** | `tf.gradients(y, x)` + Session | Define-and-Run (분리) | 명시적 Graph 객체 |
+
+- **핵심 질문들** (탐구에서 다룰 것):
+  - 왜 PyTorch/DeZero/JAX는 "흡수" 또는 "함수형"을 택했나?
+  - 왜 TF 1.x(명시적 Graph 분리)는 **사용성 때문에 TF 2.x에서 Define-by-Run로 전환**했나?
+  - "사용성 vs 구조적 순도" 트레이드오프 — 프레임워크는 왜 전부 사용성을 택했나?
+  - JAX의 함수형 접근이 브로가 Q4에서 직감한 "전역 함수"와 어떻게 일치하나?
+- **부수 주제**: `set_creator` 메서드 vs 직접 속성 할당 (작은 설계 결정이지만 캡슐화 철학 드러냄)
+- **키워드**: `#DAG` `#계산그래프` `#Define-by-Run` `#Define-and-Run` `#PyTorch` `#JAX` `#TensorFlow` `#흡수vs분리` `#OOPvs함수형` `#autograd철학` `#set_creator` `#백워드위치` `#전역함수` `#프레임워크설계` `#사용성vs구조적순도`
+- **회수 조건**:
+  - step17 (메모리 관리/weakref) — DAG 구조 더 깊이 다룰 때
+  - step23 (패키지화) — rezero/core.py 설계 시 이 철학 반영 결정
+  - 또는 step 진도 여유 생길 때 (step06 탐구 폭발 경험 반영, 무리하지 말 것)
+
 ---
 
 ## 회수 이력

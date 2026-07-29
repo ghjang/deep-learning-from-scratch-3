@@ -311,6 +311,9 @@ step 전환은 **오직 브로의 명시적 선언**으로만 발생.
      - `LEARNING_NOTES.md` 해당 step: 🔄→✅, 완료일
      - `rezero/__init__.py` 버전 bump (예: `0.0.N` → `0.0.N+1`)
      - GitHub Issue close (완료 코멘트와 함께)
+     - ★ **`#N` 자동 링크 검증** — 완료 코멘트 + 이번 step에서 만든 모든 이슈/코멘트 본문에서
+       단독 `#N`(N ≥ 9, 우리 레포 이슈 1~8 범위 밖)이 없는지 확인.
+       상세 절차는 Known Gotcha #10 "★★★ 사전 검증" 참고. 재발 시 oreilly-japan referenced 이벤트 영구 손상.
      - `LEARNING_PROGRESS.md` 전체 요약 카운트 갱신
    - **브로에게 커밋/푸시 승인 요청** ("이대로 커밋+푸시할까요?")
    - 승인 시 커밋 + push (★최우선 규칙: 브로 명시적 승인 없이 커밋/푸시 금지)
@@ -780,6 +783,35 @@ fork 레포에서의 동작:
 ```
 
 → 핵심: **이슈 번호엔 `#N` 자유롭게 쓰고, 문서/섹션 번호엔 `#N` 대신 텍스트나 링크 사용.**
+
+##### ★★★ 사전 검증 (이슈/코멘트/커밋 메시지 작성 시 필수 — 재발 방지)
+
+> 2026-07-29 재발 사태 (이슈 #7, #8) 반영. **생성 전 검증**이 유일한 확실한 방어망.
+> 사후 정정은 우리쪽 링크만 고칠 뿐, oreilly-japan referenced 이벤트는 영구 남음 (⑥ 참고).
+
+이슈/PR/코멘트/커밋 메시지에 `#N` 패턴을 쓸 때, **게시 전에 반드시**:
+
+1. **"`#N`의 N이 이슈 번호인가?"** 자문 — 이슈 번호가 아니면 `#N` 쓰지 말 것
+2. **의심되면 게시 전에 로컬에서 검증** — 본문에서 단독 `#N`(N ≥ 9, 우리 레포 이슈 1~8 범위 밖) 찾기:
+   ```bash
+   # 게시 전 본문 파일(/tmp/...md) 검증
+   grep -nE '(^|[^a-zA-Z0-9_])#[0-9]+' /tmp/issue_body.md
+   ```
+3. **정정 패턴** (이슈가 아닌 번호에 적용):
+   - `탐구 #N` → `탐구 노트 N번` 또는 `[exploration_N_...](...)`
+   - `Known Gotcha #N` → `Known Gotcha 섹션 N`
+   - `REZERO_CHANGES.md #NNN` → `REZERO_CHANGES.md 항목 N번`
+   - `§N` (섹션) → 텍스트 그대로 OK (§는 자동 링크 아님, 안전)
+4. **게시 후 즉시 렌더링 확인** (의심 시):
+   ```bash
+   gh api -H "Accept: application/vnd.github.full+json" \
+     repos/ghjang/deep-learning-from-scratch-3/issues/N --jq '.body_html' | \
+     grep -oE 'href="[^"]*oreilly-japan[^"]*"'
+   # oreilly-japan 링크 나오면 → 재발, 즉시 정정
+   ```
+
+> ⚠️ **랩업 절차 연동**: step 랩업 시 이슈 close 코멘트 작성 전 **위 검증 의무**.
+> AGENTS.md "스텝 랩업" 6단계(상태 전환 작업)에 "이슈/코멘트 `#N` 검증" 하위 단계 추가됨.
 
 #### ⑤ 명시적 레포 지정 (필요 시)
 

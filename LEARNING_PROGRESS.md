@@ -24,10 +24,10 @@
 
 ## 📈 전체 요약
 
-- **완료**: 6 / 60 (step01~06 ✅)
+- **완료**: 7 / 60 (step01~07 ✅)
 - **진행 중**: 0
 - **막힘**: 0
-- **마지막 업데이트**: 2026-07-29 — step06 완료
+- **마지막 업데이트**: 2026-07-29 — step07 완료
 
 ---
 
@@ -49,8 +49,8 @@
 | step04 | 수치 미분 | ✅ | [#5](https://github.com/ghjang/deep-learning-from-scratch-3/issues/5) | 2026-07-24 | numerical_diff 중앙차분, self.input/output 복선, 탐구 3종 (#10/#11/#12) |
 | step05 | 역전파 이론 [No code] | ✅ | [#6](https://github.com/ghjang/deep-learning-from-scratch-3/issues/6) | 2026-07-28 | 역전파=chain rule, 계산그래프, 국소적 미분; 탐구 3종 (#13 표기법+fold 통찰 / #14 용어 / #15 기호 어원) |
 | step06 | 수동 역전파 (Variable.grad, Function.backward) | ✅ | [#7](https://github.com/ghjang/deep-learning-from-scratch-3/issues/7) | 2026-07-29 | 수동 역전파=right fold unfold; step04 복선 회수; 변형 3종(gy/gx→upstream/downstream+local_deriv, grad Optional 힌트, backward @abstractmethod); REZERO_CHANGES.md 신설 |
-| step07 | 역전파 구현 - Variable.backward() | ⏳ | - | - | - |
-| step08 | Function.backward() 구현 | ⏳ | - | - | - |
+| step07 | 역전파 자동화 (재귀적 right fold) | ✅ | [#8](https://github.com/ghjang/deep-learning-from-scratch-3/issues/8) | 2026-07-29 | 역전파 자동화=재귀 right fold; Define-by-Run 완성; 변형 5종(#010~#014: apply/derivative hook 대칭, derivative callable, backward 전역 함수 JAX 스타일); #001 회수(타입 힌트 세트); Known Gotcha 10 재발+방어망 강화; RESEARCH_QUEUE 6 등록 |
+| step08 | 역전파 자동화 (반복문 최적화) | ⏳ | - | - | - |
 | step09 | 함수를 더 편하게 (Function 기반 클래스화) | ⏳ | - | - | - |
 | step10 | 테스트 (unittest로 동작 검증) | ⏳ | - | - | - |
 

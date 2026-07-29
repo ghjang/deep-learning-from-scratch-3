@@ -498,25 +498,90 @@ x.grad = A.backward(a.grad)             # fold step 3: A 노드 (a → x, 입력
 
 ---
 
-## Step 07 — [1고지] 역전파 구현 - Variable.backward()
+## Step 07 — [1고지] 역전파 자동화 (재귀적 right fold)
 
-**Issue**: (링크)
-**완료일**: -
-**상태**: ⏳
+**Issue**: [#8](https://github.com/ghjang/deep-learning-from-scratch-3/issues/8)
+**완료일**: 2026-07-29
+**상태**: ✅
 
 ### 📖 요약 (한 줄)
 
+step06 수동 역전파를 **자동화** — `Variable.creator` 역방향 링크로 그래프 기록, 전역 `backward(start_var)` 한 번에 재귀 연쇄. step05 통찰(역전파 = right fold)의 **재귀적 구현**. Define-by-Run 완성. **★ 이번 step은 코드 자체보다 5개 구조 변형(#010~#014) + Known Gotcha 재발 사태 대응이 압도적.**
 
 ### ❓ 질문 / 막힌 점
 
+- ✅ `creator`/`set_creator` 네이밍 — 책 충실 유지. 검증 결과 `dezero/core.py:81-83`에 generation 설정(step16 복선) 추가 로직 확인 → 메서드 존재 이유 납득 (#012)
+- ✅ Variable.backward() vs Function.backward(gy) 혼동 — **전역 backward로 분리** (#014) → 혼동 원천 제거
+- ✅ `self.output` 저장 — step07에선 저장하지만 미사용, step08(반복문)에서 실사용 (이중 복선 유지)
+- ⚠️ Known Gotcha #10 (`#N` 자동 링크) **재발** — 이슈 #7/#8 본문에서 `#9`/`#10`/`#13`이 oreilly-japan으로 연결. 정정 완료 + AGENTS.md #10 "사전 검증" 절 추가 + 랩업 6단계에 검증 하위 단계 추가. 단, oreilly-japan referenced 이벤트는 영구 손상.
 
 ### 💡 통찰 / 배운 점
 
+**★ 역전파 자동화 = right fold의 재귀 구현** — step05 통찰 회수.
+- step06: 손으로 unfold (C/B/A.backward 직접 호출 5줄)
+- step07: creator 링크로 `backward(y)` 한 번에 재귀 (1줄, upstream_grad 기본값)
+
+**★ Define-by-Run 완성** — 순전파 시점에 `output.set_creator(self)`로 그래프 자동 기록. 역전파 시 creator 링크 따라 연쇄.
+
+**★ 5개 구조 변형 연쇄** (브로 "다 똑같네" 통찰에서 시작):
+1. backward 중복 발견 → **derivative hook** (#010)
+2. forward도 같은 구조 → **apply hook, 대칭 완성** (#011)
+3. set_creator 의심 → **generation 복선 발견** (#012)
+4. "도함수값이 아니라 도함수" → **derivative callable 반환** (#013, 노트 13번 §4 구현)
+5. "backward는 Variable에 왜?" → **전역 함수 분리** (#014, JAX 스타일, rezero 정체성)
+
+**★ 타입 힌트 세트 도입** (#001 회수) — 부분 도입하면 정적 분석 깨진다는 교훈(step06 실패)을 step07에서 세트 도입으로 증명. Pyright가 실제 버그(grad None)까지 잡아줌.
+
+**★ Known Gotcha #10 재발 사태** — AGENTS.md에 랩업 절차에 #N 검증 없던 게 원인. 이번에 "사전/사후 검증" 절 추가. 미래 AI/브로가 같은 실수 안 하게 방어망 강화.
+
+### 📝 결정 기록: 변형 5종 + 회수 1종 (REZERO_CHANGES #001, #010~#014)
+
+**#010 derivative hook** — backward에 Template Method 재적용. 자식 구현량 5줄→1줄. DRY.
+**#011 apply hook** — forward에도 동일 구조. `forward`→`apply` 네이밍 (수학 f(x) 함수 적용과 일치). 대칭 완성.
+**#012 set_creator 유지** — 책 충실. 검증 결과 generation(step16) 복선 발견 → 메서드 존재 이유 납득.
+**#013 derivative callable 반환** — `derivative()`가 도함수(함수 객체) 반환. 노트 13번 §4 "도함수 = 고차 함수" 통찰의 코드 구현.
+**#014 ★★★ backward 전역 함수** — Variable 메서드 → 전역 `backward(start_var)`로 분리. JAX 스타일. Variable은 순수 데이터 상자로 회귀. rezero 정체성. (+ upstream_grad 기본값 None→ones_like, start_var 네이밍, 재귀 버그 수정 교훈)
+**#001 회수** — 전체 시그니처 타입 힌트 세트 도입. step06 실패("세트로 넣어야")를 step07에서 증명.
+
+> 📌 모든 변형은 **"최종 반영 보류"** 메모 달아둠 — step13(가변 길이)/step34(행렬 미분) 진입 시점에서 재평가. 복잡해지면 apply/derivative hook이나 전역 backward가 안 맞을 수 있어. 그때 열어둔 탈출구(backward 직접 오버라이드) 사용.
 
 ### 🔗 관련 링크
 
+- Issue: https://github.com/ghjang/deep-learning-from-scratch-3/issues/8
+- 구현: `rezero/steps/step07.py`
+- 정답지: `steps/step07.py`
+- 이전 step: step06 수동 역전파 (변형 3종 + pyright 0 errors)
+- 🧪 탐구 노트 13번 §8: 역전파 = right fold 통찰 (step07 재귀 구현의 사고 기반)
+- 🔧 REZERO_CHANGES.md: **step07 변형 5종(#010~#014) + #001 회수** ★ 이번 step 하이라이트
+- 🔬 RESEARCH_QUEUE.md 후보 6번: DAG 흡수 vs 분리, 3가지 autograd 패러다임 (#014 실증 자료)
 
 ### 📝 코드 / 수식 메모
+
+**최종 구조 (rezero 정체성 — Variable 순수 데이터 상자 + 전역 backward)**:
+```python
+class Variable:                           # 순수 데이터 상자 (backward 없음 ★)
+    data; grad; creator
+    set_creator(func)
+
+class Function(ABC):                      # 대칭 구조 (apply/derivative hook)
+    __call__(input_var) → forward → apply (hook) + set_creator
+    forward(x) → apply(x)                 # 기본 구현
+    backward(gy) → derivative(x) * gy     # 기본 구현
+    apply(x) / derivative()               # 선택적 hook (NotImplementedError)
+
+def backward(start_var, upstream_grad=None):   # ★★★ 전역 함수 (#014)
+    # 3단계 우선순위: 명시적 인자 > 기존 grad > ones_like 자동
+    ...
+    f.backward(start_var.grad)             # Function.backward (단일 노드)
+    backward(x)                            # 재귀 연쇄
+
+# 사용
+backward(y)                                # 한 줄이면 역전파 완료
+```
+
+**검증**: `x.grad = 3.297442541400256` (step06과 동일, 해석적 정답), pyright 0 errors ✅
+
+**키워드**: `#역전파자동화` `#재귀적right-fold` `#DefineByRun완성` `#creator역방향링크` `#apply-hook` `#derivative-hook` `#TemplateMethod대칭` `#callable반환` `#도함수객체` `#전역함수backward` `#JAX스타일` `#start_var` `#upstream_grad기본값` `#ones_like자동초기화` `#관심사분리` `#SoC` `#타입힌트세트` `#pyright0errors` `#KnownGotcha10재발` `#사전검증` `#변형5종` `#REZERO_CHANGES` `#아하모먼트`
 
 
 ---
