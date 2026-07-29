@@ -27,3 +27,18 @@ packages = ["dezero"]
 [tool.uv]
 # 학습용이므로 이 프로젝트 자체를 패키지로 빌드하지는 않음.
 package = false
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+# ★ pytest가 모듈(dezero, rezero)을 임포트할 수 있게 루트를 sys.path에 추가.
+# (uv 프로젝트가 package=false라 설치되지 않고, unittest와 달리 pytest는 자동 추가 안 함)
+pythonpath = ["."]
+# 테스트 발견 규칙 — test_*.py 파일 + Test* 클래스 (unittest 호환)
+testpaths = ["tests", "rezero/tests", "rezero/steps"]
+python_files = ["test_*.py", "step*.py"]
+# unittest.TestCase 기반 테스트도 pytest가 인식 (역호환)
+addopts = "--tb=short"

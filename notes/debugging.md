@@ -117,15 +117,71 @@ step07 타입 힌트 세트 도입 중 `Variable.backward()`에서 `f.backward(s
 `self.grad: Optional` → None 가능한데 `Function.backward(upstream: np.ndarray)`는 None 안 받음.
 → `assert` 가드로 방어. 단, 이것도 `-O`에선 사라지므로 "프로덕션 보장용"은 아니고 "개발 중 조기 발견용".
 
+### 🎯 ★ assert의 3번째 용도 — 정적 분석과 "협력" (타입 좁히기)
+
+브로 통찰 (step10): *"정적분석 피해가다니... 세맨틱까지 분석해서 빨간줄?"*
+→ ★ 정확히 봄. assert는 단순 "런타임 검증"을 넘어 **정적 분석기(Pylance/pyright)와 협력하는 도구**.
+
+#### 정적 분석의 한계 — 런타임 부작용 추적 불가
+
+```python
+self.grad: Optional[np.ndarray] = None   # 타입은 Optional
+
+fill_grad(y)                              # ★ 런타임 부작용: x.grad 채움 (정적 분석은 모름!)
+np.allclose(x.grad, num_grad)             # ← 정적 분석: "Optional이니 None 가능" 경고
+```
+
+정적 분석이 **못 하는 것**:
+- 런타임 부작용 추적 (`fill_grad`가 x.grad 채운다는 것)
+- 논리적 추론 ("테스트에선 None일 수 없다")
+- 이건 **정지 문제(Halting Problem)** 급이라 근본적으로 불가능
+
+→ 그래서 정적 분석은 **보수적** — 모르면 일단 경고. 안전 측 선택.
+
+#### assert로 정적 분석에게 "알려주기" — 타입 좁히기
+
+```python
+fill_grad(y)
+assert x.grad is not None                 # ★ "이 시점에선 None 아니다" — 정적 분석에게 알림
+np.allclose(x.grad, num_grad)             # 이제 정적 분석도 OK (Optional → np.ndarray로 좁혀짐)
+```
+
+★ 핵심: assert는 정적 분석이 **이해할 수 있는 언어**로 상태를 번역해주는 것. Pylance는 assert 이후 코드에서 `x.grad`를 `np.ndarray`로 추론 (타입 좁히기, type narrowing).
+
+#### `assert` vs `# type: ignore` — 협력 vs 억압
+
+| 관점 | `# type: ignore` | `assert x is not None` |
+|---|---|---|
+| 정적 분석과의 관계 | **억압** — "닥쳐, 내가 안다" | ★ **협력** — "이 시점에선 None 아니야, 이유는 이거" |
+| 의미 | 경고 무시 (왜인지 모름) | 불변조건 명시 |
+| 런타임 검증 | ❌ 아무것도 안 함 | ★ 진짜 None이면 AssertionError |
+| 버그 숨김 위험 | 높음 (다른 에러도 묻힘) | 낮음 (정확히 이 조건만) |
+| 코드 블록 전파 | 매 줄마다 써야 | ★ 하나로 아래 전체에 전파 |
+
+→ assert가 **일석삼조**: 정적 분석 만족 + 불변조건 명시 + 런타임 검증.
+
+#### DeZero/rezero 등장 지점 (step09~10)
+
+step10 테스트 4곳 (gradient check 3 + 데모 1)에서 동일 패턴:
+```python
+fill_grad(y)
+assert x.grad is not None            # ★ 방어막 (Pylance 타입 좁히기)
+assert np.allclose(x.grad, num_grad)
+```
+
+cf. 이건 "방어막 3번(None 가드)"과 짝 — None 가드는 `if ... raise` (사용자 오용),
+assert는 프로그래먘 불변조건. 같은 None 처리지만 **용도에 따른 도구 선택** (debugging.md 원칙 일관).
+
 ### 🔑 핵심 키워드
 
-`#assert` `#-O` `#-OO` `#__debug__` `#NDEBUG` `#최적화모드` `#릴리스빌드` `#불변조건` `#invariant` `#부작용금지` `#검증문` `#C/C++비교`
+`#assert` `#-O` `#-OO` `#__debug__` `#NDEBUG` `#최적화모드` `#릴리스빌드` `#불변조건` `#invariant` `#부작용금지` `#검증문` `#C/C++비교` `#타입좁히기` `#type-narrowing` `#정적분석협력` `#vs-type-ignore` `#런타임부작용추적불가` `#정지문제`
 
 ### 🔗 관련
 
 - C/C++의 `assert()` 매크로 + `NDEBUG` 매크로 (같은 철학 — 디버그 빌드에선 작동, 릴리스에선 제거)
 - Java의 `assert` (JVM `-ea`/`-da` 스위치로 on/off — 파이썬의 `-O`와 유사)
 - PEP 시 참고: 파이썬 공식 문서 [assert statements](https://docs.python.org/3/reference/simple_stmts.html#the-assert-statement)
+- step10 `rezero/steps/step10.py` — pytest 테스트에서 assert로 타입 좁히기 적용 (4곳)
 
 ---
 

@@ -56,6 +56,7 @@
 | 14 | step05 진행 중 | "미분" 용어 7중 혼돈과 해독 전략 (미분값/도함수/미분연산, 한영 대조, 밑시딥 실전) | [notes/exploration_14_derivative_terminology.md](./notes/exploration_14_derivative_terminology.md) |
 | 15 | step05 진행 중 | 수학 기호의 어원과 역사 (√/∫/d/∂/∇/∞ 모양의 진짜 이유) | [notes/exploration_15_math_symbol_origins.md](./notes/exploration_15_math_symbol_origins.md) |
 | 16 | step08 진행 중 | "부작용" 번역 비판 + side effect 재프로그래밍 (번역어 감정색 왜곡, 순수함수, 최적화 충돌) | [notes/exploration_16_side_effect.md](./notes/exploration_16_side_effect.md) |
+| 17 | step10 준비 중 | 파이썬 테스팅 패러다임 진화 (unittest→pytest, 책 교육적 선택 vs 실무 국룰, hypothesis) | [notes/exploration_17_python_testing.md](./notes/exploration_17_python_testing.md) |
 
 ### 🎨 디자인 패턴 (횡단 관심사, 누적형)
 
@@ -819,25 +820,65 @@ as_array가 스칼라→ndarray 정규화로 isinstance 통과 보조 → 3겹�
 
 ---
 
-## Step 10 — [1고지] 테스트 (unittest로 동작 검증)
+## Step 10 — [1고지] 테스트 (unittest로 동작 검증) ★ 1고지 마지막 — 완료!
 
-**Issue**: (링크)
-**완료일**: -
-**상태**: ⏳
+**Issue**: [#11](https://github.com/ghjang/deep-learning-from-scratch-3/issues/11)
+**완료일**: 2026-07-29
+**상태**: ✅ ★ 1고지 전체 완료 (step01~10)
 
 ### 📖 요약 (한 줄)
 
+새 기능이 아니라 **"검증 도구"** 도입 — pytest(국룰, 책의 unittest 대신) + gradient check로 step01~09 구축을 신뢰할 수 있게 만드는 1고지의 "완결성 인증". `numerical_diff`(step04 재등장, 복선 회수)와 역전파(해석적 미분) 결과를 비교해 구현이 맞는지 독립적으로 검증.
 
 ### ❓ 질문 / 막힌 점
 
+- ✅ "밑시딥 3권이 좀 됐는데 unittest가 여전히 유효?" → 유효하나 실무 국룰은 pytest. 책의 교육적 선택 vs 실무 국룰 (탐구 17번).
+- ✅ "책의 unittest 대신 pytest로?" → 브로 결정: 국룰 pytest로 가자. 책 코드는 역호환 실행 가능.
+- ✅ Pylance `x.grad` Optional 빨간줄 (3곳 테스트 + 1곳 데모) → `assert x.grad is not None` (타입 좁히기). `# type: ignore` 아님.
+- ✅ "assert에 런타임 처리(if raise)도 필요?" → 아니. y0/y1은 불변조건(assert), x.data는 사용자 오용(if/raise) — 용도에 따른 도구 선택.
+- ✅ 빈 줄 누락 (numerical_diff) → 3개 논리 블록 분리 (AGENTS.md 원칙 위반 스스로 잡음).
 
 ### 💡 통찰 / 배운 점
 
+**★ gradient check = 1고지 "품질 보증"** — 역전파(해석적)와 수치 미분(독립적 방법)이 일치 → step01~09 모든 구현 신뢰. 이게 없으면 "내가 짠 게 맞나?" 의문 남음.
+
+**★ pytest 도입 = "책 시대 한계" 극복** — 책(2020년)은 교육용 unittest, 실무(2026년)는 pytest 국룰. 역호환 덕분에 둘 다 잡는 하이브리드 전략 (탐구 17번).
+
+**★ assert = 정적 분석과 "협력"** — `# type: ignore`(억압) 대신 `assert x.grad is not None`(협력) 로 타입 좁히기. 일석삼조: 정적 분석 만족 + 불변조건 명시 + 런타임 검증. debugging.md 항목 1 보강.
+
+**★ 방어막 None 가드 일관 적용** — 5곳(`__call__`/`backward`/`fill_grad`/`numerical_diff` + 테스트 4곳 assert). 같은 패턴이 코드 전체로 전파되는 구조.
+
+**★ "과거 step 보존, 현재 step 반영" 원칙** — step04 numerical_diff는 그 시점 기록으로 보존, step10에서 as_array 보강 (step09 isinstance 도입으로 암묵적 깨짐 해결). 코드 진화가 step 단위로.
 
 ### 🔗 관련 링크
 
+- Issue: https://github.com/ghjang/deep-learning-from-scratch-3/issues/11
+- 구현: `rezero/steps/step10.py`
+- 정답지: `steps/step10.py`
+- 이전 step: step09 Function 사용성 개선 — Issue 10
+- step04 numerical_diff 재등장 (gradient check용 복선 회수)
+- 🔧 rezero 변형 항목 14번 (fill_grad 전역 함수) — 테스트에서 검증
+- 🧪 탐구 17번: [notes/exploration_17_python_testing.md](./notes/exploration_17_python_testing.md) (unittest vs pytest 패러다임)
+- 🐛 debugging.md 항목 1 보강 (정적 분석과 협력하는 assert — 타입 좁히기)
+
 
 ### 📝 코드 / 수식 메모
+
+**pytest 스타일 테스트 (책의 unittest 대신 국룰)**:
+```python
+def test_square_gradient_check():
+    x = Variable(np.random.rand(1))
+    y = square(x)
+    fill_grad(y)
+    assert x.grad is not None              # ★ 불변조건 (Pylance 타입 좁히기)
+    num_grad = numerical_diff(square, x)
+    assert np.allclose(x.grad, num_grad)   # 역전파 == 수치 미분 → 신뢰
+```
+
+**검증**: pytest 5 passed (forward/backward/gradient check + 합성 + pipe).
+역전파(1.0) vs 수치 미분(0.9999...) 일치 (x=0.5, square 미분 2x=1.0).
+
+**키워드**: `#테스트` `#pytest` `#unittest대신국룰` `#gradient-check` `#역전파신뢰` `#수치미분비교` `#numerical_diff` `#step04복선회수` `#방어막None가드` `#assert타입좁히기` `#정적분석협력` `#type-ignore아님` `#과거step보존` `#1고지완결성인증` `#책시대한계`
 
 
 ---

@@ -23,6 +23,7 @@
 | 14 | [exploration_14_derivative_terminology.md](./exploration_14_derivative_terminology.md) | step05 진행 중 | "미분" 용어 7중 혼돈과 해독 전략 (미분값/도함수/미분연산, 한영 대조, 밑시딥 실전 해독) |
 | 15 | [exploration_15_math_symbol_origins.md](./exploration_15_math_symbol_origins.md) | step05 진행 중 | 수학 기호의 어원과 역사 (√/∫/d/∂/∇/∞ 왜 이런 모양인가, radix/summa/differentia) |
 | 16 | [exploration_16_side_effect.md](./exploration_16_side_effect.md) | step08 진행 중 | "부작용"이라는 번역이 사고를 지배한다: side effect 재프로그래밍 (번역어 감정색 왜곡, 순수 함수, 최적화 충돌) |
+| 17 | [exploration_17_python_testing.md](./exploration_17_python_testing.md) | step10 준비 중 | 파이썬 테스팅 패러다임 진화: unittest에서 pytest로 (책의 교육적 선택 vs 실무 국룰, hypothesis property-based testing) |
 
 > 파일 번호 = **생성 순서** (탐구 역사 보존)
 > 아래 "추천 읽는 순서"는 처음 읽을 때 논리적 흐름 기준
