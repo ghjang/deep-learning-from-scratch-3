@@ -992,28 +992,67 @@ step11의 리스트 기반 API를 `*inputs` 가변 인수로 자연스럽게 개
 
 **키워드**: `#2고지` `#가변길이인수` `#개선편` `#가변인수` `#star-inputs` `#위치인수` `#출력단일화` `#apply가변인수통일` `#브로통찰` `#star이중성` `#튜플수집` `#언패킹전달` `#step11거시기함해소`
 
-## Step 13 — [2고지] 가변 길이 인수 역전파
+## Step 13 — [2고지] 가변 길이 인수(역전파 편) ✅
 
-**Issue**: (링크)
-**완료일**: -
-**상태**: ⏳
+**Issue**: [#16](https://github.com/ghjang/deep-learning-from-scratch-3/issues/16)
+**완료일**: 2026-07-30
+**상태**: ✅ 완료
+
+> step11~13 "가변 길이 인수" 3부작의 대미. step11~12 순전파에 이어 역전파 다변 버전 완결.
+> ★★ step07부터 매달아둔 "derivative hook 운명"이 판가관 나는 결정적 시험대.
+> ★ 브로 정정: "가변 길이 인수 역전파" → **"가변 길이 인수(역전파 편)"** 이 정확.
 
 ### 📖 요약 (한 줄)
 
+fill_grad 다변 입력 진화 + derivative hook 시험대 통과(Add 상수함수) + self.output 단수화(스칼라 출력 명시). 3부작 대미.
 
 ### ❓ 질문 / 막힌 점
 
+- (step 진행하며 업데이트)
 
 ### 💡 통찰 / 배운 점
 
+- ★★ **derivative hook 시험대** — Add는 gy→(gy,gy) (1입력 2출력)이라 derivative 1줄 표현 불가.
+  → "선택적 hook" 패턴: 단일(Square)은 derivative, 다변(Add)은 backward 직접.
+  REZERO_CHANGES 항목 010~013 "최종 반영 보류"가 여기서 판가관.
+- ★ **Add 역전파 우아함** — `return gy, gy` ("들어온 걸 그대로 양쪽에 흘려보내라").
+  ∂y/∂x0=1, ∂y/∂x1=1. step11 "skip connection 기초" 복선 회수.
+- ★ **zip 동시 언패킹** (A.7.6) — `for x, gx in zip(f.inputs, gxs)` 가 입력-grad 배분 핵심 이디엄.
+- ★ **fill_grad 다변 진화** — output_grads 회수 + 언패킹 호출 + zip 배분. step08 구조의 자연스러운 확장.
+- ★★★ **"다변 역전파 ≠ 다출력 역전파" 혼동 교훈** (step13 구현 중 발견)
+  - "다변" = **입력이 여러 개** (Add: x0, x1). 출력은 여전히 스칼라 1개 → gy도 1개.
+  - 내가 초안에서 "다변"을 "upstream도 여러 개"로 해석 → `backward(*gys)` 가변으로 너무 앞서감.
+  - 브로가 3연속 지적으로 정정:
+    1. "너무 나갔다" → backward(gy) 단일로 회귀 (스칼라 가정)
+    2. "upstream_grad 써라" → #007 정체성 회복 (책 gy 그대로 안 씀)
+    3. "출력 다변 가정하지 마라" → f.outputs 리스트 언패킹 → f.output 단수 직접 회수 (#019 신설)
+  - ★ 학습 가치: 책이 self.outputs 복수형으로 "미리 나간" 구조를 둬서 혼란 발생.
+    rezero는 step13 시점(스칼라)에 충실하게 self.output 단수로 가고,
+    **step34+ 다출력 함수 등장 시 복수로 진화** (REZERO_CHANGES #019에 진화 체크리스트 명시).
+- ★ **output 단수화 결정** (REZERO_CHANGES #019) — 스칼라 출력 명시 + Pylance 만족 + step34 진화 지점 명시
+  - 책의 "미래 확장 대비 복수형" vs rezero의 "현재 시점 충실 단수형"
+  - 브로 철학: "학습이니 우리 의도대로 가고, 잘못되면 뒷목 잡으며 배운다"
 
 ### 🔗 관련 링크
 
+- 진행 이슈: #16
+- 정답지: steps/step13.py
+- 이전 step: step12 가변 길이 인수(개선 편) — #15
+- derivative hook 운명: REZERO_CHANGES 항목 010~013
+- 동시 언패킹(zip): exploration_07 A.7.6
+- fill_grad 변형: REZERO_CHANGES 항목 014~017
 
 ### 📝 코드 / 수식 메모
 
+- `fill_grad` 다변 입력 진화 — output_grads 회수 + f.output.grad 직접 + zip 배분
+- `Function.backward(upstream_grad)` 단일 인자 (스칼라 출력 가정, 책 step13 충실)
+- `derivative` 단일/튜플 자유 + 부모 정규화 (책 패턴 확장)
+- Add.derivative `(lambda _: 1, lambda _: 1)` ★ 브로 상수함수 통찰 실현
+- `self.output` 단수 (#019) — 스칼라 출력 명시, step34+에서 outputs 복수로 진화
+- `partials` 변수명 — 편도함수(partial derivatives), 수학적 정확
+- "가정/전제" 표 docstring에 명시 — 다른 세션 혼동 방지
 
----
+**키워드**: `#2고지` `#가변길이인수` `#역전파편` `#3부작대미` `#fill_grad다변진화` `#Add역전파` `#gy-gy` `#skip-connection기초` `#derivative-hook시험대` `#선택적hook` `#zip동시언패킹` `#항목010~013판가관`
 
 ## Step 14 — [2고지] 같은 변수 반복 사용 (누적 gradient)
 

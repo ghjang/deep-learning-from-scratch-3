@@ -350,6 +350,32 @@
 - **구현 형태**: `lambda x: 2 * x` (간결). 복잡해지면 내부 def로 전환 고려.
 - **주의 / 최종 반영 보류**: #010/#011과 동일 — step13/step34 진입 시점에서 재평가.
   행렬 미분(step34+)은 도함수가 단순 callable로 표현 안 될 수 있음 (전치 등) → backward 직접 오버라이드로 전환.
+- **★★ step13 검증 결과 (2026-07-30) — "스칼라 출력 전용" 확정**:
+  브로 통찰: *"derivative hook은 함수 출력이 스칼라일 때까지만 의미 있는 짓 아닌가?"*
+  → ★ 정확함. 실증 검증 완료:
+  | 출력 형태 | 역전파 공식 | derivative hook 유효? |
+  |---|---|---|
+  | **스칼라** (Square, Add 등 step01~33 전 범위) | `df(x) * gy` (스칼라×스칼라) | ✅ 유효 |
+  | **벡터/행렬** (step34+ 행렬 미분, step41+ 텐서) | `J^T @ gy` (야코비안 전치 곱) | ❌ 붕괴 — backward 직접 필수 |
+  - 핵심: derivative hook의 `df(x) * gy` 공식은 **"출력 y가 스칼라"** 일 때만 성립.
+    출력이 벡터/행렬이면 역전파가 야코비안 전치행렬 곱(`J^T @ gy`)이 되어 스칼라 곱 공식이 붕괴.
+  - ★ 즉 derivative hook의 유효 범위 = **step01~33 (스칼라 회로)**. step34+부턴 backward 직접 오버라이드가 표준.
+- **★ step13 옵션 2-α 선택 (브로 통찰 + 상수함수 아이디어)**:
+  브로 아이디어: *"Add의 도함수는 입력 무시하는 '1'이란 상수를 리턴하는 상수함수!"*
+  → ★ 수학적으로 정확. Add 편도함수 $\partial y/\partial x_i = 1$ = **FP의 const(1) 상수함수**.
+  - 이걸 살리기 위해 **derivative가 "각 입력별 도함수 리스트" 반환** 구조 채택 (옵션 2-α):
+    ```python
+    class Add(Function):
+        def derivative(self):
+            return [lambda _: 1, lambda _: 1]   # ★ 각 편도함수 = 상수함수 (브로 통찰)
+    class Square(Function):
+        def derivative(self):
+            return [lambda x: 2 * x]             # 단일도 리스트 (일관성)
+    ```
+  - 부모 backward가 `zip(inputs, dfs, gys)` 로 다변 처리 (복잡도↑ but 학습 가치↑)
+  - ★ Issue #14 "FP 유틸"의 `const` 함수가 **실제 용도 발견** — Add 편도함수 표현.
+  - trade-off: 부모 backward 복잡도 증가. 실용적이라면 옵션 2-β(단일 derivative/다변 backward 직접)가 단순.
+    학습용 프로젝트이므로 브로 아이디어 살리는 2-α 선택.
 - **검증**: `pyright rezero/steps/step07.py` → `0 errors, 0 warnings` ✅
 - **회수**: step23 → `rezero/core.py` Function + `functions.py` 자식들 승격 시 (#010/#011과 함께 유지)
 
@@ -605,6 +631,103 @@
   pipe/compose/partial/curry/bind는 함수형 프로그래밍의 핵심 개념들.
   step23에서 DeZero(Define-by-Run)과 FP(합성)가 어떻게 만나는지 실험할 자리.
 - **회수**: step23 → `rezero/__init__.py` 또는 utils성 모듈에 재도입 (★ FP 화두와 함께 논의)
+
+### #019 — ★★★ `self.outputs` (리스트) → `self.output` (단수) — 스칼라 출력 명시 (step13)
+- **위치**: step13~
+- **상태**: ✅ 반영 (2026-07-30)
+- **종류**: 🔵 라이브러리성 ★★★ (책과 다른 구조적 선택, rezero 정체성 + 학습 명시성)
+- **내용**:
+  책 원본 step13은 `self.outputs = outputs` (리스트, 복수형)로 출력을 저장.
+  이유: 미래 다출력 함수(step34+) 대비 "미리 나간" 구조.
+  rezero는 **step13 시점(출력 스칼라 1개)에 충실하게 단수 `self.output`로 단순화**:
+  ```python
+  # 책 (복수형, 미래 확장 대비)
+  self.outputs = outputs                              # list[Variable]
+  return outputs if len(outputs) > 1 else outputs[0]  # 반환만 단일화
+
+  # rezero (단수, 스칼라 명시)
+  assert len(ys) == 1, "step13은 출력 1개(스칼라) 가정"
+  output = Variable(as_array(ys[0]))
+  self.output = output                                # Variable 1개
+  return output                                       # 항상 단일
+  ```
+- **★ 왜 단수화했는가 (3가지 이유)**:
+  1. **step13 시점 정확성** — 다출력 함수가 step34+까지 안 나옴. 굳이 복수 구조 유지할 이유 없음
+  2. **Pylance 만족** — 책의 리스트 언패킹(`f.backward(*gys)`)은 단일 인자 backward와 불일치 경고.
+     단수화하면 `f.backward(f.output.grad)` 직접 회수로 깔끔.
+  3. **"스칼라 출력 전용" 명시** — derivative hook의 유효 범위(step01~33)가 코드 구조로 드러남.
+     self.output 단수 = "이 프레임워크는 출력 1개만 다룬다" 선언.
+- **★★★ 핵심 — step34+ 진화 지점 (다른 세션 반드시 인지)**:
+  step34+에서 **다출력 함수(벡터/행렬 출력)** 가 등장하면 `self.output` → `self.outputs` (복수)로 **되돌려야 함**.
+
+  ★ 다출력 함수의 예 — **Split** (책 step13 그림에 복선으로 등장, 브로 발견):
+  하나의 입력을 여러 출력으로 쪼개는 함수 (Add와 정반대 방향):
+  ```
+  입력 1개        출력 N개
+   [x]  ──Split──→  [y0], [y1], ...
+  ```
+  실제 사례: multi-head attention (특징 벡터 → 여러 head 분기),
+  multi-task 분기 (은닉층 → classification + regression), PyTorch `torch.split`/`torch.chunk`.
+  책은 코드엔 안 내면서 **그림으로만 살짝 예고** (미래 복선 전략). step34+ 또는 신경망 응용(step40+)에서 실제 등장 예상.
+  → 이 Split 같은 다출력 함수가 등장하는 시점이 바로 self.output → self.outputs 진화가 필요한 순간.
+  그때 함께 바꿔야 할 것들:
+  | 변경 항목 | step13 (현재) | step34+ (진화) |
+  |---|---|---|
+  | `self.output` | 단수 Variable | `self.outputs` list[Variable] (복수) |
+  | `__call__` 반환 | `Variable` | `Variable \| list[Variable]` (책처럼 len으로 분기) |
+  | `fill_grad` 회수 | `f.output.grad` 직접 | `output_grads = [out.grad for out in f.outputs]` |
+  | `backward` 시그니처 | `(self, upstream_grad)` 단일 | `(self, *gys)` 가변 (다출력 대응) |
+  | derivative hook | 유효 (스칼라 곱) | ★ 붕괴 — backward 직접 오버라이드 필수 (야코비안) |
+  → 이 표가 **"step34 진입 체크리스트"** 임. step34 이슈 생성 시 이 항목 참조.
+- **★ 책과의 차이 — 학습 서사**:
+  - 책: "미리 다출력 대비 구조" → 독자가 "왜 복수지?" 혼란 (브로 경험)
+  - rezero: "step13 시점 스칼라 명시" → step34에서 자연스럽게 복수로 진화 (복선의 회수)
+  - 즉 책은 **전진 설계(forward design)**, rezero는 **점진적 진화(evolutionary)**.
+    학습용에선 후자가 "왜 이 구조가 필요한지"를 단계별로 체감하게 함.
+- **★ 브로 철학 반영**:
+  > "리제로의 정체성을 유지하고 싶고, 이건 학습이니 우리 의도대로 진행해보자.
+  >  그 길이 잘못됐으면 '아! 그래서 그랬군!' 하며 뒷목 잡겠지만,
+  >  실수로 인해 많이 배우지 않겠냐?"
+  → 이 변형은 그 철학의 실현. "책과 다른 길을 가되, 그 근거와 회수 지점을 명시한다."
+- **★ 관련 혼동 교훈 (LEARNING_NOTES step13에 상세)**:
+  "다변 역전파 ≠ 다출력 역전파" — step13은 **입력은 다변(Add: x0,x1)** 이지만 **출력은 스칼라 1개**.
+  이 혼동에서 비롯된 3가지 수정 연쇄 (이전 초안 → 최종):
+  1. `backward(*gys)` 가변 → `backward(upstream_grad)` 단일
+  2. `gy` → `upstream_grad` (#007 정체성 회복)
+  3. `f.outputs` 리스트 언패킹 → `f.output.grad` 직접 (이 항목)
+- **검증**: `z = add(square(x), square(y)) → x.grad=4, y.grad=6` 정상 동작 ✅
+- **회수**: step23 → `rezero/core.py` Function 승격 시 self.output 단수 유지.
+  단, **step34 진입 시 반드시 self.outputs 복수로 진화** (위 표 참조).
+
+### #020 — ★★ step23 패키지화 시 역전파 주석/docstring 정비 (학습 관점 트레이드오프 서술)
+- **위치**: step13 도입 / **step23 회수 예정**
+- **상태**: 🔄 보류 (2026-07-30, step13 진행 중 결정)
+- **종류**: 🟢 step 한정 → step23 회수 (문서화 작업)
+- **내용**:
+  derivative hook 구조(step07~13)는 **역전파의 일반적 구조(chain rule fold step)를 부모 한 곳에 집중**시킴.
+  장점: 수학 구조 명확, 네이밍 투명 (partials, upstream_grad 등).
+  단점: 말단 함수(Square/Add)의 `derivative` 1줄만 보면 **"이 함수의 역전파"가 안 보임**.
+  책 방식(backward 직접)은 반대 — 각 함수가 `return 2*x*gy` 식으로 역전파 직접 체감 강함.
+- **★ 트레이드오프 (브로 통찰)**:
+  | 관점 | 우리 방식 (derivative hook) | 책 방식 (backward 직접) |
+  |---|---|---|
+  | 역전파 일반 구조 체감 | ★ 강함 (부모 fold step 집중) | 약함 (각 함수마다分散) |
+  | 각 함수 역전파 직접 체감 | 약함 (derivative 1줄만) | ★ 강함 (`2*x*gy` 직접 작성) |
+  | 수학 구조 드러남 | ★ 강함 (partials, chain rule) | 약함 |
+  | DRY (중복 제거) | ★ 강함 | 약함 (자식마다 fold step 중복) |
+  브로 의견: *"추상화 관점에선 상위 클래스 메인 동작 보는 게 덜 헷갈린다"*
+  → 역전파 일반 구조 이해엔 우리 방식이 유리. 각 함수 직접 체감엔 책 방식이 유리.
+- **★ step23 회수 시 할 일 (구체적)**:
+  `rezero/core.py` Function + `functions.py` 자식들 승격할 때:
+  1. **Function.backward docstring** — "이 메서드가 chain rule fold step의 일반 구조" 명시
+  2. **Square/Add docstring** — "이 함수의 역전파는 derivative()로 표현, 부모 backward가 fold" 안내
+  3. **(선택) 비교 주석** — Square에 책 방식(`# def backward(self, gy): return 2*x*gy`)을 주석으로 남겨
+     "이렇게도 할 수 있지만 우린 derivative hook 택함" 비교 가시화
+  → 학습자가 core.py 읽을 때 "왜 이 구조인지 + 책과 어떻게 다른지" 한번에 파악 가능
+- **★ 까먹지 않게 하는 장치**:
+  이 항목(#020) 자체가 "step23 회수 예정" 항목. #018(pipe), #019(output 단수)와 같은 패턴.
+  step23 진입 시 REZERO_CHANGES에서 #020 보고 "아, 역전파 주석 정비 있었지" 회수.
+- **회수**: step23 → `rezero/core.py` + `functions.py` 승격 시 docstring/주석 정비
 
 ---
 
