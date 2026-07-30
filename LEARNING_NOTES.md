@@ -1054,28 +1054,53 @@ fill_grad 다변 입력 진화 + derivative hook 시험대 통과(Add 상수함�
 
 **키워드**: `#2고지` `#가변길이인수` `#역전파편` `#3부작대미` `#fill_grad다변진화` `#Add역전파` `#gy-gy` `#skip-connection기초` `#derivative-hook시험대` `#선택적hook` `#zip동시언패킹` `#항목010~013판가관`
 
-## Step 14 — [2고지] 같은 변수 반복 사용 (누적 gradient)
+## Step 14 — [2고지] 같은 변수 반복 사용 ✅
 
-**Issue**: (링크)
-**완료일**: -
-**상태**: ⏳
+**Issue**: [#17](https://github.com/ghjang/deep-learning-from-scratch-3/issues/17)
+**완료일**: 2026-07-30
+**상태**: ✅ 완료
+
+> 가변 길이 인수 3부작(step11~13) 완결 후 새 패턴.
+> 같은 Variable이 여러 곳에 쓰이면 gradient **누적** 필요.
+> ★ 브로 정정: "같은 변수 반복 사용 (누적 gradient)" → **"같은 변수 반복 사용"** 이 정확 (책 제목).
 
 ### 📖 요약 (한 줄)
 
+같은 Variable 반복 사용 시 gradient 누적(if None 패턴) + clear_grad() 도입 + Define-by-Run 가정 명시.
 
 ### ❓ 질문 / 막힌 점
 
+- (step 진행하며 업데이트)
 
 ### 💡 통찰 / 배운 점
 
+- ★ **gradient 누적** — `x.grad = input_grad` 대입 → 덮어쓰기 버그. `if None: 대입 else: 누적` 패턴.
+- ★ **`+=` vs 명시적 `x.grad + gx`** — ndarray in-place 부작용 방지. 새 배열 생성이 안전.
+- ★ **cleargrad()의 의미** — Variable 재사용 시 이전 grad 잔류 방지. 명시적 초기화.
+- ★★ **clear_grad가 전제하는 Define-by-Run 가정** (브로 통찰)
+  - clear_grad 존재 자체가 "계산 그래프는 순전파 시 매번 재생성" 가정을 전제
+  - Define-by-Run: 순전파 실행 시점에 그래프 "생성" (cf. Define-and-Run은 미리 정의)
+  - 같은 Variable로 2번째 forward → 새 그래프 + 이전 grad 잔류 → 잘못 누적
+  - 그래서 clear_grad()로 초기화해야 올바른 역전파 결과
+  - step13 가정(스칼라 출력)에 추가: "계산 그래프 매번 재생성" 가정
+  - 상세: exploration_03/11/16 (Define-by-Run)
 
 ### 🔗 관련 링크
 
+- 진행 이슈: #17
+- 정답지: steps/step14.py
+- 이전 step: step13 가변 길이 인수(역전파 편) — #16
+- fill_grad 변형: REZERO_CHANGES 항목 014~017
 
 ### 📝 코드 / 수식 메모
 
+- `Variable.clear_grad()` — grad 초기화 (#021 네이밍 일관성, 책 cleargrad → clear_grad)
+- fill_grad 누적 로직 — `if x.grad is None: 대입 else: x.grad + downstream_grad` (명시적 +)
+- `downstream_grads`/`downstream_grad` 변수명 — #007 upstream/downstream 대칭 완성
+- if None 체크 이유 — `add(x,x)` 시 f.inputs=(x,x), zip이 같은 객체 2회 방문 → 누적 필요
+- 가정 표 — Define-by-Run(그래프 매번 재생성) + 같은 Variable 반복 가능
 
----
+**키워드**: `#2고지` `#같은변수반복사용` `#gradient누적` `#if-else패턴` `#cleargrad` `#ndarray-inplace` `#명시적덧셈` `#fill_grad확장`
 
 ## Step 15 — [2고지] 복잡한 계산 그래프 이론 [No code]
 

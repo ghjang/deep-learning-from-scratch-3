@@ -24,10 +24,10 @@
 
 ## 📈 전체 요약
 
-- **완료**: 13 / 60 (step01~13 ✅) ★ **2고지 가변 길이 인수 3부작 완결!**
+- **완료**: 14 / 60 (step01~14 ✅)
 - **진행 중**: 0
 - **막힘**: 0
-- **마지막 업데이트**: 2026-07-30 — step13 완료 (2고지 3스텝, 가변 인수 3부작 완결)
+- **마지막 업데이트**: 2026-07-30 — step14 완료 (2고지 4스텝)
 
 ---
 
@@ -61,7 +61,7 @@
 | step11 | 가변 길이 인수(순전파 편) | ✅ | [#12](https://github.com/ghjang/deep-learning-from-scratch-3/issues/12) | 2026-07-30 | 다입력 Add; 방향 (B) apply hook 다변 일반화 성공; pipe 보류(#13); FP 유틸 이슈(#14) 파생; 언패킹 탐구(exploration_07 A.7) |
 | step12 | 가변 길이 인수(개선 편) | ✅ | [#15](https://github.com/ghjang/deep-learning-from-scratch-3/issues/15) | 2026-07-30 | *inputs 가변 인수; apply도 *xs 통일(브로 통찰); 출력 단일화; assert isinstance(wrapper); 탐구 3건(A.7.5 이중성, C.1.4 오버라이드 시그니처 자유, debugging Type Narrowing 변형) |
 | step13 | 가변 길이 인수(역전파 편) | ✅ | [#16](https://github.com/ghjang/deep-learning-from-scratch-3/issues/16) | 2026-07-30 | 3부작 대미; fill_grad 다변 입력 진화; Add derivative 상수함수(브로 통찰); self.output 단수(#019); "다변≠다출력" 혼동 교훈; 역전파 주석 정비(#020, step23 회수) |
-| step14 | 같은 변수 반복 사용 (누적 gradient) | ⏳ | - | - | - |
+| step14 | 같은 변수 반복 사용 | ✅ | [#17](https://github.com/ghjang/deep-learning-from-scratch-3/issues/17) | 2026-07-30 | gradient 누적(if None 패턴); clear_grad() 도입(#021 네이밍 일관성); downstream_grads 네이밍(#007); Define-by-Run 가정 명시; ndarray in-place 방지(명시적 +) |
 | step15 | 복잡한 계산 그래프 이론 [No code] | ⏳ | - | - | - |
 | step16 | 복잡한 계산 그래프 구현 (generation) | ⏳ | - | - | - |
 | step17 | 메모리 관리와 순환 참조 (weakref) | ⏳ | - | - | - |

@@ -725,9 +725,44 @@
      "이렇게도 할 수 있지만 우린 derivative hook 택함" 비교 가시화
   → 학습자가 core.py 읽을 때 "왜 이 구조인지 + 책과 어떻게 다른지" 한번에 파악 가능
 - **★ 까먹지 않게 하는 장치**:
-  이 항목(#020) 자체가 "step23 회수 예정" 항목. #018(pipe), #019(output 단수)와 같은 패턴.
-  step23 진입 시 REZERO_CHANGES에서 #020 보고 "아, 역전파 주석 정비 있었지" 회수.
+  이 항목 자체가 "step23 회수 예정" 항목. 항목 018(pipe), 019(output 단수)와 같은 패턴.
+  step23 진입 시 REZERO_CHANGES에서 항목 020 보고 "아, 역전파 주석 정비 있었지" 회수.
 - **회수**: step23 → `rezero/core.py` + `functions.py` 승격 시 docstring/주석 정비
+
+### #021 — `cleargrad` → `clear_grad` — 스네이크 케이스 일관성 (step14)
+- **위치**: step14~
+- **상태**: ✅ 반영 (2026-07-30)
+- **종류**: 🔵 라이브러리성 (네이밍 일관성)
+- **브로 지적** (step14):
+  > "cleargrad가 Variable 클래스에 들어간 건데, 'clear_grad'가 아니라 걍 붙여쓴 거,
+  >  잘 보면 알겠지만. 그리고 set_creator가 떡하니 _를 쓰고 있는데."
+  → 같은 클래스 안에서 `set_creator` (언더스코어 O) vs `cleargrad` (언더스코어 X) 불일치 발견.
+- **내용**:
+  책 원본 step14는 `cleargrad` (언더스코어 없음). 하지만 같은 Variable 클래스에
+  `set_creator` (언더스코어 있음)가 있어서 **PEP 8 스네이크 케이스 불일치**.
+  rezero는 일관성 위해 `clear_grad`로 수정:
+  ```python
+  # 책 원본 (불일치)
+  def set_creator(self, func): ...    # 언더스코어 O
+  def cleargrad(self): ...            # 언더스코어 X ★ 불일치
+
+  # rezero (일관성)
+  def set_creator(self, func): ...    # 언더스코어 O
+  def clear_grad(self): ...           # ★ 언더스코어 O로 통일
+  ```
+- **★ 왜 책이 이렇게 됐을까 (추측)**:
+  책의 `set_creator`는 step02에서, `cleargrad`는 step14에서 도입.
+  각각 다른 시점에 추가되면서 일관성 검사가 누락된 것으로 보임.
+  자바/루비 배경의 개발자라 `clearGrad` (카멜)에 익숙해서 `cleargrad` (소문자 통일)로 쓴 뒤
+  파이썬 스네이크 케이스 규칙을 부분 적용한 흔적일 수 있음.
+- **★ 이 변형의 가치**:
+  네이밍 일관성은 "읽을 때 거슬리지 않는" 핵심. 같은 클래스의 메서드들이
+  같은 케이스 규칙을 따르면 인지 부하 ↓. rezero 정체성 (네이밍 투명성, 항목 007/015와 같은 결).
+- **★ 향후 다른 비슷한 메서드들 검토 (step 진행하며)**:
+  step16 `backward` (이미 단어 1개라 해당 없음), step19 `cleargrad` 확장 등.
+  새 메서드 추가 시 "이 클래스의 다른 메서드와 케이스 일치?" 항상 체크.
+- **검증**: `clear_grad()` 실행 정상, grad None으로 초기화 확인 ✅
+- **회수**: step23 → `rezero/core.py` Variable 승격 시 `clear_grad` 유지
 
 ---
 
