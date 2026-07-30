@@ -83,6 +83,18 @@ class Function(ABC):
     방향 (B): step10의 apply hook 구조를 다변으로 일반화.
     forward→apply hook 호출은 `return self.apply(xs)`로 구조 그대로 살아남음.
     역전파(backward/derivative)는 step13에서 다변 버전으로 재설계 — 여기선 빈칸.
+
+    ★ 관점 분리 — "박스 컨텍스트" 3계층 (REZERO_CHANGES 항목 011):
+      | 메서드     | 역할                                    | 박스 컨텍스트 |
+      |------------|-----------------------------------------|---------------|
+      | __call__   | 값 전달/흐름 관리 (Variable 회수→래핑→creator 연결) | O (Variable)  |
+      | forward    | 순전파 뼈대 (hook 호출 or 직접 계산)    | X (ndarray만) |
+      | apply      | 순수 수학 계산 (x², x0+x1)              | X (순수 ndarray) |
+
+    "forward"는 '전달(forwarding)' 뉘앙스지만 실제 전달은 __call__이 담당.
+    forward는 그 파이프라인 안의 "순수 계산 단계" → apply가 실제 함수 적용 ($f(x)$).
+    ★ 책/PyTorch는 생태계 관례(forward pass/backward pass)를 따르나,
+      rezero는 학습용이라 더 정확한 apply 이름 실험. 이중 용어 인식 필요.
     """
 
     def __init__(self) -> None:
@@ -111,15 +123,17 @@ class Function(ABC):
         return outputs
 
     def forward(self, xs: list[np.ndarray]) -> tuple[np.ndarray, ...]:
-        """순전파: 기본 구현 (apply hook 호출). 자식은 apply 또는 forward 직접 오버라이드.
+        """순전파 뼈대 (apply hook 호출). 자식은 apply 또는 forward 직접 오버라이드.
 
+        ★ 박스 컨텍스트 없는 단계 — ndarray만 다룸 (Variable 회수/래핑은 __call__이 담당).
         ★ step11 다변 일반화: 시그니처 x → xs. hook 호출 구조는 그대로.
         """
         return self.apply(xs)
 
     def apply(self, xs: list[np.ndarray]) -> tuple[np.ndarray, ...]:
-        """함수 본문 hook (다변). 자식이 채우거나 forward 직접 오버라이드.
+        """순수 수학 계산 hook (다변). 자식이 채우거나 forward 직접 오버라이드.
 
+        ★ 박스 컨텍스트 없는 순수 계산 — 수학의 f(x) "함수 적용" 단계.
         ★ 다변 일반화: 단일 apply(x) → apply(xs). 리스트 언팩킹으로 입력 회수.
         """
         raise NotImplementedError(
