@@ -457,8 +457,10 @@ uv run python steps/step01.py
 uv run python your_script.py
 
 # 단위 테스트 실행
-uv run python -m unittest discover tests            # 원본 dezero 테스트
-uv run python -m unittest discover rezero/tests     # rezero 학습 테스트
+uv run python -m unittest discover tests            # 원본 dezero 테스트 (unittest)
+uv run pytest rezero/                               # ★ rezero 테스트는 pytest (국룰, 탐구 17번)
+uv run pytest rezero/steps/stepNN.py -v             # 개별 step 테스트 상세 출력
+uv run python -m unittest discover rezero/tests     # (레거시 unittest 명령 — pytest 권장)
 
 # 새 의존성 추가 (pyproject.toml + uv.lock 자동 갱신)
 uv add scipy pillow opencv-python   # examples 일부에 필요할 때
@@ -526,8 +528,10 @@ notes/                🧪 보충 탐구 노트 (주제별 개별 파일, 깊이
 → **이 11개 실패는 정상입니다.** DeZero 자체 기능 이상이 아님. 나머지 66개는 통과합니다.
 
 > 참고: `rezero/tests/`는 현재 전부 `@unittest.skip("rezero 구현 대기 중")` 상태입니다.
-> `uv run python -m unittest discover rezero/tests`를 돌리면 `OK (skipped=21)`로 떠야 정상.
-> 브로가 rezero 모듈을 구현하면서 skip을 풀고 테스트를 채워나갑니다.
+> ★ **rezero 테스트는 pytest로 실행** (국룰, 탐구 17번). 단 현재 skip 상태라:
+> - `uv run pytest rezero/` → 전부 skipped (pytest가 unittest 스타일도 역호환 실행)
+> - `uv run python -m unittest discover rezero/tests` → `OK (skipped=21)` (레거시 명령)
+> 브로가 rezero 모듈을 구현하면서 skip을 풀고 pytest 스타일(함수 + assert)로 테스트를 채워나갑니다.
 
 ### 2. CuPy / GPU 백엔드 (macOS 미지원)
 
@@ -904,8 +908,9 @@ GitHub Issue Forms(`.github/ISSUE_TEMPLATE/`)로 3종 이슈를 관리합니다:
 ### 변경 전 체크리스트
 
 1. `uv sync`로 환경이 최신인지 확인.
-2. 작업 후 `uv run python -m unittest discover tests`로 회귀 확인
-   (chainer 관련 11개 실패는 무시).
+2. 작업 후 테스트로 회귀 확인:
+   - `uv run python -m unittest discover tests` — 원본 dezero 테스트 (chainer 관련 11개 실패는 무시)
+   - `uv run pytest rezero/` — ★ rezero 테스트는 pytest (국룰, 탐구 17번)
 3. `dezero/`, `steps/`, `examples/` 원본 코드를 건드렸다면 사용자에게 사전 설명 필수.
 
 ---
