@@ -24,6 +24,7 @@
 | 15 | [exploration_15_math_symbol_origins.md](./exploration_15_math_symbol_origins.md) | step05 진행 중 | 수학 기호의 어원과 역사 (√/∫/d/∂/∇/∞ 왜 이런 모양인가, radix/summa/differentia) |
 | 16 | [exploration_16_side_effect.md](./exploration_16_side_effect.md) | step08 진행 중 | "부작용"이라는 번역이 사고를 지배한다: side effect 재프로그래밍 (번역어 감정색 왜곡, 순수 함수, 최적화 충돌) |
 | 17 | [exploration_17_python_testing.md](./exploration_17_python_testing.md) | step10 준비 중 | 파이썬 테스팅 패러다임 진화: unittest에서 pytest로 (책의 교육적 선택 vs 실무 국룰, hypothesis property-based testing) |
+| 18 | [exploration_18_graph_traversal.md](./exploration_18_graph_traversal.md) | step15 | 그래프 기본과 순회 — DAG, DFS/BFS 파이썬 구현, 위상 정렬(Kahn's). step16 generation 이해 위한 배경지식 (확장 후보 open-ended) |
 
 > 파일 번호 = **생성 순서** (탐구 역사 보존)
 > 아래 "추천 읽는 순서"는 처음 읽을 때 논리적 흐름 기준

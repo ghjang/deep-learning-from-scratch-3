@@ -1102,28 +1102,60 @@ fill_grad 다변 입력 진화 + derivative hook 시험대 통과(Add 상수함�
 
 **키워드**: `#2고지` `#같은변수반복사용` `#gradient누적` `#if-else패턴` `#cleargrad` `#ndarray-inplace` `#명시적덧셈` `#fill_grad확장`
 
-## Step 15 — [2고지] 복잡한 계산 그래프 이론 [No code]
+## Step 15 — [2고지] 복잡한 계산 그래프(이론 편) ✅ [No code]
 
-**Issue**: (링크)
-**완료일**: -
-**상태**: ⏳
+**Issue**: [#18](https://github.com/ghjang/deep-learning-from-scratch-3/issues/18)
+**완료일**: 2026-07-30
+**상태**: ✅ 완료
+
+> ★ 이론 step — 코드 없음 (steps/step15.py = `# No code`).
+> step16에서 generation 코드로 구현. step15는 "왜 필요한지" 이해 + 노트 정리.
+> ★ 브로 정정: "복잡한 계산 그래프 이론" → **"복잡한 계산 그래프(이론 편)"** 이 정확 (책 제목).
 
 ### 📖 요약 (한 줄)
 
+복잡한 계산 그래프(분기/합류)에서 역전파 순서 문제 + generation(위상 정렬)으로 해결하는 이론.
 
 ### ❓ 질문 / 막힌 점
 
+- (step 진행하며 업데이트)
 
 ### 💡 통찰 / 배운 점
 
+- ★★ **계산 그래프 = DAG** (Directed Acyclic Graph, 방향성 비순환 그래프)
+- ★★ **역전파 순서 = 위상 정렬** (topological sort) — 의존성 순서 강제
+  - 브로 "BFS?" → 반은 맞고 반은 다름. BFS와 비슷한 효과지만, 핵심은 generation 정렬
+- ★ **현재 fill_grad의 문제** — worklist + LIFO pop = DFS. 선형 그래프는 OK, 분기/합류 그래프에선 순서 꼬임 가능
+- ★ **generation(세대) 해법** — 순전파 깊이 기록, 역전파 시 generation 내림차순 정렬 → "출력에 가까운 노드부터" 확실히 처리
+- ★★★ **generation = 표현식 중첩 깊이** (브로 통찰 — 책 15.3 그림 해석)
+  - 책 15.3 그림(순전파 노드들에 "N세대" 주석) 보고 "왜 스택 프레임이 떠오르지?" 짚음
+  - ★ 브로 직관 유효! 두 코드 패턴에 따라 두 관점이 있음:
+    - 패턴 A (DeZero 사용법 `square(square(x))`): 순수 합성, 인자 먼저 평가 → "표현식 중첩 깊이"
+    - 패턴 B (본문 안 호출 중첩 `a() { b() { c() } }`): ★ 진짜 스택 프레임 중첩 → "런타임 스택 깊이" (브로 직관 그대로 맞음)
+  - DeZero는 패턴 A지만 "부모 gen + 1" 기록이 패턴 B의 스택 깊이와 정신적으로 같음
+  - Define-by-Run 정수: 실행(Run)할 때마다 그래프 + generation 함께 결정 (런타임 값)
+  - 상세: exploration_18 §6 "generation = 표현식 중첩 깊이" (두 패턴 비교 포함)
+- ★★ **책 그림의 시각적 함정 — 2개 DAG 겹침** (브로 통찰)
+  - 책 step15/16 그림이 "순환처럼" 보이는 건 **2개 DAG를 하나에 겹쳐 그린 것**
+  - DAG 1 (순전파): Function.inputs/output에 간선 저장, 방향 ↓
+  - DAG 2 (역전파): Variable.creator에 간선 저장, 방향 ↑
+  - 순전파 한 번 실행으로 양쪽 DAG 동시 구축 (Define-by-Run 정수)
+  - 실제론 사이클 없음 = DAG. 시각적 함정일 뿐
+  - 상세: exploration_18 §6 "책 그림의 시각적 함정"
 
 ### 🔗 관련 링크
 
+- 진행 이슈: #18
+- 정답지: steps/step15.py (`# No code`)
+- **★ 배경지식 탐구 노트**: [exploration_18_graph_traversal.md](./notes/exploration_18_graph_traversal.md) — 그래프 기본/DFS/BFS/위상정렬, step16 이해 위한 사전 학습
+- 다음 step: step16 복잡한 계산 그래프 구현 (generation 도입)
+- 기존 worklist: step08 항목 017 (design_patterns Worklist Algorithm)
 
 ### 📝 코드 / 수식 메모
 
+(step15는 코드 없음 — 이해 노트 위주. step16에서 generation 구현)
 
----
+**키워드**: `#2고지` `#복잡한계산그래프` `#이론편` `#No-code` `#DAG` `#위상정렬` `#topological-sort` `#generation` `#역전파순서` `#브로BFS이해반틀림` `#fill_grad확장필요` `#step16구현`
 
 ## Step 16 — [2고지] 복잡한 계산 그래프 구현 (generation)
 
