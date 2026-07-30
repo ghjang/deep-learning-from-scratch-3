@@ -15,6 +15,7 @@
 - [A.4 "primitive"와 박싱](#a4-primitive와-박싱--python의-객체-철학)
 - [A.5 파이썬은 진짜 편한가?](#a5-파이썬은-진짜-편한가)
 - [A.6 lambda 표현식](#a6-lambda-표현식--제한적이지만-특정-용도에선-국룰)
+- [A.7 언패킹(unpacking) — 리스트/튜플을 변수로 쪼개기](#a7-언패킹unpacking--리스트튜플을-변수로-쪼개기)
 
 ---
 
@@ -640,9 +641,222 @@ print([f() for f in funcs])   # [2, 2, 2] ← 0,1,2가 아니라 다 2!
 
 **키워드**: `#lambda` `#람다표현식` `#표현식1개제약` `#sorted_key` `#map` `#filter` `#closure함정` `#PEP20` `#단일명확방식` `#JS화살표함수비교` `#def권장`
 
+---
 
-**학습 완료일**: 2026-07-21
+### A.7 언패킹(unpacking) — 리스트/튜플을 변수로 쪼개기
+
+> **step11 학습 중 추가** (2026-07-30)
+> 다변수 함수(Add) 구현에서 `x0, x1 = xs`가 등장. 언패킹의 본질과 `*` 심화까지 정리.
+
+#### A.7.1 핵심 — "상자를 열어 내용물을 각자에게"
+
+**언패킹**: 우측의 리스트/튜플(여러 값을 담은 상자)을 좌측 변수 여러 개에 **쪼개서** 담는 연산.
+
+```python
+xs = [2, 3]
+x0, x1 = xs       # x0=2, x1=3 — 리스트 원소를 각 변수에 분배
+
+point = (10, 20)
+px, py = point    # 튜플도 동일. px=10, py=20
+```
+
+리스트든 튜플이든 **반복 가능한(iterable) 객체**면 다 언패킹 가능.
+
+##### step11에서의 실제 사용 (Add 다변수 함수)
+
+```python
+class Add(Function):
+    def apply(self, xs):       # xs = [x0_data, x1_data] (리스트로 들어옴)
+        x0, x1 = xs            # ★ 언패킹 — 리스트를 2개 변수로 분해
+        y = x0 + x1            # 이제 분리된 변수로 연산
+        return (y,)
+```
+
+Add는 **2개 입력**을 받는 다변수 함수. 리스트로 묶여 들어온 입력을 실제 연산을 위해 개별 변수로 풀어야 함 → 언패킹이 필수.
+
+#### A.7.2 변수 개수 불일치 — 엄격한 규칙
+
+Python은 **변수 개수와 원소 개수가 정확히 맞아야 함**. 안 맞으면 에러.
+
+```python
+xs = [2, 3]
+
+x0, x1 = xs          # ✅ 2개 = 2개 → OK. x0=2, x1=3
+
+x0 = xs              # ✅ 언패킹 아님 — x0 = [2, 3] (리스트 통째로)
+
+x0, x1, x2 = xs      # ❌ ValueError: not enough values to unpack (expected 3, got 2)
+                      #   "3개 기대했는데 2개뿐이라 못 채워"
+```
+
+에러 메시지가 친절: **"expected N, got M"** — 변수 N개 기대, 원소 M개뿐.
+
+##### 함정: 쉼표 하나의 차이
+
+```python
+x0 = xs,             # ⚠️ 쉼표 → x0 = ([2,3],) 튜플로 감쌈 (언패킹 아님!)
+x0 = xs              #     쉼표 없음 → x0 = [2,3] (그냥 할당)
+x0, = xs             # ✅ 우측이 1원소 리스트면 → x0 = 2 (1개 변수 언패킹)
+```
+
+쉼표 하나로 "튜플 생성" vs "언패킹"이 갈림. 단항 튜플 `(x,)`의 쉼표와 같은 문법.
+
+#### A.7.3 `*` 스플래트 — "나머지 전부를 리스트로"
+
+개수가 안 맞을 때, **남는 걸 하나의 리스트로 몰아담는** 연산자.
+
+```python
+xs = [1, 2, 3, 4, 5]
+
+first, *rest = xs            # first=1, rest=[2, 3, 4, 5]
+*init, last = xs             # init=[1, 2, 3, 4], last=5
+first, *middle, last = xs    # first=1, middle=[2, 3, 4], last=5
+```
+
+→ `*변수`는 "내가 안 받은 나머지 전부를 리스트로 가져라". **유연성의 핵심**.
+
+##### `*`는 양끝에서 몇 개든 고정 가능
+
+```python
+a, b, *middle, c, d = [1, 2, 3, 4, 5]
+# a=1, b=2, middle=[3], c=4, d=5
+# ★ 앞 2개, 뒤 2개 고정 → 남은 것(middle) 흡수
+```
+
+양끝에서 "고정할 만큼" 일반 변수를 적고, 남는 걸 `*`가 흡수. 가운데가 비면 `middle = []`.
+
+#### A.7.4 `*`는 여러 개 불가 — 모호성 때문에 문법 금지
+
+```python
+*a, *b = [1, 2, 3, 4]
+# ❌ SyntaxError: two starred expressions in assignment
+```
+
+**왜 금지?** 모호성(ambiguity). `[1, 2, 3, 4]`를 어디서 자를지 Python이 결정 못 함:
+- `a=[1,2], b=[3,4]`?
+- `a=[1], b=[2,3,4]`?
+- `a=[], b=[1,2,3,4]`?
+
+→ **Python 철학**: 모호한 건 문법 자체에서 막아버림 (PEP 20: *"Ambiguity is the enemy of correctness"*).
+언패킹은 **`*` 최대 1개**라는 단순 규칙. 이게 "읽기 좋은 언어"인 이유 중 하나.
+
+#### A.7.5 for 루프에서 동시 언패킹 — 자주 쓰는 이디엄
+
+이게 실전에 제일 많이 쓰임. 리스트 안의 튜플/리스트를 순회하며 바로 분해:
+
+```python
+pairs = [(1, 'a'), (2, 'b'), (3, 'c')]
+
+# 방법 1: 튜플 통째로 → 매번 언패킹 (번거러움)
+for pair in pairs:
+    num, letter = pair        # 매번 한 번 더 풀어야
+    print(num, letter)
+
+# 방법 2: for에서 바로 언패킹 (★ Pythonic)
+for num, letter in pairs:     # ★ 한 번에 분해!
+    print(num, letter)
+```
+
+##### DeZero 코드에서의 사례
+
+```python
+# step08 fill_grad에서 이미 사용 중
+f = worklist.pop()
+x, y = f.input, f.output     # ★ 우측 (f.input, f.output) 튜플 → 좌측 언패킹
+
+# 딕셔너리 순회 (나중에 자주 쓸 패턴)
+for key, value in some_dict.items():
+    ...
+```
+
+우측이 튜플 리터럴 `(a, b)`여도 좌측 언패킹이 됨. 리스트만 해당되는 게 아님.
+
+#### A.7.6 head/tail 패턴 — 함수형 프로그래밍 연결 ★
+
+`first, *rest = xs`는 **함수형 프로그래밍의 head/tail 분해**와 정확히 같은 패턴.
+
+```python
+# Python — 언패킹으로 head/tail
+first, *rest = [1, 2, 3, 4]   # first=1 (head), rest=[2,3,4] (tail)
+
+# Haskell — 같은 개념
+-- head [1,2,3,4] = 1
+-- tail [1,2,3,4] = [2,3,4]
+```
+
+Haskell/Elixir/ML 계열에선 리스트 처리의 기본 단위. 재귀적 리스트 순회의 뼈대:
+```haskell
+-- Haskell: 리스트의 합 (재귀)
+sumList [] = 0
+sumList (x:xs) = x + sumList xs   -- x=head, xs=tail로 분해 후 재귀
+```
+
+Python도 같은 패턴 가능:
+```python
+def sum_list(lst):
+    if not lst:
+        return 0
+    head, *tail = lst             # head/tail 분해
+    return head + sum_list(tail)  # 재귀
+```
+
+##### ★ 유틸 함수로 직접 만들어 쓰기도
+
+브로가 "head, tail 유틸 함수 다 만드는 거 아니냐" — 맞음! FP 스타일 좋아하는 사람들은 직접 만듦:
+
+```python
+def head(lst): return lst[0]
+def tail(lst): return lst[1:]
+
+# 또는 튜플 반환 버전
+def uncons(lst):
+    """리스트를 (head, tail)로 분해. 빈 리스트면 None."""
+    return (lst[0], lst[1:]) if lst else None
+```
+
+`uncons`는 Haskell `unzip`/Elixir `hd`+`tl`에 대응. 다만 Python에선 언패킹 문법(`first, *rest`)이 더 직관적이라 유틸 함수까지 만드는 건 취향. DeZero에선 언패킹 문법 그대로 쓰는 게 자연스러움.
+
+##### pipe/compose와의 연결 (step23 복선)
+
+`head/tail` 분해 + `pipe` 합성은 **FP 리스트 처리 파이프라인**의 기본 조립 블록.
+step23에서 pipe 재도입할 때 "리스트 처리 + 합성" 패턴이 자연스럽게 이어질 수 있음 (Issue #13의 FP 화두와 연결).
+
+#### A.7.7 DeZero에서 언패킹이 계속 등장할 곳 (복선)
+
+| step | 사용 예상 | 패턴 |
+|---|---|---|
+| step11 (현재) | `x0, x1 = xs` (Add 입력 분해) | 리스트 → 2변수 |
+| step13 | `gx0, gx1 = gys` (Add 역전파 출력 분해) | 튜플 → 2변수 |
+| step14 | 같은 변수 반복 사용 시 gradient 누적 | 누적 로직에서 다변 처리 |
+| step16 | generation 정렬, 다중 노드 처리 | 리스트 순회 + 언패킹 |
+| step34+ | 행렬 연산 (MatMul)에서 shape 분해 | `rows, cols = shape` |
+
+→ 언패킹은 **2고지~4고지 전반에 깔리는 기본 이디엄**. 지금 확실히 잡아두는 게 투자.
+
+#### A.7.8 요약표
+
+| 패턴 | 코드 | 결과 |
+|---|---|---|
+| 딱 맞게 | `x0, x1 = [2, 3]` | `x0=2, x1=3` ✅ |
+| 너무 많음 | `x0, x1, x2 = [2, 3]` | `ValueError` ❌ |
+| 너무 적음 | `x0 = [2, 3]` | `x0=[2,3]` (통째로) |
+| 나머지 묶기 | `first, *rest = [1,2,3,4]` | `first=1, rest=[2,3,4]` ✅ |
+| 양끝 고정 | `a, *m, z = [1,2,3]` | `a=1, m=[2], z=3` ✅ |
+| `*` 2개 | `*a, *b = [1,2,3]` | `SyntaxError` ❌ |
+| 우측 튜플 | `x, y = a, b` | `x=a, y=b` |
+| for 동시 | `for k, v in items:` | 각 원소 언패킹 순회 |
+| head/tail | `h, *t = lst` | FP의 head/tail 분해 |
+
+**키워드**: `#언패킹` `#unpacking` `#튜플언패킹` `#리스트언패킹` `#스플래트` `#star연산자` `#나머지묶기` `#middle패턴` `#별표1개제한` `#모호성금지` `#for동시언패킹` `#head-tail` `#함수형프로그래밍` `#FP연결` `#PEP20` `#step11추가` `#2고지기본이디엄`
+
+---
+
+## 📝 노트 푸터
+
+**학습 완료일**: A.1~A.6 (2026-07-21, step01 직후) / A.7 (2026-07-30, step11 진행 중)
 **관련 링크**:
 - 탐구 #1 (Python 클래스/캡슐화): [exploration_01_python_basics.md](./exploration_01_python_basics.md)
 - 탐구 #5 (객체 모델): [exploration_05_python_object_model.md](./exploration_05_python_object_model.md)
 - 이 탐구는 원래 탐구 #1의 C 섹션에서 분리됨
+- A.7 언패킹은 step11 다변수 함수(Add) 구현에서 파생 — [LEARNING_NOTES.md step11](../LEARNING_NOTES.md)
+- A.7.6 head/tail은 pipe/compose FP 화두(Issue #13, step23 재도입)와 연결

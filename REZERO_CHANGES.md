@@ -243,6 +243,21 @@
   - Python 2 내장함수 `apply(func, args)`와 같은 의미 (Python 3에선 빌트인 제거라 충돌 없음)
   - `__call__` 매직메서드와 혼동 없음 (`call` 후보의 단점 회피)
   - `forward`의 "포워딩" 어색함 제거 — 실제 역할(함수 본문 실행)과 이름 일치
+- **★ 관점 분리 (step11 브로 통찰 보강 — "박스 컨텍스트" 계층)**:
+  apply가 **"박스 컨텍스트 없는 순수 계산"** 만 담당한다는 관점이 apply 네이밍의 가장 명확한 근거:
+  | 메서드 | 역할 | 박스 컨텍스트 |
+  |---|---|---|
+  | `__call__` | **값 전달/흐름 관리** (Variable 회수→래핑→creator 연결) | O (Variable 다룸) |
+  | `forward` | 순전파 뼈대 (hook 호출 or 직접 계산) | X (ndarray만) |
+  | `apply` | **순수 수학 계산** (`x²`, `x0+x1`) | X (순수 ndarray) |
+  → 브로 지적: "forward"는 '전달(forwarding)' 뉘앙스인데 **실제 전달은 `__call__`** 이 함.
+  forward는 전달 파이프라인 안의 "순수 계산 단계"일 뿐 → "함수 적용"엔 **apply가 정확**.
+- **★ 왜 책은 forward를 고집하는가 (생태계 관례 vs 미스리딩)**:
+  - **이유**: 딥러닝 생태계 표준 용어 — 신경망 순전파 = **forward pass**, 역전파 = **backward pass**
+  - PyTorch도 `forward()`/`backward()` 이命名. DeZero가 이 관례를 그대로 준수
+  - 책은 "생태계 관례 준수"를 선택 → 브로가 느끼는 **"전달 뉘앙스 미스리딩"은 관례의 부작용**
+  - rezero는 학습용이라 **apply로 더 정확한 이름 실험** (#011).
+    단, PyTorch/DeZero 생태계 코드 읽을 땐 forward가 쓰이므로 이중 용어 인식 필요
 - **★ 대칭 완성 (이게 진짜 핵심)**:
   | | 기본 구현 | hook 메서드 | 의미 |
   |---|---|---|---|
@@ -557,6 +572,39 @@
   - `fill_grad(y)` 실행 → `x.grad = 3.297442541400256` (리네임/타입 힌트 전후 동일) ✅
   - pyright → 환경성 에러 2개(override/numpy) + type 문 버전 에러 1개 (Python 3.12+ 기능, step23 설정 시 해결 예정)
 - **회수**: step23 → `rezero/core.py` fill_grad 내부 worklist + Worklist 타입 별칭 함께 유지
+
+### #018 — ★★ `pipe` 헬퍼 (FP 합성) — step11~22 보류, step23 재도입 예정
+- **위치**: step09 도입 / step10 검증 / **step11~22 보류** / step23 재도입 예정
+- **상태**: 🔄 보류 (2026-07-30, step11 진입 시 결정)
+- **종류**: 🔵 라이브러리성 ★★ (rezero FP 철학 — Haskell/Elixir 스타일 데이터 흐름 합성)
+- **추적**: [Issue #13](https://github.com/ghjang/deep-learning-from-scratch-3/issues/13)
+- **내용**: step09에서 도입한 `pipe(value, *funcs)` 헬퍼 (FP 합성).
+  ```python
+  def pipe(value, *funcs):
+      """데이터 흐름 순서로 함수 합성. pipe(x, f, g, h) = h(g(f(x)))."""
+      return reduce(lambda val, f: f(val), funcs, value)
+  ```
+  step10에서 `pipe(x, square, exp, square)`로 합성 함수 gradient check까지 검증 완료.
+- **★ 왜 보류하나 (step11~22)**:
+  step11부터 **가변 길이 인수**(2고지) 도입 → `Add(x0, x1)` 같은 **다입력 함수** 등장.
+  pipe는 **단일 흐름 합성**만 표현하므로 다입력 함수엔 구조가 안 맞음:
+  ```
+  pipe(x, square, exp)             # ✅ 단일 흐름 — pipe 잘 맞음
+  pipe(???, add(x0, x1), square)   # ❌ 다입력 — pipe 구조로 표현 안 됨
+  ```
+  → 2고지(step11~24) 동안은 step 소스에서 **pipe 제외**. 단일 함수 wrapper(square/exp)는 유지.
+- **★ 재도입 시점 — step23 패키지화**:
+  `rezero/core.py` 등으로 승격할 때 pipe도 재도입. 핵심 화두: **다입력 함수를 pipe에 어떻게 끼워넣나?**
+- **★ step23에서 풀어볼 FP 화두** (Issue #13에 상세):
+  | 화두 | 키워드 | 방향 |
+  |---|---|---|
+  | `compose` vs `pipe` | 방향(데이터 순서 vs 수학적 합성) | 둘 다 제공? 일반화? |
+  | partial binding | `functools.partial`, 커링 | 다입력 → 단일 흐름 변환 |
+  | `bind` (모나드) | Haskell `>>=`, Variable 문맥 | 심화(오버엔지니어링 위험) |
+- **★ 학습 가치**: 단순 "합성 헬퍼"가 아니라 **FP 패러다임과의 접점**.
+  pipe/compose/partial/curry/bind는 함수형 프로그래밍의 핵심 개념들.
+  step23에서 DeZero(Define-by-Run)과 FP(합성)가 어떻게 만나는지 실험할 자리.
+- **회수**: step23 → `rezero/__init__.py` 또는 utils성 모듈에 재도입 (★ FP 화두와 함께 논의)
 
 ---
 

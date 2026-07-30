@@ -883,28 +883,63 @@ def test_square_gradient_check():
 
 ---
 
-## Step 11 — [2고지] 가변 길이 인수 (인수/반환값 여러 개)
+## Step 11 — [2고지] 가변 길이 인수(순전파 편) ✅
 
-**Issue**: (링크)
-**완료일**: -
-**상태**: ⏳
+**Issue**: [#12](https://github.com/ghjang/deep-learning-from-scratch-3/issues/12)
+**완료일**: 2026-07-30
+**상태**: ✅ 완료
+
+> ★ 제2고지 "자연스러운 코드로" 의 첫 단추. step11~13이 "가변 길이 인수" 3부작
+> (step11 순전파 → step12 개선 → step13 역전파). step11은 **순전파만** 집중.
+> ★ 브로 정정: 원 제목 "가변 길이 인수 (인수/반환값 여러 개)" → **"가변 길이 인수(순전파 편)"** 이 정확.
 
 ### 📖 요약 (한 줄)
 
+`Function.__call__` 입출력을 `Variable` → `list[Variable]`로 일반화. Add(다입력 함수) 도입. apply hook 다변 일반화 성공.
 
 ### ❓ 질문 / 막힌 점
 
+- (step 진행하며 업데이트)
 
 ### 💡 통찰 / 배운 점
 
+- ★ **방향 (B) 확정**: apply/derivative hook 구조를 다변 인수로 일반화하는 실험 (Issue #12)
+- ★ **책의 "구조 리셋" 인지**: step11~13은 다변 인수 구조로 Function을 다시 쌓아올리는 단계
+  - `Variable.backward()` 자동화 ❌ (step13에서 다변 버전으로 재도입)
+  - `fill_grad` 전역 함수 ❌ (이번 step 사용 안 함) — forward에 집중
+- ★ **pipe 보류 결정**: 다입력 함수엔 단일 흐름 pipe가 안 맞음 → step11~22 제외, step23 재도입 (Issue #13)
+  - compose / partial binding / bind FP 화두 step23 시점으로 미룸
+- ★★ **Add = "가장 단순한 다변수 함수"** — `+`를 다변수 함수로 보는 시선 전환 (브로 통찰)
+  - 보통: `+`는 "두 수 합치는 연산자". 수학/프레임워크: $\text{Add}: \mathbb{R}^2 \to \mathbb{R}$ 다변수 매핑
+  - 모든 이항 연산(`+`, `*`, `max`)은 $\mathbb{R}^2 \to \mathbb{R}$ 함수로 승격 가능 ("연산 = 함수" 동치)
+  - 이 시선이 있으면 step13(Add 역전파), step20(연산자 오버로딩), step54(ResNet skip)까지 이어짐
+  - Add 역전파는 "들어온 걸 그대로 흘려보내는" 성질 ($\partial y/\partial x_0 = 1$) → skip connection 기초 (복선)
+- ★ **다변 회수 루프 타입 좁히기 함정** (디버깅 노트 후보)
+  - `for x: if x.data is None: raise` 가드 + 별도 `[x.data for x in inputs]` 컴프리헨션 회수 →
+    Pylance가 가드의 타입 좁히기를 컴프리헨션까지 안 이어줌 → `xs: list[Optional]` 경고
+  - 해결: 회수와 가드를 **같은 루프에** (`if...: raise` 후 `xs.append(x.data)`) → 흐름 따라잡음
+  - step10 `fill_grad`의 `assert` 패턴과 다른, 다변 회수 루프 특유의 패턴
+- ★ **책 구조에 대한 비판적 시선 — step11 "거시기함"** (브로 감상)
+  - step12(개선)에서 금방 `Add(x0, x1)` 위치 인수로 흡수될 내용이라 **독립 장으로선 약함**
+  - 책 특유의 "작게 쪼개서 진화" 스타일(step01~60 전부 이 패턴) — 교육적으론 이해되나
+    rezero 입장에선 "step11+12 합쳐도 되지 않나?" 싶은 인위적 분할
+  - 다만 이 가벼움이 **2고지를 빠르게 보고 반복하는 학습 전략**(브로 방침)과 맞물려 오히려 적합
+- ★ **FP 유틸 도구함 이슈 파생** (Issue #14)
+  - 언패킹 head/tail 논의 → DeZero의 FP적 뿌리 발견 → head/tail/compose/curry/bind 유틸 회수 이슈로
+  - step23 패키지화 또는 탐구 모드에서 회수
 
 ### 🔗 관련 링크
 
+- 진행 이슈: #12
+- pipe 보류 + FP 화두: #13
+- 정답지: steps/step11.py
+- 이전 step: step10 (gradient check, 1고지 완료)
 
 ### 📝 코드 / 수식 메모
 
+(step 진행하며 채울 것 — apply hook 다변 일반화 설계, Add 구현)
 
----
+**키워드**: `#2고지시작` `#가변길이인수` `#순전파편` `#다입력함수` `#Add` `#방향B` `#apply hook다변일반화` `#pipe보류` `#책구조리셋`
 
 ## Step 12 — [2고지] 가변 길이 인수 개선
 
