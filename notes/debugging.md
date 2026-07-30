@@ -172,9 +172,46 @@ assert np.allclose(x.grad, num_grad)
 cf. 이건 "방어막 3번(None 가드)"과 짝 — None 가드는 `if ... raise` (사용자 오용),
 assert는 프로그래먘 불변조건. 같은 None 처리지만 **용도에 따른 도구 선택** (debugging.md 원칙 일관).
 
+#### ★ 변형 — `assert isinstance(result, T)` 타입 좁히기 (step12 추가)
+
+step10에서 쓴 패턴은 **값 검증** (`assert x.grad is not None` — "None 아니다").
+step12에선 **타입 검증** 변형이 등장 (`assert isinstance(result, Variable)` — "이 타입이다").
+
+```python
+# step12 wrapper — __call__ 반환은 Variable | list[Variable] (둘 다 가능)
+def add(x0: Variable, x1: Variable) -> Variable:
+    result = Add()(x0, x1)
+    assert isinstance(result, Variable), "Add는 단일 출력이므로 Variable이어야 함"
+    return result    # ★ 이 줄부터 Pylance가 result를 Variable로 추론 (Union → Variable 좁힘)
+```
+
+브로 통찰 (step12): *"assert로 Pylance 경고 없애는 거, 이거 이디엄스럽지 않아?"*
+→ ★ 맞음. **Type Narrowing은 Python typed 생태계의 정식 이디엄** (mypy/Pylance 매뉴얼에 명시된 패턴).
+
+##### `isinstance` 좁히기 vs `is not None` 좁히기
+
+| | `assert x is not None` (step10) | `assert isinstance(x, T)` (step12) |
+|---|---|---|
+| 좁히는 것 | `Optional[T]` → `T` | `Union[A, B]` → `A` (또는 B) |
+| 상황 | "None일 수 있지만 여기선 아니다" | "여러 타입 가능하지만 여기선 이거다" |
+| 런타임 검증 | None이면 AssertionError | 다른 타입이면 AssertionError |
+| DeZero 사용처 | grad/creator None 가드 | wrapper 반환값 타입 보장 |
+
+→ 두 변형 모두 같은 이디엄 (Type Narrowing). 상황에 따라 `is not None` / `isinstance` 선택.
+
+##### 3가지 Type Narrowing 도구 비교
+
+| 도구 | 코드 | 적합한 상황 |
+|---|---|---|
+| **`assert isinstance`** ★ | `assert isinstance(x, T)` | "무조건 T야" — 단일 타입 보장 (step12 wrapper) |
+| **`@overload`** | 시그니처 여러 개 선언 | "N개 입력 → M개 출력" 정밀 매핑 (verbose) |
+| **`# type: ignore`** ❌ | 경고 무시 | 금지 — 진짜 버그도 숨김 |
+
+→ 브로 감각대로 **assert가 가장 이디엄스럽고 가벼운 선택**. 한 줄에 정적 만족 + 런타임 검증 + 문서화(메시지) 3효과.
+
 ### 🔑 핵심 키워드
 
-`#assert` `#-O` `#-OO` `#__debug__` `#NDEBUG` `#최적화모드` `#릴리스빌드` `#불변조건` `#invariant` `#부작용금지` `#검증문` `#C/C++비교` `#타입좁히기` `#type-narrowing` `#정적분석협력` `#vs-type-ignore` `#런타임부작용추적불가` `#정지문제`
+`#assert` `#-O` `#-OO` `#__debug__` `#NDEBUG` `#최적화모드` `#릴리스빌드` `#불변조건` `#invariant` `#부작용금지` `#검증문` `#C/C++비교` `#타입좁히기` `#type-narrowing` `#정적분석협력` `#vs-type-ignore` `#런타임부작용추적불가` `#정지문제` `#isinstance좁히기` `#assert-isinstance` `#Union좁히기` `#wrapper반환타입` `#step12추가` `#이디엄` `#브로통찰`
 
 ### 🔗 관련
 
@@ -182,6 +219,7 @@ assert는 프로그래먘 불변조건. 같은 None 처리지만 **용도에 따
 - Java의 `assert` (JVM `-ea`/`-da` 스위치로 on/off — 파이썬의 `-O`와 유사)
 - PEP 시 참고: 파이썬 공식 문서 [assert statements](https://docs.python.org/3/reference/simple_stmts.html#the-assert-statement)
 - step10 `rezero/steps/step10.py` — pytest 테스트에서 assert로 타입 좁히기 적용 (4곳)
+- step12 `rezero/steps/step12.py` — wrapper(add/square)에서 `assert isinstance(result, Variable)` 타입 좁히기 적용
 
 ---
 

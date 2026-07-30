@@ -941,28 +941,56 @@ def test_square_gradient_check():
 
 **키워드**: `#2고지시작` `#가변길이인수` `#순전파편` `#다입력함수` `#Add` `#방향B` `#apply hook다변일반화` `#pipe보류` `#책구조리셋`
 
-## Step 12 — [2고지] 가변 길이 인수 개선
+## Step 12 — [2고지] 가변 길이 인수(개선 편) ✅
 
-**Issue**: (링크)
-**완료일**: -
-**상태**: ⏳
+**Issue**: [#15](https://github.com/ghjang/deep-learning-from-scratch-3/issues/15)
+**완료일**: 2026-07-30
+**상태**: ✅ 완료
+
+> step11~13 3부작 중 2번째. step11의 "거시기한" API를 자연스럽게 개선.
+> ★ 브로 정정: "가변 길이 인수 개선" → **"가변 길이 인수(개선 편)"** 이 정확.
 
 ### 📖 요약 (한 줄)
 
+step11의 리스트 기반 API를 `*inputs` 가변 인수로 자연스럽게 개선. apply도 `*xs`로 통일(브로 통찰). 출력 단일화. step11 "거시기함" 해소.
 
 ### ❓ 질문 / 막힌 점
 
+- (step 진행하며 업데이트)
 
 ### 💡 통찰 / 배운 점
 
+- ★ **apply 가변 인수 통일 결정** (브로 통찰) — forward가 `*xs` 가변 인수인데 apply가 리스트면 불일치.
+  → apply도 `*xs`로 통일. Add.apply는 `def apply(self, x0, x1):` 직접 위치 인수.
+- ★ **`*` 이중성** (함수 정의 vs 호출) — 같은 `*` 기호인데 문맥에 따라 반대:
+  - 정의 `def f(*args)`: 여러 인수 **수집** → tuple
+  - 호출 `f(*xs)`: 리스트/튜플 **풀어서** 전달 → 개별 인수
+  - 브로 "파람 쪽 문맥은 가변인수, 파람명은 튜플 타입" — 정확
+- ★ **step11 "거시기함" 해소 지점** — step12에서 `Add(x0, x1)` 자연스러운 위치 인수로.
+- ★ **이중 언패킹 성능 통찰** (브로 질문에서 파생)
+  - `__call__→forward→apply` 거치며 "수집→언패킹" 2회 반복 (브로 "불편한 사실" 정확)
+  - 벤치마크: 이중 언패킹 133ns/call vs 직접 38ns/call = 3.5x 느림 (95ns 오버헤드)
+  - **병목 아님**: NumPy 연산/Variable 생성이 수십~수백 배 비쌈 (Amdahl's law). 인자도 1~2개
+  - **유연성 가치 > 95ns**: 부모 apply `*xs`가 자식 시그니처 호환성 보장. Knuth "premature optimization" 사례
+  - 실제 프로덕션(PyTorch)은 Python 자체 우회(C++/CUDA)로 최적화 — 언패킹이 아니라 언어 전환
 
 ### 🔗 관련 링크
 
+- 진행 이슈: #15
+- 정답지: steps/step12.py
+- 이전 step: step11 가변 길이 인수(순전파 편) — #12
+- 언패킹 노트: exploration_07 A.7 (`*` 이중성 보강 완료)
 
 ### 📝 코드 / 수식 메모
 
+- `__call__(*inputs)` 가변 인수 + 회수/가드 한 루프(step11 패턴 유지)
+- `forward(*xs)` / `apply(*xs)` — 방향 (B) 시그니처 통일
+- Add.apply `(x0, x1)` 직접 위치 인수, 단일값 반환 (`__call__`에서 튜플 정규화)
+- Square.apply `(x)` — 단일 함수도 가변 인수 체계에 맞춤
+- wrapper `add`/`square` — `assert isinstance(result, Variable)` 타입 좁히기
+- 출력 단일화: `return outputs if len(outputs) > 1 else outputs[0]`
 
----
+**키워드**: `#2고지` `#가변길이인수` `#개선편` `#가변인수` `#star-inputs` `#위치인수` `#출력단일화` `#apply가변인수통일` `#브로통찰` `#star이중성` `#튜플수집` `#언패킹전달` `#step11거시기함해소`
 
 ## Step 13 — [2고지] 가변 길이 인수 역전파
 

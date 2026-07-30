@@ -24,10 +24,10 @@
 
 ## 📈 전체 요약
 
-- **완료**: 11 / 60 (step01~11 ✅)
+- **완료**: 12 / 60 (step01~12 ✅)
 - **진행 중**: 0
 - **막힘**: 0
-- **마지막 업데이트**: 2026-07-30 — step11 완료 (2고지 1스텝)
+- **마지막 업데이트**: 2026-07-30 — step12 완료 (2고지 2스텝)
 
 ---
 
@@ -59,7 +59,7 @@
 | Step | 주제 | 상태 | Issue | 완료일 | 메모 |
 |---|---|---|---|---|---|
 | step11 | 가변 길이 인수(순전파 편) | ✅ | [#12](https://github.com/ghjang/deep-learning-from-scratch-3/issues/12) | 2026-07-30 | 다입력 Add; 방향 (B) apply hook 다변 일반화 성공; pipe 보류(#13); FP 유틸 이슈(#14) 파생; 언패킹 탐구(exploration_07 A.7) |
-| step12 | 가변 길이 인수 개선 | ⏳ | - | - | - |
+| step12 | 가변 길이 인수(개선 편) | ✅ | [#15](https://github.com/ghjang/deep-learning-from-scratch-3/issues/15) | 2026-07-30 | *inputs 가변 인수; apply도 *xs 통일(브로 통찰); 출력 단일화; assert isinstance(wrapper); 탐구 3건(A.7.5 이중성, C.1.4 오버라이드 시그니처 자유, debugging Type Narrowing 변형) |
 | step13 | 가변 길이 인수 역전파 | ⏳ | - | - | - |
 | step14 | 같은 변수 반복 사용 (누적 gradient) | ⏳ | - | - | - |
 | step15 | 복잡한 계산 그래프 이론 [No code] | ⏳ | - | - | - |
