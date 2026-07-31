@@ -30,9 +30,38 @@
 
 ---
 
-## 🗂 분류 (항목이 쌓이면 패턴 보고 채움)
+## 🗂 분류 (주제별 색인 — 항목 번호순 물리 배치는 유지, 이 표로 그룹 탐색)
 
-> 지금은 분류 안 함. 어느 정도 쌓이면 주제별로 그룹화(예: 타입 힌트 / 네이밍 / 추상화 강제력 / ...).
+> ★ 2026-07-31 그룹화 — 27개 항목 쌓여 주제별 색인 추가 (step23 회수 전 정리).
+> 항목 자체는 append-only 정책 존중 — **번호순 물리 배치 유지 + 이 표로 그룹 탐색**.
+> 한 항목이 여러 그룹에 걸칠 수 있으나 "주된 결" 하나로 분류. 상세는 각 항목 본문 참조.
+
+### 항목 번호 → 그룹 매핑
+
+| 그룹 | 항목 | 개수 | 핵심 |
+|---|---|---|---|
+| **타입 힌트 / 정적 분석** | #001, #008 | 2 | ndarray 힌트 세트, Optional grad |
+| **네이밍 (의미 투명성)** | #002, #007, #015, #017, #019, #021, #022, #023, #025 | 9 | input_var, upstream_grad, fill_grad, worklist, output 단수, clear_grad, visited, schedule, 크로스참조 시도/철회 |
+| **구조 / 추상화 (Function 핵심 설계)** | #003, #004, #010, #011, #013, #014 | 6 | ABC, @override, derivative/apply hook 대칭, backward→fill_grad 전역 함수 |
+| **검증 / 방어막** | #016 | 1 | assert vs RuntimeError 구분 |
+| **메모리 관리** | #026, #027 | 2 | weakref 순환 끊기, Config/no_grad 절약 모드 |
+| **유틸 / step 한정 / 문서 정비** | #005, #006, #009, #012, #018, #020, #024 | 7 | name shadowing(step04), numerical_diff docstring, backward docstring, set_creator 복선, pipe(FP), 주석 정비, fill_grad 통합 |
+
+### 회수 분류와의 관계 (step23 패키지화 시)
+
+위 "주제별 그룹"과 헤더(L8)의 "회수 분류"(`🔵 라이브러리성` / `🟢 step 한정` / `🟡 유틸성`)는 **직교**:
+- **주제별 그룹**: "무엇에 대한 변경인가" (네이밍? 구조? 메모리?)
+- **회수 분류**: "어디로 가나" (core.py? 그 step에? utils.py?)
+
+step23 회수 시: 각 항목마다 "주제별 그룹 + 회수 분류" 둘 다 보고 승격 결정.
+
+### 상태 분포 (2026-07-31 기준)
+
+| 상태 | 항목 수 | 비고 |
+|---|---|---|
+| ✅ 반영 | 24 | 대부분 |
+| 🔄 보류 | 2 | #018 (pipe, step23 재도입), #020 (주석 정비, step23 회수) |
+| ⏭ 철회 | 1 | #025 (크로스참조 네이밍 시도/철회, 교훈은 영구 보존) |
 
 ---
 
@@ -1026,8 +1055,78 @@
   - 정상 역전파: y.data=32.0, x.grad=64.0 (step16과 동일, 정합성 유지) ✅
   - 메모리 누수 시나리오: for 루프 10회 big_data 정상 완료 (정답지와 동일 동작) ✅
   - (★ AGENTS.md "수정 후 재실행" 체크리스트 준수)
-- **회수**: step23 → `rezero/core.py` Function 승격 시 `output_ref` (단수 weakref) 유지.
-  단, step34+ 진정한 다출력 함수 등장 시 `output_refs` 복수로 진화 (항목 019 회수와 동기화).
+- **회수**: step23 → `rezero/core.py` Function 승격 시 `output` (단수 weakref, 타입 힌트로 `Optional[weakref.ref]`) 유지.
+  단, step34+ 진정한 다출력 함수 등장 시 `outputs` 복수로 진화 (항목 019 회수와 동기화).
+
+### #027 — ★ Config + no_grad + retain_grad 도입 (메모리 절약 모드) (step18)
+- **위치**: step18~
+- **상태**: ✅ 반영 (2026-07-31)
+- **종류**: 🔵 라이브러리성 ★ (PyTorch 표준 패턴, 책 방식 충실 + 정체성 한 곳 적용)
+- **내용**: 역전파 안 할 때(no_grad 블록) 계산 그래프 구축 생략 + 역전파 후 중간 grad 버리기(retain_grad).
+  ```python
+  # 신규: Config 전역 플래그 + 컨텍스트 매니저
+  class Config:
+      enable_backprop: bool = True
+
+  @contextlib.contextmanager
+  def using_config(name, value):
+      old_value = getattr(Config, name)
+      setattr(Config, name, value)
+      try:
+          yield                          # with 블록 본문에 제어 넘김
+      finally:
+          setattr(Config, name, old_value)   # 자동 복구 (예외에도)
+
+  def no_grad():
+      return using_config('enable_backprop', False)
+
+  # Function.__call__ — 그래프 구축 조건부
+  if Config.enable_backprop:
+      output.set_creator(self); self.inputs = inputs; self.output = weakref.ref(output)
+  return output
+  ```
+- **★ A/B/C는 책 방식 그대로 (PyTorch 표준 패턴)**:
+  | 변형 | 책 방식 | 우리 방향 | 이유 |
+  |---|---|---|---|
+  | A: Config 클래스 | 전역 클래스 | 동일 | Pythonic, PyTorch 방식 |
+  | B: using_config/no_grad | @contextmanager + yield | 동일 | 컨텍스트 매니저 이디엄 |
+  | C: __call__ 그래프 조건부 | if Config.enable_backprop: | 동일 | |
+  | D: retain_grad | y.backward(retain_grad=False) | ★ fill_grad(y, retain_grad=False) | 정체성 항목 014 유지 |
+- **★ D 핵심 — 항목 014(fill_grad 전역 함수) 유지하며 자연스럽게 확장**:
+  책은 `y.backward(retain_grad=False)` (Variable 메서드 방식).
+  우리는 `fill_grad(start_var, ..., *, retain_grad=False)` (전역 함수, 항목 014).
+  - 키워드 전용 인자(`*`)로 retain_grad 받음 — 위치 인자 헷갈림 방지
+  - fill_grad 시그니처: `(start_var, upstream_grad=None, *, retain_grad=False)`
+  - 정체성 유지 + 자연스러운 매개변수 확장 (과거 호환성도 유지)
+- **★ retain_grad 구현 — output.grad 해제**:
+  ```python
+  # fill_grad 메인 루프 안, 각 Function 처리 후:
+  if not retain_grad:
+      output.grad = None    # 이번 Function 출력의 grad은 역전파 후 안 쓰므로 버림
+  ```
+  - 중간 Variable grad은 보통 필요 없음 (최종 입력 x0.grad 등만 사용)
+  - 큰 ndarray 중간 grad이 메모리 잡아먹는 것 방지
+- **★★ 핵심 학습 포인트 — 컨텍스트 매니저 마법** (탐구 노트 23번으로 심화):
+  `@contextlib.contextmanager` + `yield`가 어떻게 `with`를 지원하는가.
+  - yield 본질 = "실행 일시정지 지점" (값 내보내기가 본질 아님)
+  - yield 이전 = `__enter__`, yield 이후 = `__exit__` (try/finally로 예외 안전)
+  - 탐구 21번(yield/코루틴)의 자연스러운 후속 — yield의 제어 양보 능력 활용
+- **★ 이번 step의 깔끔함 — step17 교훈 적용**:
+  step17에선 정체성 원칙 4연속 위반 사태. step18은 변형 최소 (D 한 곳만 정체성 적용).
+  "원칙 준수"가 잘 지켜짐 — 책 표준 패턴(A/B/C) 충실히 따르되, 우리 정체성(D) 한 곳만 명확히.
+- **★ 가정/전제 추가 (step17 전제에)**:
+  | 새 전제 (step18) | 의미 | 깨지면? |
+  |---|---|---|
+  | 전역 Config는 언제든 수정 가능 | 스레드 안전성 없음 | 멀티스레딩 시 위험 (PyTorch도 마찬가지) |
+  | 역전파 안 할 땐 그래프가 필요 없다 | 추론(predict) 시 y.data만 필요 | no_grad 블록 안에서 y.backward() 호출하면 에러 |
+  | retain_grad=False면 중간 grad 버려도 된다 | 최종 입력 grad만 필요 | 중간 Variable grad 접근 시 None |
+- **검증**:
+  - retain_grad=False (기본): y.grad=None, t.grad=None, x0.grad=2.0, x1.grad=1.0 (정답지와 일치) ✅
+  - retain_grad=True: 모든 Variable grad 유지 (y=1.0, t=1.0, x0=2.0, x1=1.0) ✅
+  - no_grad 블록: y.data는 나오지만 y.creator=None (그래프 안 만듦), 블록 벗어나면 자동 복구 ✅
+  - (★ AGENTS.md "수정 후 재실행" 체크리스트 준수)
+- **회수**: step23 → `rezero/core.py`에 Config + using_config + no_grad + fill_grad(retain_grad) 승격.
+  Config는 별도 모듈(`rezero/core.py` 또는 `rezero/config.py`)로 둘지 core에 넣을지 그때 결정.
 
 ---
 

@@ -42,3 +42,11 @@ testpaths = ["tests", "rezero/tests", "rezero/steps"]
 python_files = ["test_*.py", "step*.py"]
 # unittest.TestCase 기반 테스트도 pytest가 인식 (역호환)
 addopts = "--tb=short"
+
+[tool.pyright]
+# ★ uvx pyright가 .venv를 인식하게 (브로 통찰 "수정 못 해?", 2026-07-31).
+# 이 설정 없으면 uvx pyright는 .venv를 몰라 numpy 등 의존성 import 에러.
+# Pylance(VSCode)는 .vscode/settings.json에서 defaultInterpreterPath로 이미 인식하지만,
+# Pyright(uvx 명령줄)는 별도 설정 필요. 이걸로 "AI만 잡는 가짜 에러" 소멸.
+venvPath = "."
+venv = ".venv"

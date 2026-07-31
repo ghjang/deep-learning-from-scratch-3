@@ -62,6 +62,8 @@
 | 20 | step16 완료 후 | Node 상위 클래스 도입 아이디어 (계산 그래프 추상화 경계, Pythonic vs OOP, 간선 비대칭 문제, manim 시각화 시너지, Node vs 이터레이터 옵션 매트릭스) 💡보류 | [notes/exploration_20_node_class_idea.md](./notes/exploration_20_node_class_idea.md) |
 | 21 | step16 완료 후 | yield, 제너레이터, 코루틴 (이터레이터 프로토콜, yield 문법, lazy evaluation, 코루틴 3세대 진화 yield→yield from→async/await, 벤다이어그램 관계) | [notes/exploration_21_yield_generator_coroutine.md](./notes/exploration_21_yield_generator_coroutine.md) |
 | 22 | step17 진행 중 | weakref와 GC (약한 참조의 마법, CPython Py_INCREF 스킵 + ob_weakreflist 구독자 모델, 참조 카운팅 vs 순환 감지 세대별 GC, 딥러닝 큰 ndarray 특수성, C++/Rust 비교) | [notes/exploration_22_weakref_gc.md](./notes/exploration_22_weakref_gc.md) |
+| 23 | step18 진행 중 | 컨텍스트 매니저와 contextlib (yield가 with를 만드는 마법, __enter__/__exit__ vs @contextmanager+yield, 제어 양보 지점으로서 yield, _GeneratorContextManager 내부, async with, PyTorch no_grad 패턴) | [notes/exploration_23_contextmanager.md](./notes/exploration_23_contextmanager.md) |
+| 24 | step18 진행 중 | 전략/이터레이터 패턴 + "결정 시점" 딜레마 (Config if문=인라인 전략 선택, 이터레이터 vs 전략 경계 모호성, 결정 시점 4층위 if문/생성시점/wrapper/전역, with no_grad가 런타임 if문 요구하는 이유, DI/PyTorch 합리적 타협, 브로 머리 꼬임=패턴 인식) | [notes/exploration_24_strategy_iterator_config.md](./notes/exploration_24_strategy_iterator_config.md) |
 
 ### 🎨 디자인 패턴 (횡단 관심사, 누적형)
 
@@ -1324,26 +1326,82 @@ Variable ──creator──→ Function ──inputs──→ Variable (강한 
 
 ---
 
-## Step 18 — [2고지] 메모리 절약 모드 (Config, no_grad)
+## Step 18 — [2고지] 메모리 절약 모드 ✅
 
-**Issue**: (링크)
-**완료일**: -
-**상태**: ⏳
+**Issue**: [#23](https://github.com/ghjang/deep-learning-from-scratch-3/issues/23)
+**완료일**: 2026-07-31
+**상태**: ✅ 완료
 
 ### 📖 요약 (한 줄)
 
+추론(역전파 안 함) 시 계산 그래프 생성 생략(Config/no_grad) + 중간 grad 버리기(retain_grad)로 메모리 절약.
 
 ### ❓ 질문 / 막힌 점
 
+- (step 진행하며 업데이트)
 
 ### 💡 통찰 / 배운 점
 
+- ★★ **핵심 문제 — 역전파 안 할 때도 그래프 만들면 메모리 낭비**
+  - step17까지는 순전파만 해도 역전파 대비 그래프(creator/inputs/output weakref) 구축
+  - 추론(predict)은 y.data만 필요한데 그래프까지 유지 → 큰 ndarray 시 폭발
+- ★★ **해법 1 — Config 전역 플래그 + 그래프 구축 조건부** (`if Config.enable_backprop:`)
+  - 역전파 안 할 땐 creator/inputs/output 세팅 안 함 → 그래프 안 생김 → 메모리 절약
+- ★★ **사용자 인터페이스 — 컨텍스트 매니저 `with no_grad():`**
+  - 매번 Config 바꾸면 까먹을 위험 → with 블록으로 안전하게 (finally 자동 복구)
+  - cf. PyTorch `torch.no_grad()` 와 정확히 같은 패턴/이름
+- ★ **추가 최적화 — retain_grad (중간 grad 버리기)**
+  - 보통 역전파는 최종 입력 grad만 필요. 중간 Variable grad는 안 씀
+  - retain_grad=False(기본): 중간 grad를 None으로 버림 → 큰 ndarray 메모리 해제
+- ★★ **`@contextlib.contextmanager` + `yield` 마법** (탐구 23번으로 심화)
+  - yield가 "값 내보내기"가 아니라 **"with 블록 본문에 제어 넘기고, 끝나면 이어서"** (제어 양보 지점)
+  - yield 이전 = `__enter__`, yield 이후 = `__exit__` (try/finally로 예외 안전)
+  - 탐구 21번(yield/코루틴)과 연결 — "yield 본질 = 실행 일시정지 지점"
+- ★ **우리 변형 — fill_grad에 retain_grad 매개변수 확장** (항목 014 유지)
+  - 책: `y.backward(retain_grad=False)` (Variable 메서드)
+  - 우리: `fill_grad(y, retain_grad=False)` (전역 함수, 정체성 유지하며 자연스럽게 확장)
+  - ★ 키워드 전용 인자(`*`)로 retain_grad 받아 위치 인자 헷갈림 방지
+- ★ **이번엔 변형 최소** (A/B/C 책 방식 그대로, D만 우리 정체성)
+  - step17의 4연속 위반 교훈 살려 정체성 위반 없이 깔끔하게 진행
 
 ### 🔗 관련 링크
 
+- 진행 이슈: 23번
+- 정답지: steps/step18.py (`None None / 2.0 1.0` — 우리 케이스 1과 일치)
+- 이전 step: step17 (weakref 순환 참조 해결)
+- **★ 심화 탐구 노트**: [exploration_23_contextmanager.md](./notes/exploration_23_contextmanager.md) — contextlib/yield 마법 (탐구 21번과 연결)
+- rezero 변형: REZERO_CHANGES 항목 014 (fill_grad — retain_grad 매개변수 확장), 027 (Config/no_grad 도입)
 
 ### 📝 코드 / 수식 메모
 
+**Config + no_grad 패턴**:
+```python
+class Config:
+    enable_backprop: bool = True
+
+@contextlib.contextmanager
+def using_config(name, value):
+    old_value = getattr(Config, name)
+    setattr(Config, name, value)
+    try:
+        yield                        # with 블록 본문에 제어 넘김
+    finally:
+        setattr(Config, name, old_value)  # 자동 복구 (예외에도)
+
+def no_grad():
+    return using_config('enable_backprop', False)
+```
+
+**Function.__call__ 조건부 그래프 구축**:
+```python
+if Config.enable_backprop:
+    output.set_creator(self)
+    self.inputs = inputs
+    self.output = weakref.ref(output)
+return output  # no_grad 블록에선 이것만 (그래프 안 만듦)
+```
+
+**키워드**: `#2고지` `#메모리절약` `#Config` `#no_grad` `#enable_backprop` `#컨텍스트매니저` `#contextlib` `#yield` `#제어양보` `#retain_grad` `#중간grad버리기` `#PyTorch패턴` `#항목014확장` `#탐구23` `#탐구21연결`
 
 ---
 

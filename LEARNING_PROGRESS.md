@@ -24,10 +24,10 @@
 
 ## 📈 전체 요약
 
-- **완료**: 17 / 60 (step01~17 ✅)
+- **완료**: 18 / 60 (step01~18 ✅)
 - **진행 중**: 0
 - **막힘**: 0
-- **마지막 업데이트**: 2026-07-31 — step17 완료 (2고지 7스텝 — 메모리 관리와 순환 참조, weakref)
+- **마지막 업데이트**: 2026-07-31 — step18 완료 (2고지 8스텝 — 메모리 절약 모드, Config/no_grad)
 
 ---
 
@@ -65,7 +65,7 @@
 | step15 | 복잡한 계산 그래프(이론 편) | ✅ | [#18](https://github.com/ghjang/deep-learning-from-scratch-3/issues/18) | 2026-07-30 | [No code]; exploration_18 풍성한 탐구(그래프/DAG/DFS/BFS/위상정렬); 브로 통찰 3개(DAG 2개 겹침, 노드/간선 매핑, generation=표현식중첩깊이); step16 구현 준비 완료 |
 | step16 | 복잡한 계산 그래프(구현 편) | ✅ | [#19](https://github.com/ghjang/deep-learning-from-scratch-3/issues/19) | 2026-07-31 | generation + visited + schedule; 복선 회수(항목 012, 탐구 18 §4.4); 네이밍 셋트(worklist/visited/schedule); 크로스참조 네이밍 시도/철회 교훈(항목 025, 탐구 19); 탐구 20/21(Node/이터레이터/코루틴 파생) |
 | step17 | 메모리 관리와 순환 참조 | ✅ | [#22](https://github.com/ghjang/deep-learning-from-scratch-3/issues/22) | 2026-07-31 | weakref(약한 참조)로 순환 참조 끊기; output 이름 유지+타입힌트 진화(항목 026); 브로 4연속 원칙 위반 캐치(output_ref 헝가리안, upstream_grad 변수명, Gotcha #10, 주석 gy); 탐구 22(weakref/GC/CPython 내부) |
-| step18 | 메모리 절약 모드 (Config, no_grad) | ⏳ | - | - | - |
+| step18 | 메모리 절약 모드 | ✅ | [#23](https://github.com/ghjang/deep-learning-from-scratch-3/issues/23) | 2026-07-31 | Config 전역 플래그 + contextlib 컨텍스트 매니저(no_grad); retain_grad 중간 grad 버리기(항목 014 확장); 탐구 23(contextmanager/yield)+24(전략/팩토리/결정시점 5층위); AGENTS.md 보강(제목 확인 절차/원칙); pyproject.toml pyright 설정 |
 | step19 | Variable 사용성 개선 (이름, len, repr) | ⏳ | - | - | - |
 | step20 | 연산자 오버로딩(1) (__add__, __mul__) | ⏳ | - | - | - |
 | step21 | Variable 사용성 추가 (인덱스, shape 등) | ⏳ | - | - | - |

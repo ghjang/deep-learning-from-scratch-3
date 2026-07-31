@@ -16,8 +16,8 @@ rezero — 『밑바닥부터 시작하는 딥러닝 3』 직접 구현 학습 �
   4. 변종 실험 환영. 더 좋은 이름, 더 좋은 구조를 상상해볼 것.
 
 진행 상황:
-  - 현재 단계: step18 대기 (2고지 "자연스러운 코드로" — 메모리 절약 모드, Config/no_grad)
-  - 완료한 step: step01 ~ step17 ✅ (제 1 고지 + step11~14 가변 인수/누적 gradient + step15 그래프 이론 + step16 generation/visited + step17 weakref 순환 참조 해결)
+  - 현재 단계: step19 대기 (2고지 "자연스러운 코드로" — Variable 사용성 개선)
+  - 완료한 step: step01 ~ step18 ✅ (제 1 고지 + step11~14 가변 인수/누적 gradient + step15 그래프 이론 + step16 generation/visited + step17 weakref 순환 참조 해결 + step18 Config/no_grad 메모리 절약)
 """
 
-__version__ = "0.1.7"  # step17 완료 (메모리 관리와 순환 참조 — weakref로 순환 끊기; 브로 4연속 원칙 위반 캐치)
+__version__ = "0.1.8"  # step18 완료 (메모리 절약 모드 — Config/no_grad + retain_grad; 브로 전략/팩토리 패턴 심화 통찰)
