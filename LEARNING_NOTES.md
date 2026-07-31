@@ -61,6 +61,7 @@
 | 19 | step16 진행 중 | 네이밍과 헝가리안 표기법 (Systems vs Apps Hungarian, 현대 Pythonic "이름은 역할, 타입은 힌트에", 크로스 참조 네이밍 시도/철회 교훈) | [notes/exploration_19_naming_hungarian.md](./notes/exploration_19_naming_hungarian.md) |
 | 20 | step16 완료 후 | Node 상위 클래스 도입 아이디어 (계산 그래프 추상화 경계, Pythonic vs OOP, 간선 비대칭 문제, manim 시각화 시너지, Node vs 이터레이터 옵션 매트릭스) 💡보류 | [notes/exploration_20_node_class_idea.md](./notes/exploration_20_node_class_idea.md) |
 | 21 | step16 완료 후 | yield, 제너레이터, 코루틴 (이터레이터 프로토콜, yield 문법, lazy evaluation, 코루틴 3세대 진화 yield→yield from→async/await, 벤다이어그램 관계) | [notes/exploration_21_yield_generator_coroutine.md](./notes/exploration_21_yield_generator_coroutine.md) |
+| 22 | step17 진행 중 | weakref와 GC (약한 참조의 마법, CPython Py_INCREF 스킵 + ob_weakreflist 구독자 모델, 참조 카운팅 vs 순환 감지 세대별 GC, 딥러닝 큰 ndarray 특수성, C++/Rust 비교) | [notes/exploration_22_weakref_gc.md](./notes/exploration_22_weakref_gc.md) |
 
 ### 🎨 디자인 패턴 (횡단 관심사, 누적형)
 
@@ -1242,26 +1243,84 @@ add               → gen 2 (max(입력들)=2).    y.gen = 2+1 = 3
 
 **키워드**: `#2고지` `#복잡한계산그래프` `#구현편` `#generation` `#visited` `#schedule` `#위상정렬` `#topological-sort` `#역방향` `#중복push방지` `#두방어막차이` `#복선회수항목012` `#복선회수탐구18` `#네이밍셋트`
 
-## Step 17 — [2고지] 메모리 관리와 순환 참조 (weakref)
+## Step 17 — [2고지] 메모리 관리와 순환 참조 ✅
 
-**Issue**: (링크)
-**완료일**: -
-**상태**: ⏳
+**Issue**: [#22](https://github.com/ghjang/deep-learning-from-scratch-3/issues/22)
+**완료일**: 2026-07-31
+**상태**: ✅ 완료
+
+> ★ 브로 정정: "메모리 관리와 순환 참조 (weakref)" → **"메모리 관리와 순환 참조"** (weakref는 해법, 제목엔 안).
 
 ### 📖 요약 (한 줄)
 
+순환 참조(Variable ↔ Function)로 인한 메모리 누수를 weakref(약한 참조)로 해결.
 
 ### ❓ 질문 / 막힌 점
 
+- (step 진행하며 업데이트)
 
 ### 💡 통찰 / 배운 점
 
+- ★★★ **브로 통찰 — weakref 도입은 출력 다변화와 별개** (내가 잘못 연결한 걸 브로가 정정)
+  - weakref: 순환 참조 끊기용 (출력 개수 무관)
+  - 출력 다변화: step34+ 진짜 다출력 함수(Split 등)와 무관
+  - → 항목 019(self.output 단수)는 유지한 채 **단수 + weakref** 조합으로 진행 (항목 026)
+- ★★ **파이썬 GC 두 단계** (브로 통찰 — "결국 처리한다")
+  1. 참조 카운팅 (즉시, 순환 못 잡음)
+  2. 순환 감지 GC (주기적 세대별, 순환 잡음)
+  - 즉 순환 참조는 결국 회수됨. 근데 딥러닝 큰 ndarray는 GC 주기까지 기다리면 폭발 → weakref로 즉시 회수
+- ★★ **weakref도 객체다** (브로 질문)
+  - weakref.ReferenceType 인스턴스. 자기 자체 refcount도 있음.
+  - 근데 대상 refcount는 **안 올림** — CPython이 Py_INCREF 호출 스킵
+  - 마법: 대상 객체의 ob_weakreflist 슬롯에 "구독자"로 등록만 함. 대상 파괴 시 통지받아 None 반환.
+- ★ **책의 비대칭 설계 — output만 weakref, inputs는 강한 참조 유지**
+  - inputs: 역전파 시 inputs.data 접근에 반드시 필요 → 강한 참조
+  - output: 역전파 시 grad 회수용, 그 후엔 안 씀 → weakref로 회수 허용
+  - 이 비대칭이 메모리 효율과 역전파 정합성 동시 확보의 핵심
+- ★ **우리 변형 — output 이름 유지, 타입 힌트만 진화** (항목 026)
+  - 책: self.outputs = [weakref.ref(o)] (복수 리스트, 원래부터 복수였으니)
+  - 초기 시도: self.output_ref (AI 제안) → 브로 "파이써닉하지 않아?" → ★ 헝가리안 자각 → 철회
+  - 최종: self.output: Optional[weakref.ref] (이름은 output 그대로, 타입 힌트만 Variable→weakref.ref 진화)
+  - step16 #025(creator_func 철회)와 같은 패턴 — 탐구 노트 19번 원칙 일관 적용
+  - ★ 교훈: "원칙 수립 ≠ 원칙 준수" — step16에서 세운 원칙을 바로 다음 step에서 AI가 위반, 브로가 캐치
+- ★★ **"원칙 준수" 3연속 위반 사태 (step17)** 🔥
+  - 1차: output_ref 헝가리안 (위 항목)
+  - 2차: pylance 경고 피하려고 `upstream_grad` 변수명 제거 (★ 항목 007 rezero 정체성 위반!)
+    - 브로: "의미있는 변수 이름으로 가자는 우리 리제로의 특성 아니었어?"
+    - 해결: `upstream_grad = output.grad` 할당 후 **변수에 직접 assert** (`assert upstream_grad is not None`)
+    - → 변수명 유지 + pylance 타입 좁히기 인식 동시 만족
+  - ★★ 핵심 교훈 (강화): "원칙 수립 ≠ 원칙 준수"는 단순 문서 작성 이상의 문제.
+    **이미 합의된 원칙(항목 007)을 pylance 경고 하나 피하려고 버리는 순간**이 가장 위험.
+    정적 분석 도구 경고 ≠ 원칙 위반 정당화. 변수명/구조 정체성이 우선.
 
 ### 🔗 관련 링크
 
+- 진행 이슈: 22번
+- 정답지: steps/step17.py (메모리 누수 없으면 출력 없음 = 성공)
+- 이전 step: step16 (generation/visited)
+- **★ 심화 탐구 노트**: [exploration_22_weakref_gc.md](./notes/exploration_22_weakref_gc.md) — weakref/GC/CPython 내부 (브로 3질문 답)
+- rezero 변형: REZERO_CHANGES 항목 019 (output 단수 유지), 026 (weakref 도입)
 
 ### 📝 코드 / 수식 메모
 
+**weakref 도입 (3군데)**:
+```python
+import weakref
+# Function.__call__:
+self.output_ref = weakref.ref(output)   # 단수, 약한 참조 (항목 019 + 026)
+# fill_grad 회수:
+output = f.output_ref()                  # 역참조 (호출로 실제 객체, 또는 None)
+```
+
+**순환 참조 구조**:
+```
+Variable ──creator──→ Function ──inputs──→ Variable (강한 참조, 유지)
+       ↑                                        │
+       └──── output_ref (weakref, 약한) ────────┘
+       ★ output 방향만 weakref → 순환 끊김
+```
+
+**키워드**: `#2고지` `#메모리관리` `#순환참조` `#weakref` `#약한참조` `#output_ref` `#항목019유지` `#항목026` `#순환감지GC` `#세대별GC` `#딥러닝특수성` `#즉시회수` `#브로정정weakref별개`
 
 ---
 

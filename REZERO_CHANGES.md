@@ -964,6 +964,71 @@
 - **회수**: ⏭ 철회 항목. step23 → `rezero/core.py` Variable/Function 승격 시 **책 원본 이름** 사용.
   단, 교훈(탐구 노트 19번)은 영구 보존.
 
+### #026 — ★★ weakref 도입 — output을 약한 참조로 (순환 참조 끊기) (step17)
+- **위치**: step17~
+- **상태**: ✅ 반영 (2026-07-31)
+- **종류**: 🔵 라이브러리성 ★★ (메모리 관리 핵심, 책 방식을 단수에 맞게 변형)
+- **내용**: Function.output을 weakref로 잡아 순환 참조 끊기.
+  ```python
+  # 이전 (step16, 강한 참조 — 순환 발생)
+  self.output: Optional[Variable] = None
+  self.output = output                  # refcount +1 → 순환 참조
+
+  # 이후 (step17, 약한 참조 — 순환 끊김)
+  self.output_ref: Optional[weakref.ref] = None
+  self.output_ref = weakref.ref(output) # refcount 변동 X → 순환 끊김 ★
+  ```
+  fill_grad 회수도 weakref 역참조로 조정:
+  ```python
+  # 이전: output = f.output (직접)
+  # 이후: output = f.output_ref() (weakref 역참조, None 가드 추가)
+  ```
+- **★ 네이밍 — output 이름 유지, 타입 힌트만 진화 (브로 일관성 테스트 통과)**:
+  초기엔 `output_ref`라 명명했으나(AI 제안), 브로가 "파이써닉하지 않은 건 아니냐?" 짚음.
+  → ★ 정확한 지적. `output_ref`는 `_ref` 접미사로 타입(weakref.ref)을 인코딩 = **헝가리안**.
+  step16 #025(creator_func 철회)와 **정확히 같은 패턴** — 탐구 노트 19번 원칙 위반.
+  → 철회. 이름은 `output` 그대로, 타입 힌트만 `Variable` → `weakref.ref`로 진화:
+  ```python
+  # step16: self.output: Optional[Variable] = None      (강한 참조, 역할=출력)
+  # step17: self.output: Optional[weakref.ref] = None   (약한 참조, 역할=출력 그대로)
+  #         ↑ 이름은 동일, 타입 힌트만 진화 — "이름은 역할, 타입은 힌트에"
+  ```
+  ★ 학습 가치: step16에서 세운 원칙을 **바로 다음 step에서 AI가 위반**, 브로가 캐치.
+  "원칙 수립 ≠ 원칙 준수" — 일관성 테스트의 중요성 증명. (cf. 책은 self.outputs = [weakref.ref(o)] 복수 리스트 — 우리는 단수 + weakref)
+- **★★★ 핵심 — 항목 019(self.output 단수)는 유지** (브로 통찰으로 정정):
+  AI가 처음에 "step17에서 self.outputs(복수)로 진화 = 항목 019 회수 시점"이라 잘못 연결.
+  브로가 정확히 정정:
+  > "weakref의 도입이랑, 함수의 출력을 다변화하는 것과는 아무 상관없지 않아?
+  >  다변화하지 않고도, 현재 순환참조 문제는 있는 것 아니냐?"
+  → ★ 정확함. weakref는 순환 참조 끊기용이지 출력 개수와 무관.
+  - 순환 참조: 단일 출력이든 복수 출력이든 발생
+  - 출력 다변화: step34+ 진짜 다출력 함수(Split 등)와 무관
+  → 항목 019(self.output 단수)는 **step34+ 진정한 다출력 함수 등장 시까지 유지**.
+    step17은 단수에 weakref 얹는 `self.output_ref` 조합으로 진행.
+- **★ 책의 비대칭 설계 유지 — output만 weakref, inputs는 강한 참조**:
+  | 참조 | step17 | 이유 |
+  |---|---|---|
+  | Function.inputs → Variable | 강한 참조 (유지) | 역전파 시 inputs.data 접근 필요 |
+  | Function.output → Variable | 약한 참조 (weakref) | 역전파 후엔 output 필요 없음 → 회수 허용 |
+  이 비대칭이 메모리 효율과 역전파 정합성 동시 확보의 핵심.
+- **★ weakref 역참조 None 가드 추가** (우리 보강):
+  `f.output_ref()`가 None 반환 가능 (output 이미 회수된 경우).
+  정상 흐름에선 일어나지 않지만 (사용자가 start_var 들고 있으니 경로상 Variable 살아있음),
+  방어막으로 RuntimeError 가드 추가. 친절한 에러 메시지 포함.
+- **★ 브로 통찰 — GC와 순환 참조** (탐구 노트 22번으로 심화):
+  > "GC가 순환참조 결국 처리한다고 책에 적혀있어"
+  → 정확함. 파이썬 GC는 두 단계:
+  1. 참조 카운팅 (즉시, 순환 못 잡음)
+  2. 순환 감지 GC (주기적 세대별, 순환 잡음)
+  즉 순환 참조는 결국 회수됨. 근데 딥러닝 큰 ndarray는 GC 주기까지 기다리면 폭발 → weakref로 즉시 회수 확보.
+  상세: notes/exploration_22_weakref_gc.md (CPython 내부 Py_INCREF 스킵, ob_weakreflist 구독자 모델 포함)
+- **검증**:
+  - 정상 역전파: y.data=32.0, x.grad=64.0 (step16과 동일, 정합성 유지) ✅
+  - 메모리 누수 시나리오: for 루프 10회 big_data 정상 완료 (정답지와 동일 동작) ✅
+  - (★ AGENTS.md "수정 후 재실행" 체크리스트 준수)
+- **회수**: step23 → `rezero/core.py` Function 승격 시 `output_ref` (단수 weakref) 유지.
+  단, step34+ 진정한 다출력 함수 등장 시 `output_refs` 복수로 진화 (항목 019 회수와 동기화).
+
 ---
 
 > 생각나는 대로 한 줄씩. 구체화되면 위 항목으로 승격.
