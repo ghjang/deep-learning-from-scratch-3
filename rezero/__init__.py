@@ -16,8 +16,8 @@ rezero — 『밑바닥부터 시작하는 딥러닝 3』 직접 구현 학습 �
   4. 변종 실험 환영. 더 좋은 이름, 더 좋은 구조를 상상해볼 것.
 
 진행 상황:
-  - 현재 단계: step16 대기 (2고지 "자연스러운 코드로" — 복잡한 계산 그래프 구현, generation)
-  - 완료한 step: step01 ~ step15 ✅ (제 1 고지 + step11~14 가변 인수/누적 gradient + step15 그래프 이론)
+  - 현재 단계: step17 대기 (2고지 "자연스러운 코드로" — 메모리 관리와 순환 참조, weakref)
+  - 완료한 step: step01 ~ step16 ✅ (제 1 고지 + step11~14 가변 인수/누적 gradient + step15 그래프 이론 + step16 generation/visited 구현)
 """
 
-__version__ = "0.1.5"  # step15 완료 (복잡한 계산 그래프 이론, No code — generation=표현식중첩깊이 통찰)
+__version__ = "0.1.6"  # step16 완료 (복잡한 계산 그래프 구현 — generation + visited + schedule; 크로스참조 네이밍 시도/철회 교훈)

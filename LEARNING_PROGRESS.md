@@ -24,10 +24,10 @@
 
 ## 📈 전체 요약
 
-- **완료**: 15 / 60 (step01~15 ✅)
+- **완료**: 16 / 60 (step01~16 ✅)
 - **진행 중**: 0
 - **막힘**: 0
-- **마지막 업데이트**: 2026-07-30 — step15 완료 (2고지 5스텝 — 복잡한 그래프 이론, No code)
+- **마지막 업데이트**: 2026-07-31 — step16 완료 (2고지 6스텝 — 복잡한 그래프 구현, generation + visited + schedule)
 
 ---
 
@@ -63,7 +63,7 @@
 | step13 | 가변 길이 인수(역전파 편) | ✅ | [#16](https://github.com/ghjang/deep-learning-from-scratch-3/issues/16) | 2026-07-30 | 3부작 대미; fill_grad 다변 입력 진화; Add derivative 상수함수(브로 통찰); self.output 단수(#019); "다변≠다출력" 혼동 교훈; 역전파 주석 정비(#020, step23 회수) |
 | step14 | 같은 변수 반복 사용 | ✅ | [#17](https://github.com/ghjang/deep-learning-from-scratch-3/issues/17) | 2026-07-30 | gradient 누적(if None 패턴); clear_grad() 도입(#021 네이밍 일관성); downstream_grads 네이밍(#007); Define-by-Run 가정 명시; ndarray in-place 방지(명시적 +) |
 | step15 | 복잡한 계산 그래프(이론 편) | ✅ | [#18](https://github.com/ghjang/deep-learning-from-scratch-3/issues/18) | 2026-07-30 | [No code]; exploration_18 풍성한 탐구(그래프/DAG/DFS/BFS/위상정렬); 브로 통찰 3개(DAG 2개 겹침, 노드/간선 매핑, generation=표현식중첩깊이); step16 구현 준비 완료 |
-| step16 | 복잡한 계산 그래프 구현 (generation) | ⏳ | - | - | - |
+| step16 | 복잡한 계산 그래프(구현 편) | ✅ | [#19](https://github.com/ghjang/deep-learning-from-scratch-3/issues/19) | 2026-07-31 | generation + visited + schedule; 복선 회수(항목 012, 탐구 18 §4.4); 네이밍 셋트(worklist/visited/schedule); 크로스참조 네이밍 시도/철회 교훈(항목 025, 탐구 19); 탐구 20/21(Node/이터레이터/코루틴 파생) |
 | step17 | 메모리 관리와 순환 참조 (weakref) | ⏳ | - | - | - |
 | step18 | 메모리 절약 모드 (Config, no_grad) | ⏳ | - | - | - |
 | step19 | Variable 사용성 개선 (이름, len, repr) | ⏳ | - | - | - |

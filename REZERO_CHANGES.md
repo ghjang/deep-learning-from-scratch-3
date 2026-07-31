@@ -764,6 +764,206 @@
 - **검증**: `clear_grad()` 실행 정상, grad None으로 초기화 확인 ✅
 - **회수**: step23 → `rezero/core.py` Variable 승격 시 `clear_grad` 유지
 
+### #022 — ★★ `seen_set` → `visited` (CS 학술 표준, 탐구 18번과 일치) (step16)
+- **위치**: step16~
+- **상태**: ✅ 반영 (2026-07-31)
+- **종류**: 🔵 라이브러리성 ★★ (네이밍 투명성, #007/#015/#017과 같은 결)
+- **내용**: 책 원본은 중복 push 방지용 set을 `seen_set`으로 명명.
+  rezero는 CS 그래프 순회 알고리즘의 학술 표준 용어 **`visited`** 로 교체:
+  ```python
+  # 책 (관례적)
+  seen_set = set()       # "본 적 있는" — 무엇을? 암시만
+  def add_func(f):
+      if f not in seen_set: ...
+
+  # rezero (학술 표준)
+  visited: set[Function] = set()    # ★ "방문한" — DFS/BFS/위상정렬 필수 용어
+  def schedule(f):
+      if f not in visited: ...
+  ```
+- **★ 왜 visited인가** (후보 비교):
+  | 이름 | 평가 |
+  |---|---|
+  | `seen_set` (책) | 의미는 통하나 "본 적 있는"이 암시적. set 자료형도 이름에 중복 인코딩 |
+  | `visited` ★ | CS 학술 표준 (CLRS, DFS/BFS, 위상정렬 Kahn's algorithm 어디서나). 타입 힌트로 set임 명시 가능 |
+- **★ 코드 ↔ 탐구 노트 일관성** (핵심 가치):
+  `notes/exploration_18_graph_traversal.md`에서 그래프 순회 알고리즘 설명 시 **`visited`** 용어 사용.
+  코드도 같은 단어 쓰면 학습자가 "코드 ↔ 노트" 대응이 즉시 됨.
+  ★ 이게 브로가 추천을 수락한 결정적 이유 — 일관성 있는 어휘가 학습 가치 ↑.
+- **★ 타입 힌트 부수 이점**:
+  `seen_set`은 set 자료형을 이름에 박아넣어 타입 힌트(`: set[Function]`)와 중복.
+  `visited`는 추상적이라 타입 힌트로 구체화하는 게 자연스러움.
+- **★ 관련 네이밍 셋트** (이번 step에서 완성):
+  `worklist`(항목 017) + `visited`(이 항목) + `schedule`(항목 023) = **그래프 순회 알고리즘 CS 학술 용어 3총사**.
+  → 코드만 봐도 "역방향 위상 정렬 수행 중"이 한눈에 드러남.
+- **검증**: `visited` 도입 후 데모 `x.grad = 64.0` (정답지와 일치) ✅
+- **회수**: step23 → `rezero/core.py` fill_grad 승격 시 `visited` 유지
+
+### #023 — ★★ `add_func` → `schedule` (위상 순서 예약 의미 명시) (step16)
+- **위치**: step16~
+- **상태**: ✅ 반영 (2026-07-31)
+- **종류**: 🔵 라이브러리성 ★★ (#022 visited, #017 worklist와 한 쌍)
+- **브로 지적** (step16 변형 포인트 C 토론):
+  > "개인적으로 'add_func'라는 함수명이 마음에 들지 않는데... visited로 변수명도 우리 바꿀 것이잔아?
+  > 뭔가 좀 더 와닿는 의미에 맞는 네이밍 없나?"
+  → `add_func`은 "함수 추가"라 너무 제네릭. **무슨 조건으로? 어디에? 어떤 순서로?** 안 드러남.
+- **내용**:
+  ```python
+  # 책 (관례적)
+  def add_func(f):
+      funcs.append(f); seen_set.add(f); funcs.sort(key=...)   # 3가지 동작 묶음인데 이름엔 "추가"만
+
+  # rezero (위상 순서 예약 명시)
+  def schedule(f):
+      worklist.append(f); visited.add(f); worklist.sort(key=...)  # "순서 있게 처리 예약" 의미
+  ```
+- **★ 왜 schedule인가** (후보 비교 — 브로와 토론):
+  | 이름 | 평가 |
+  |---|---|
+  | `add_func` (책) | "함수 추가". 제네릭. visited 체크/정렬까지 묶었다는 게 안 드러남 |
+  | `enqueue` | "큐에 넣기" worklist 뉘앙스. 근데 정확히 큐(LIFO)가 아니라 정렬 리스트라 어색 |
+  | `push` | "스택에 밀어 넣기". 정렬까지 한다는 게 안 드러남 |
+  | `schedule` ★ | "순서 있게 처리 예약" ★ 가장 정확. 위상 정렬/워크플로우 뉘앙스. 브로 선택 |
+  | `register` | "등록하다" 깔끔하나 "순서" 뉘앙스 약함 |
+- **★ 브로 선택 근거** (schedule 결정):
+  > "schedule이 일단 깔끔한 느낌? worklist와도 잘 맞는 것 같고?"
+  → `worklist`(대기열) + `schedule`(예약하다)는 자연어에서도 짝을 이루는 단어 조합.
+  "worklist에 schedule 한다" = "대기열에 순서대로 예약한다". 코드가 문장처럼 읽힘.
+- **★ 핵심 가치 — 클로저 3가지 동작을 이름에 인코딩**:
+  `schedule(f)`는 사실 **3가지 동작**을 묶은 클로저:
+    1. visited 체크 (중복 push 방지)
+    2. worklist append (대기열 추가)
+    3. generation 정렬 (위상 순서 유지)
+  책의 `add_func`은 이 중 1,2번만 암시. **3번 "정렬"이 이름에 안 드러남**.
+  `schedule`은 "순서 있는 예약"이므로 3번까지 암시 — 3가지 동작 모두 이름에 인코딩.
+- **★ 클로저 유지 결정 (변형 포인트 C — 책 방식 채택)**:
+  schedule은 **모듈 수준 함수가 아니라 fill_grad 내부 클로저**로 둠 (책 방식 존중).
+  이유: worklist + visited 두 상태를 캡처하는 클로저가 자연스러움. 모듈 함수로 빼면
+  인자로 worklist/visited 둘 다 넘겨야 해서 시그니처가 길어짐. step16만의 특수 로직이라
+  재사용성 낮음 → 굳이 빼지 않음.
+- **★ heapq 변형은 보류 (변형 포인트 D — 책 충실)**:
+  schedule 내부의 매 `sort`는 O(n log n)을 n번 = O(n² log n)으로 비효율적.
+  heapq 우선순위 큐로 O(n log n) 최적화 가능하지만, "step16 본 목적은 generation 개념 도입이지
+  성능 최적화가 아님" + "worklist 단순 스택 구조가 흔들림" 이유로 **책 충실(sort) 채택**.
+  heapq는 별도 탐구 후보로 큐에 등록 (동작 확인 후 재논의 가능).
+- **검증**: `schedule` 도입 후 데모 `x.grad = 64.0` (정답지와 일치) ✅
+- **회수**: step23 → `rezero/core.py` fill_grad 승격 시 `schedule` 클로저 유지
+
+### #024 — ★★ `fill_grad`에 generation 정렬 + visited 통합 (전역 함수 구조 유지) (step16)
+- **위치**: step16~
+- **상태**: ✅ 반영 (2026-07-31)
+- **종류**: 🔵 라이브러리성 ★★ (항목 014/015의 자연스러운 확장, rezero 정체성 유지)
+- **내용**: 책 원본은 `Variable.backward()` 메서드 안에 generation 정렬 로직을 통째로 넣음.
+  rezero는 **전역 `fill_grad` 함수 안에 generation 정렬 + visited를 통합** (항목 014 정체성 유지):
+  ```python
+  # 책 (Variable 메서드 — generation 로직이 Variable에 흡수)
+  class Variable:
+      def backward(self):
+          funcs, seen_set = [], set()
+          def add_func(f): ...
+          # generation 정렬 + 역전파 + 누적 모두 Variable 메서드 안
+
+  # rezero (전역 함수 — Variable은 순수 데이터 상자 유지)
+  def fill_grad(start_var, upstream_grad=None):
+      worklist, visited = [], set()
+      def schedule(f): ...                    # ★ generation 정렬 클로저
+      # 역전파 순회 로직은 전역 함수에. Variable은 data/grad/creator/generation만.
+  ```
+- **★ 핵심 가치 — 관심사 분리(SoC) 유지 (항목 014 연장)**:
+  step07에서 "Variable은 순수 데이터 상자, 그래프 순회는 별도 함수" 원칙 수립.
+  step16에서 generation 정렬이 추가되도록 **이 원칙 유지**.
+  - Variable: data + grad + creator + generation (순전파 깊이) — 여전히 순수 데이터
+  - fill_grad: 그래프 순회 + generation 정렬 + visited 중복 방지 — 순회 알고리즘 총괄
+  → 책은 "generation 정렬까지 Variable에 흡수"하지만, rezero는 "순회 로직은 전역 함수에" 일관성 유지.
+- **★ generation 필드는 Variable/Function 양쪽에 (데이터는 Variable에, 계산은 fill_grad에)**:
+  generation **값 자체**는 Variable/Function의 속성 (순전파 깊이 = 데이터).
+  generation **정렬 활용**은 fill_grad의 알고리즘. 이 분리가 SoC의 핵심.
+- **★ REZERO_CHANGES 항목 012 복선 회수** 🔥:
+  step07에서 "왜 set_creator를 단순 할당 말고 메서드로 뒀을까?" 의심 → "미래 확장 포인트 예약" 납득.
+  ★ 그 미래가 바로 step16 — set_creator에 `self.generation = func.generation + 1` 한 줄이 추가되는 순간.
+  항목 012의 복선이 회수됨. 이게 브로가 step07에서 의심을 품은 것의 진짜 가치.
+  step14 docstring에 "step16 generation 확장 포인트" 적어둔 것도 같이 회수.
+- **★ rezero 정체성 정립 — step07~16 변형 흐름**:
+  | step | 변형 | rezero 정체성 기여 |
+  |---|---|---|
+  | step07 (항목 014) | backward → 전역 `fill_grad` | Variable 순수 데이터 상자 원칙 수립 |
+  | step08 (항목 015/017) | `fill_grad` 개명 + `worklist` 리네임 | 의미 투명성 + Worklist Algorithm 인식 |
+  | step16 (이 항목) | generation 정렬 + visited 통합 | SoC 원칙 유지하며 복잡 그래프 대응 |
+  → rezero는 "책의 알고리즘은 따르되, 구조는 Variable/Function/전역함수 관심사 분리 원칙 유지".
+- **★ 가정/전제 2종 (step14 전제에 추가)**:
+  | 새 전제 (step16) | 의미 | 깨지면? |
+  |---|---|---|
+  | 계산 그래프는 DAG (위상순서 존재) | generation 정렬 가능한 전제 | Define-by-Run에선 사이클 안 생김 — 항상 성립 |
+  | 같은 Function이 worklist에 중복 push 가능 | `add(square(a), square(a))`에서 a.creator 두 번 push | visited로 방어 (이 항목) |
+- **검증**:
+  - 분기/합류 데모: `y.data=32.0, x.grad=64.0` (정답지와 일치) ✅
+  - generation 값: x=0, a=1, y=3 (표현식 중첩 깊이와 일치) ✅
+- **회수**: step23 → `rezero/core.py` 또는 `rezero/__init__.py`에 fill_grad 승격 (★★★ rezero 정체성)
+
+### #025 — ★★★ 크로스 참조 네이밍 — 개명 시도/철회 + 현대 Pythonic 교훈 (step16)
+- **위치**: step16
+- **상태**: ⏭ 시도 후 철회 (2026-07-31) — 책 원본 이름 유지
+- **종류**: 🟢 step 한정 + ★ 학습 가치 영구 보존 (탐구 노트 19번으로 승격)
+- **브로 통찰 1** (개명 시도 트리거):
+  > "우리가 사용하고 있는 Variable의 'creator'라는 속성명을 왠지 creator_func로 바꾸고 싶은 충동이...
+  > 왠지 좀 더 명시적으로 설명을 해주는 게 나을 것 같다는 느낌은?"
+  → `creator`만 보면 "사람? 객체? 함수?" 타입이 `Function`이라는 게 이름에 안 드러남.
+  `creator_func`라면 즉시 "이걸 만든 함수"가 드러남. → 4종 전면 개명 시도.
+- **브로 통찰 2** (철회 트리거) ★★★:
+  > "변경 후 코드를 보니, 변수명 자체와 타입 힌트가 중복 느낌은 있는데...
+  > 이렇게 보통 우리 코드처럼 코딩해도 이게 파이쏘닉한가 어쩐가?"
+  → ★ 정확한 자각. `creator_func: Function`은 **이름에 타입 인코딩 + 타입 힌트로 또 인코딩** = 중복.
+  이건 **Systems Hungarian** (변수명에 타입 박는 구식 관행)의 냄새.
+- **내용** — 시도했다가 철회한 개명:
+  ```python
+  # 시도 (2026-07-31, 약 30분 유지)          # 철회 후 (책 원본 이름 유지)
+  class Variable:
+      creator_func: Function      →           creator: Optional["Function"]
+      set_creator_func(func)      →           set_creator(func)
+  class Function:
+      input_vars: tuple[Variable] →           inputs: Optional[tuple[Variable, ...]]
+      output_var: Variable        →           output: Optional[Variable]
+  ```
+- **★ 최종 결정 — 책 원본 이름 유지 + 타입 힌트로 보완** (현대 Pythonic):
+  ```python
+  self.creator: Optional["Function"] = None    # creator (역할) + Function (타입 힌트)
+  self.inputs: Optional[tuple[Variable, ...]]  # inputs (역할) + tuple[Variable] (타입)
+  self.output: Optional[Variable]             # output (역할) + Variable (타입)
+  ```
+  → "이름은 역할, 타입은 힌트에 맡긴다" (현대 파이썬 철학).
+  크로스 참조 구조는 타입 힌트로 충분히 가시화됨 (IDE hover/pyright로 즉시 확인).
+- **★★★ 핵심 교훈 — Systems Hungarian vs 현대 Pythonic**:
+  | 관점 | 평가 |
+  |---|---|
+  | `creator_func: Function` | 이름에 타입(Function) 박음 + 타입 힌트로 또 박음 = **중복** (Systems Hungarian 냄새) |
+  | `creator: Function` | 이름은 역할(creator), 타입은 힌트(Function) = **독립적 정보** (Pythonic) |
+  → 판별 기준: **"이름이 역할을 말하는가, 타입을 말하는가?"**. 역할 OK, 타입 중복 NG.
+  상세: notes/exploration_19_naming_hungarian.md (헝가리안 역사, PEP 8, PyTorch 사례, 판별 기준)
+- **★ 예외적으로 `_var`/`_func`를 쓰는 곳** (이건 헝가리안 아님 — 충돌 회피/구분 목적):
+  - `Function.__call__(input_var)` (항목 002) — 빌트인 `input` 섀도잉 회피
+  - `fill_grad(start_var)` (항목 014) — `output`과 구분 + Variable 타입 명시적
+  - → 충돌/구분이 필요할 때만. 타입 인코딩이 동기가 아님.
+- **★★★ 부수 산물 1 — AGENTS.md "최우선 규칙 2" 하위 항목 신설** (영구 보존):
+  브로 핵심 지적:
+  > "과거의 스텝 소스코드 파일을 수정하는 것은 말이 안 돼잖아?
+  > 그 시점의 우리의 학습의 흔적인데... 그게 틀리든 맞든..."
+  → step01~15 파일은 그대로 보존. 이 결정이 **개명 시도 → 철회 과정에서 자연스럽게 도출**.
+  이번 항목(025) 자체가 "step16에만 머무르고 과거 step은 안 건드림" 원칙의 첫 적용 사례.
+- **★ 부수 산물 2 — "시도/철회"도 가치 있는 학습 이력**:
+  단순히 "책 따라감"이 아니라 "개명 시도 → 자각 → 원칙 발견 → 회귀(단 이유를 알고)" 사이클.
+  결과적으로 책 원본으로 돌아갔지만, **왜 Pythonic한지 이해한 상태**로 회귀.
+  이게 브로 학습 스타일("쌩짜 재현 ❌, 이해 + 변형 시도 ✅")의 정수.
+- **★ PyTorch `grad_fn`와의 관계** (참고):
+  PyTorch는 `tensor.grad_fn`으로 "역전파 함수"를 이름에 박음. 우리 `creator_func`와 비슷해 보였으나,
+  `grad_fn`의 `_fn`은 **역할**(역전파 함수) 강조지 단순 타입 인코딩이 아님.
+  우리 `creator_func`는 순수 타입 인코딩이라 이 기준에서도 철회가 맞음.
+- **검증**:
+  - 개명 시도 후: `y.data=32.0, x.grad=64.0` (정답지와 일치) ✅
+  - 철회 후 재실행: `y.data=32.0, x.grad=64.0` (동일) ✅ — 로직 안 건드림 확인
+  - (★ AGENTS.md 신규 "수정 후 재실행" 체크리스트 준수)
+- **회수**: ⏭ 철회 항목. step23 → `rezero/core.py` Variable/Function 승격 시 **책 원본 이름** 사용.
+  단, 교훈(탐구 노트 19번)은 영구 보존.
+
 ---
 
 > 생각나는 대로 한 줄씩. 구체화되면 위 항목으로 승격.

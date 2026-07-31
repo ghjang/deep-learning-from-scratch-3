@@ -57,6 +57,10 @@
 | 15 | step05 진행 중 | 수학 기호의 어원과 역사 (√/∫/d/∂/∇/∞ 모양의 진짜 이유) | [notes/exploration_15_math_symbol_origins.md](./notes/exploration_15_math_symbol_origins.md) |
 | 16 | step08 진행 중 | "부작용" 번역 비판 + side effect 재프로그래밍 (번역어 감정색 왜곡, 순수함수, 최적화 충돌) | [notes/exploration_16_side_effect.md](./notes/exploration_16_side_effect.md) |
 | 17 | step10 준비 중 | 파이썬 테스팅 패러다임 진화 (unittest→pytest, 책 교육적 선택 vs 실무 국룰, hypothesis) | [notes/exploration_17_python_testing.md](./notes/exploration_17_python_testing.md) |
+| 18 | step15 진행 중 | 그래프/DAG/DFS/BFS/위상정렬 (DeZero 계산 그래프 = DAG, 역전파 = 역방향 위상 정렬, generation = 표현식 중첩 깊이) | [notes/exploration_18_graph_traversal.md](./notes/exploration_18_graph_traversal.md) |
+| 19 | step16 진행 중 | 네이밍과 헝가리안 표기법 (Systems vs Apps Hungarian, 현대 Pythonic "이름은 역할, 타입은 힌트에", 크로스 참조 네이밍 시도/철회 교훈) | [notes/exploration_19_naming_hungarian.md](./notes/exploration_19_naming_hungarian.md) |
+| 20 | step16 완료 후 | Node 상위 클래스 도입 아이디어 (계산 그래프 추상화 경계, Pythonic vs OOP, 간선 비대칭 문제, manim 시각화 시너지, Node vs 이터레이터 옵션 매트릭스) 💡보류 | [notes/exploration_20_node_class_idea.md](./notes/exploration_20_node_class_idea.md) |
+| 21 | step16 완료 후 | yield, 제너레이터, 코루틴 (이터레이터 프로토콜, yield 문법, lazy evaluation, 코루틴 3세대 진화 yield→yield from→async/await, 벤다이어그램 관계) | [notes/exploration_21_yield_generator_coroutine.md](./notes/exploration_21_yield_generator_coroutine.md) |
 
 ### 🎨 디자인 패턴 (횡단 관심사, 누적형)
 
@@ -1157,28 +1161,86 @@ fill_grad 다변 입력 진화 + derivative hook 시험대 통과(Add 상수함�
 
 **키워드**: `#2고지` `#복잡한계산그래프` `#이론편` `#No-code` `#DAG` `#위상정렬` `#topological-sort` `#generation` `#역전파순서` `#브로BFS이해반틀림` `#fill_grad확장필요` `#step16구현`
 
-## Step 16 — [2고지] 복잡한 계산 그래프 구현 (generation)
+## Step 16 — [2고지] 복잡한 계산 그래프(구현 편) ✅
 
-**Issue**: (링크)
-**완료일**: -
-**상태**: ⏳
+**Issue**: [#19](https://github.com/ghjang/deep-learning-from-scratch-3/issues/19)
+**완료일**: 2026-07-31
+**상태**: ✅ 완료
+
+> ★ step15(이론 편)의 짝. generation + visited로 분기/합류 그래프 역전파 순서 문제를 코드로 해결.
+> ★ 브로 정정: "복잡한 계산 그래프 구현" → **"복잡한 계산 그래프(구현 편)"** (step15 "(이론 편)"과 짝).
 
 ### 📖 요약 (한 줄)
 
+generation(순전파 깊이)으로 역방향 위상 정렬 + visited(set)로 같은 Function 중복 처리 방지.
 
 ### ❓ 질문 / 막힌 점
 
+- (step 진행하며 업데이트)
 
 ### 💡 통찰 / 배운 점
 
+- ★★★ **두 방어막의 차이 — step14 누적 vs step16 visited (둘은 다른 문제!)**
+  - **step14 누적**(if None: 대입 else: +): "같은 Variable이 하나의 Function에 여러 입력으로"
+    - 예: `add(x, x)` → `f.inputs = (x, x)`. 같은 객체 2번 방문.
+  - **step16 visited**(set): "같은 Function이 worklist에 여러 번 push"
+    - 예: `add(square(a), square(a))` → `a.creator`가 두 번 push됨.
+  - 계산 그래프의 **서로 다른 구조적 상황**을 해결하는 서로 다른 방어막. 둘 다 필요.
+- ★★ **복선 회수 2종**:
+  1. **REZERO_CHANGES 항목 012** — step07에서 "왜 set_creator를 단순 할당 말고 메서드로?" 의심.
+     답: set_creator에 generation 로직이 추가되는 순간이 step16. step14 docstring "step16 generation 확장 포인트" 복선 회수.
+  2. **exploration_18 §4.4** — 브로가 step15 탐구 때 "방문 기록(visited)이 왜 필요한가" 파고들었던 주제.
+     책 원본 `seen_set`이 바로 그 visited의 실체.
+- ★★★ **네이밍 셋트 완성** — `worklist` + `visited` + `schedule` = **그래프 순회 알고리즘 CS 학술 용어 3총사**
+  - 책 원본: `funcs` / `seen_set` / `add_func` (제네릭, 의미 투명성 낮음)
+  - rezero: `worklist` / `visited` / `schedule` → 코드만 봐도 "역방향 위상 정렬 중"이 드러남
+  - 탐구 18번(exploration_18) 노트와 같은 단어 사용 → 코드 ↔ 노트 일관성
+- ★ **generation = "출력에 가까운 순서" 보장의 도구**
+  - 순전파 깊이를 런타임에 기록 (Define-by-Run 정수)
+  - 역전파 시 `worklist.sort(key=generation)` → gen 큰 것(=출력에 가까운 것)부터 pop
+  - 분기/합류 그래프에서 "아직 grad가 다 안 모인 Function"을 먼저 처리하는 버그 방어
+- ★★★ **크로스 참조 네이밍 — 개명 시도/철회 교훈 (현대 Pythonic)** (브로 통찰 2종):
+  - **통찰 1**: "creator가 모호하다" → `creator_func`/`input_vars`/`output_var`로 전면 개명 시도
+  - **통찰 2 (핵심 자각)**: "변수명과 타입 힌트가 중복 느낌" → **Systems Hungarian**(변수명에 타입 박기) 냄새 자각
+  - **최종 결정**: 책 원본 이름(`creator`/`inputs`/`output`) 유지 + 타입 힌트로 보완
+  - ★ **현대 파이썬 철학**: "이름은 역할을 말하고, 타입은 힌트에 맡긴다"
+    - `creator: Function` → creator(역할) + Function(타입 힌트) = 독립적 정보 ✅
+    - `creator_func: Function` → func(타입 인코딩) + Function(타입 힌트) = 중복 ❌
+  - ★ **학습 사이클의 가치**: 시도 → 자각 → 원칙 발견 → 회귀(이유 알고). 책 따라가는 것보다 깊음
+  - 상세: [exploration_19_naming_hungarian.md](./notes/exploration_19_naming_hungarian.md)
 
 ### 🔗 관련 링크
 
+- 진행 이슈: #19
+- 정답지: steps/step16.py (결과 일치: `y.data=32.0, x.grad=64.0`)
+- 이전 step: step15 복잡한 계산 그래프(이론 편) — generation 이론 배경
+- **★ 배경지식 탐구 노트**: [exploration_18_graph_traversal.md](./notes/exploration_18_graph_traversal.md) — DAG/위상정렬/generation = 표현식 중첩 깊이 (§4.4, §6 회수)
+- rezero 변형: REZERO_CHANGES 항목 022~024 (이번 step 신설)
 
 ### 📝 코드 / 수식 메모
 
+**역전파 추적** (`y = add(square(a), square(a)), a = square(x), x=2.0`):
+```
+순전파: a=x²=4, b=c=a²=16, y=b+c=32 ✓
+역전파:
+  y 시드 = 1
+  add:       b.grad=1, c.grad=1               (upstream 1을 양쪽에 그대로)
+  square(b): db/da=2a=8 × 1 = 8 → a
+  square(c): dc/da=2a=8 × 1 = 8 → a
+  a.grad = 8 + 8 = 16                         (★ 두 경로 누적)
+  square(a): da/dx=2x=4 × 16 = 64 → x
+  x.grad = 64 ✓
+```
 
----
+**generation 값 검증** (순전파 깊이 = 표현식 중첩 깊이):
+```
+x(입력)           → gen 0
+square(x)         → gen 0 (max(x.gen)=0).    a.gen = 0+1 = 1
+square(a) #1, #2  → gen 1 (max(a.gen)=1).    출력들 gen = 1+1 = 2
+add               → gen 2 (max(입력들)=2).    y.gen = 2+1 = 3
+```
+
+**키워드**: `#2고지` `#복잡한계산그래프` `#구현편` `#generation` `#visited` `#schedule` `#위상정렬` `#topological-sort` `#역방향` `#중복push방지` `#두방어막차이` `#복선회수항목012` `#복선회수탐구18` `#네이밍셋트`
 
 ## Step 17 — [2고지] 메모리 관리와 순환 참조 (weakref)
 
