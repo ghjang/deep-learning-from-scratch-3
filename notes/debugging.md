@@ -89,7 +89,7 @@ def divide(a, b):
 **구분 기준**:
 | 용도 | 도구 | 예 |
 |---|---|---|
-| 프로그래먘 논리 가정 (불변조건) | `assert` | `assert self.input is not None` (잘못되면 내 코드 버그) |
+| 프로그래머 논리 가정 (불변조건) | `assert` | `assert self.input is not None` (잘못되면 내 코드 버그) |
 | 런타임 데이터/사용자 입력 | `if: raise` | `if b == 0: raise ValueError(...)` (잘못되면 호출자 책임) |
 
 ### 🎯 DeZero/rezero 등장 지점
@@ -108,7 +108,7 @@ assert y.grad is not None, "y.grad must be filled (start or previous iteration s
 
 ★ step08의 핵심 결정 — 검증 3종을 **용도별로 분리**:
 - **(A)** start_var.creator None → `if/raise RuntimeError` (사용자 오용, `-O`에서도 살아남아야)
-- **(B)(C)** f.input/output/y.grad None → `assert` (프로그래먘 논리 버그, `-O`에서 사라져도 안전)
+- **(B)(C)** f.input/output/y.grad None → `assert` (프로그래머 논리 버그, `-O`에서 사라져도 안전)
 - ★ (A)는 **도입부 맨 앞**에 둠 (fail-fast / 부작용 회피 — 항목 3 참고)
 상세: REZERO_CHANGES.md 항목 16번
 
@@ -170,7 +170,7 @@ assert np.allclose(x.grad, num_grad)
 ```
 
 cf. 이건 "방어막 3번(None 가드)"과 짝 — None 가드는 `if ... raise` (사용자 오용),
-assert는 프로그래먘 불변조건. 같은 None 처리지만 **용도에 따른 도구 선택** (debugging.md 원칙 일관).
+assert는 프로그래머 불변조건. 같은 None 처리지만 **용도에 따른 도구 선택** (debugging.md 원칙 일관).
 
 #### ★ 변형 — `assert isinstance(result, T)` 타입 좁히기 (step12 추가)
 
