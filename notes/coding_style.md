@@ -24,6 +24,7 @@
 | 4 | ★ Pythonic ≠ 짧게 — "의도 투명성"이 진짜 기준 | step09 | 철학 (메타 원칙) |
 | 5 | 튜플 언패킹 — 짝인 값 한 줄로 회수 | step09 | 제어 흐름 (Pythonic, 항목 4 양면) |
 | 6 | import 위치 (모듈 최상단 vs 함수 지역) + 순환 참조 | step09 | 모듈 시스템 (Pythonic) |
+| 7 | 매직메서드는 클래스 안에 정의 — "클래스 밖 대입 비권장" | step20 | 클래스 설계 (정적 분석) |
 
 ---
 
@@ -558,6 +559,95 @@ def pipe(value, *funcs):
 - [PEP 8 — Imports](https://peps.python.org/pep-0008/#imports) — "Imports are always put at the top of the file"
 - [Python docs — The import system](https://docs.python.org/3/reference/import.html) — sys.modules 캐싱 메커니즘
 - step09 `rezero/steps/step09.py` `pipe()` — 지역→최상단 이동 사례
+
+---
+
+## 7. 매직메서드는 클래스 안에 정의 — "클래스 밖 대입 비권장"
+
+### 📖 일반 규칙
+
+파이썬의 매직메서드(`__add__`, `__mul__`, `__repr__` 등)는 **클래스 정의 안에** 넣는 게 원칙.
+클래스 밖에서 `ClassName.__method__ = func` 식으로 대입할 수는 있지만 **비권장**.
+
+```python
+# ✅ 클래스 안 정의 (원칙)
+class Variable:
+    def __add__(self, other):
+        return add(self, other)
+
+
+# ⚠️ 클래스 밖 대입 (가능은 하나 비권장)
+class Variable: ...
+def add(x0, x1): ...
+Variable.__add__ = add      # ← 정의 밖에서 속성 대입
+```
+
+### 🎯 왜 클래스 안이 원칙인가 (4가지 이유)
+
+| 이유 | 설명 |
+|---|---|
+| **1. 정적 분석 호환성** ★ | pyright/Pylance/mypy는 클래스 정의를 정적으로 분석. 클래스 밖 대입은 인식 못 함 → "지원하지 않는 연산자" 에러 + `type: ignore` 남발 |
+| **2. 가독성** | "이 클래스가 지원하는 연산자"를 클래스 정의만 보고 즉시 파악 가능. 밖에 흩어져 있으면 찾아야 함 |
+| **3. 서브클래싱** | 자식이 `super().__add__()` 호출할 때, 부모 정의가 클래스 안에 있어야 자연스러움 |
+| **4. 관행** | 파이썬 생태계 전반 (NumPy, PyTorch, pandas 등) 이 클래스 안 정의가 표준 |
+
+### 🎯 step20 실증 — pyright 11 에러 (클래스 밖 대입의 치명적 단점)
+
+step20 1차 코드에서 책 원본 방식(`Variable.__add__ = add`)을 그대로 따랐더니 **pyright 11 에러** 발생:
+```
+Attribute "__add__" is unknown (reportAttributeAccessIssue)
+Operator "*" not supported for types "Variable" and "Variable" (reportOperatorIssue)
+```
+→ 클래스 밖 대입은 pyright가 "Variable에 `__add__` 없다"고 판단. `a * b` 연산을 에러로 봄.
+→ 11곳에 `# type: ignore` 달아야 하는데, 이건 rezero 원칙("정적 분석과 협력", `debugging.md`)에 정면 위반.
+
+**해결**: 클래스 안에 정의하니 pyright **0 errors**. 깔끔.
+
+### 🎯 왜 책 원본은 클래스 밖 대입을 택했나 (가설)
+
+| 가설 | 설명 |
+|---|---|
+| **wrapper 함수 먼저 정의** | `__add__`가 `add` wrapper를 호출하니, `add`가 먼저 정의되어야 함. 근데 이건 실행 시점엔 문제 없음 (메서드는 호출 시 평가) |
+| **설명 목적 분리** | "함수 wrapper → 연산자 연결" 두 단계를 분리해 보여주려는 의도 |
+| **저자 코딩 스타일** | 일본어 원서의 다른 부분도 비슷한 경향 |
+
+즉 책만의 특수한 선택이지, 일반적인 파이썬 관행이 아님.
+
+### 🎯 언제 클래스 밖 대입이 (이론상) 의미 있나
+
+사실 "반드시"는 없음. 하지만 드문 정당화 가능성:
+
+- **런타임에 조건부로 매직메서드 추가** (예: 플러그인 시스템, 특정 조건에서만 `__add__` 지원)
+- **서드파티 클래스 확장** (본인이 수정 못 하는 클래스에 매직메서드 추가 — 근데 몽키 패치라 위험)
+- ★ DeZero/rezero에선 이런 케이스 없음 → 항상 클래스 안 정의.
+
+### 🎯 DeZero/rezero 등장 지점
+
+#### step20 — `Variable.__add__` / `Variable.__mul__` (★ 이 항목의 계기)
+
+책 원본 방식 (비권장):
+```python
+class Variable: ...
+def add(x0, x1): ...
+Variable.__add__ = add      # 클래스 밖 대입 → pyright 11 에러
+```
+
+rezero 방식 (권장):
+```python
+class Variable:
+    def __add__(self, other: "Variable") -> "Variable":
+        return add(self, other)    # 클래스 안 정의 → pyright 0 에러
+```
+
+### 🔑 핵심 키워드
+
+`#매직메서드` `#클래스안정의` `#클래스밖대입비권장` `#pyright정적분석` `#typeIgnore남발방지` `#operatorOverloading` `#식택스슈가` `#step20`
+
+### 🔗 관련
+
+- step20 `rezero/steps/step20.py` — `__add__`/`__mul__` 클래스 안 정의 (이 항목의 계기)
+- `debugging.md` — "정적 분석과 협력하는 assert" (같은 결 — 정적 분석 도구와 잘 협력)
+- `design_patterns.md` — "오버로딩" 용어 (매직메서드 = 연산자 오버로딩의 도구)
 
 ---
 
