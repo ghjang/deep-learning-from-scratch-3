@@ -24,10 +24,10 @@
 
 ## 📈 전체 요약
 
-- **완료**: 18 / 60 (step01~18 ✅)
+- **완료**: 19 / 60 (step01~19 ✅)
 - **진행 중**: 0
 - **막힘**: 0
-- **마지막 업데이트**: 2026-07-31 — step18 완료 (2고지 8스텝 — 메모리 절약 모드, Config/no_grad)
+- **마지막 업데이트**: 2026-08-10 — step19 완료 (변수 사용성 개선 — name/len/repr/property 위임 패턴)
 
 ---
 
@@ -66,7 +66,7 @@
 | step16 | 복잡한 계산 그래프(구현 편) | ✅ | [#19](https://github.com/ghjang/deep-learning-from-scratch-3/issues/19) | 2026-07-31 | generation + visited + schedule; 복선 회수(항목 012, 탐구 18 §4.4); 네이밍 셋트(worklist/visited/schedule); 크로스참조 네이밍 시도/철회 교훈(항목 025, 탐구 19); 탐구 20/21(Node/이터레이터/코루틴 파생) |
 | step17 | 메모리 관리와 순환 참조 | ✅ | [#22](https://github.com/ghjang/deep-learning-from-scratch-3/issues/22) | 2026-07-31 | weakref(약한 참조)로 순환 참조 끊기; output 이름 유지+타입힌트 진화(항목 026); 브로 4연속 원칙 위반 캐치(output_ref 헝가리안, upstream_grad 변수명, Gotcha #10, 주석 gy); 탐구 22(weakref/GC/CPython 내부) |
 | step18 | 메모리 절약 모드 | ✅ | [#23](https://github.com/ghjang/deep-learning-from-scratch-3/issues/23) | 2026-07-31 | Config 전역 플래그 + contextlib 컨텍스트 매니저(no_grad); retain_grad 중간 grad 버리기(항목 014 확장); 탐구 23(contextmanager/yield)+24(전략/팩토리/결정시점 5층위); AGENTS.md 보강(제목 확인 절차/원칙); pyproject.toml pyright 설정 |
-| step19 | Variable 사용성 개선 (이름, len, repr) | ⏳ | - | - | - |
+| step19 | 변수 사용성 개선 | ✅ | [#24](https://github.com/ghjang/deep-learning-from-scratch-3/issues/24) | 2026-08-10 | name + __len__/__repr__ + shape/ndim/size/dtype (위임 패턴); _ensure_data None 가드(항목 029); name 키워드 전용(항목 028); Variable( 대문자 repr(항목 030) |
 | step20 | 연산자 오버로딩(1) (__add__, __mul__) | ⏳ | - | - | - |
 | step21 | Variable 사용성 추가 (인덱스, shape 등) | ⏳ | - | - | - |
 | step22 | 연산자 오버로딩(2) (neg, sub, div, pow) | ⏳ | - | - | - |

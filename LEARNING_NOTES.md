@@ -1405,26 +1405,52 @@ return output  # no_grad 블록에선 이것만 (그래프 안 만듦)
 
 ---
 
-## Step 19 — [2고지] Variable 사용성 개선 (이름, len, repr)
+## Step 19 — [2고지] 변수 사용성 개선
 
-**Issue**: (링크)
-**완료일**: -
-**상태**: ⏳
+**Issue**: [#24](https://github.com/ghjang/deep-learning-from-scratch-3/issues/24)
+**완료일**: 2026-08-10
+**상태**: ✅
 
 ### 📖 요약 (한 줄)
 
-
-### ❓ 질문 / 막힌 점
-
+Variable에 name/`__len__`/`__repr__`/shape/ndim/size/dtype 추가 — 모두 내부 ndarray(self.data)에 **위임(delegate)** 하는 패턴. 역전파 로직은 건드리지 않음.
 
 ### 💡 통찰 / 배운 점
 
+- **위임 패턴(delegate pattern)** — Variable이 ndarray를 품고, 매직메서드/property는 "data한테 물어봐" 하고 떠넘김. 파이썬에선 `@property`와 매직메서드(`__len__`)가 이 위임의 도구. 기억에서 날아갔던 용어 다시 복구 ★
+- **"순수 데이터 상자" 정체성 강화** — name/property는 데이터 자체에 대한 정보/표현이라 Variable 정체성(항목 014)에 위배되지 않고 오히려 강화. 그래프 순회가 아님.
+- **`Variable(` 대문자 repr (변형 E)** — 책 원본은 소문자 `variable(` 하드코딩(chainer 관례 추정). 브로 결정으로 클래스명 그대로 `Variable(` 사용. 우연히 글자 수(9칸)가 같아 들여쓰기 매직 넘버는 안 바뀜.
+- **`_ensure_data` 헬퍼 네이밍 토론** — 브로가 "무난한 거 맞냐?" 재질문 → 후보 6종 검토 → `_ensure_data` 합의. "ensure = 보장하다"가 가드 역할(data 있음을 보장)에 정확. 네이밍은 항상 트레이드오프.
+- **키워드 전용 매개변수 패턴 (2번째 사례)** — step18 retain_grad에 이어 step19 name도 `*, name=None` 키워드 전용. 아직 "원칙"은 아니고 관찰 수준 (3~4곳 쌓이면 원칙화 검토).
 
 ### 🔗 관련 링크
 
+- [Issue #24](https://github.com/ghjang/deep-learning-from-scratch-3/issues/24) — step19 진행 추적
+- `REZERO_CHANGES.md` 항목 #028 (name 키워드 전용), #029 (property None 가드 + `_ensure_data`), #030 (`Variable(` 대문자 repr)
+- `rezero/steps/step19.py` — 구현
 
 ### 📝 코드 / 수식 메모
 
+```python
+# 위임 패턴의 핵심 — 모두 _ensure_data()로 None 가드 후 data에 떠넘김
+@property
+def shape(self) -> tuple[int, ...]:
+    return self._ensure_data().shape
+
+def _ensure_data(self) -> np.ndarray:
+    if self.data is None:
+        raise RuntimeError(...)   # 방어막 일관성 (step09 방어막 3겹 연장)
+    return self.data
+
+# __repr__은 헬퍼 안 쓰고 자체 처리 (None도 표현해야 하므로)
+def __repr__(self) -> str:
+    if self.data is None:
+        return 'Variable(None)'
+    p = str(self.data).replace('\n', '\n' + ' ' * 9)   # 들여쓰기 매직 넘버 9 = 'Variable(' 길이
+    return 'Variable(' + p + ')'
+```
+
+**키워드**: `#2고지` `#변수사용성개선` `#위임패턴` `#delegate` `#property` `#매직메서드` `#__len__` `#__repr__` `#name` `#shape` `#ndim` `#size` `#dtype` `#키워드전용` `#방어막일관성` `#_ensure_data` `#항목028` `#항목029` `#항목030`
 
 ---
 

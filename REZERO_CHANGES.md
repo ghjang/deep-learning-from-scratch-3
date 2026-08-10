@@ -32,8 +32,8 @@
 
 ## 🗂 분류 (주제별 색인 — 항목 번호순 물리 배치는 유지, 이 표로 그룹 탐색)
 
-> ★ 2026-07-31 그룹화 — 27개 항목 쌓여 주제별 색인 추가 (step23 회수 전 정리).
-> 항목 자체는 append-only 정책 존중 — **번호순 물리 배치 유지 + 이 표로 그룹 탐색**.
+> ★ 2026-07-31 그룹화 — 30개 항목 쌓여 주제별 색인 추가 (step23 회수 전 정리).
+> 항목 자체는 append-only 정책 존중 — **번호순 물리 배치는 유지 + 이 표로 그룹 탐색**.
 > 한 항목이 여러 그룹에 걸칠 수 있으나 "주된 결" 하나로 분류. 상세는 각 항목 본문 참조.
 
 ### 항목 번호 → 그룹 매핑
@@ -43,8 +43,9 @@
 | **타입 힌트 / 정적 분석** | #001, #008 | 2 | ndarray 힌트 세트, Optional grad |
 | **네이밍 (의미 투명성)** | #002, #007, #015, #017, #019, #021, #022, #023, #025 | 9 | input_var, upstream_grad, fill_grad, worklist, output 단수, clear_grad, visited, schedule, 크로스참조 시도/철회 |
 | **구조 / 추상화 (Function 핵심 설계)** | #003, #004, #010, #011, #013, #014 | 6 | ABC, @override, derivative/apply hook 대칭, backward→fill_grad 전역 함수 |
-| **검증 / 방어막** | #016 | 1 | assert vs RuntimeError 구분 |
+| **검증 / 방어막** | #016, #029 | 2 | assert vs RuntimeError 구분, property/len None 가드 |
 | **메모리 관리** | #026, #027 | 2 | weakref 순환 끊기, Config/no_grad 절약 모드 |
+| **API 설계 (매개변수/표현)** | #028, #030 | 2 | name 키워드 전용, Variable( 대문자 repr |
 | **유틸 / step 한정 / 문서 정비** | #005, #006, #009, #012, #018, #020, #024 | 7 | name shadowing(step04), numerical_diff docstring, backward docstring, set_creator 복선, pipe(FP), 주석 정비, fill_grad 통합 |
 
 ### 회수 분류와의 관계 (step23 패키지화 시)
@@ -55,11 +56,11 @@
 
 step23 회수 시: 각 항목마다 "주제별 그룹 + 회수 분류" 둘 다 보고 승격 결정.
 
-### 상태 분포 (2026-07-31 기준)
+### 상태 분포 (2026-08-07 기준)
 
 | 상태 | 항목 수 | 비고 |
 |---|---|---|
-| ✅ 반영 | 24 | 대부분 |
+| ✅ 반영 | 27 | 대부분 (#028, #029, #030 step19 신규 추가) |
 | 🔄 보류 | 2 | #018 (pipe, step23 재도입), #020 (주석 정비, step23 회수) |
 | ⏭ 철회 | 1 | #025 (크로스참조 네이밍 시도/철회, 교훈은 영구 보존) |
 
@@ -1127,6 +1128,149 @@ step23 회수 시: 각 항목마다 "주제별 그룹 + 회수 분류" 둘 다 �
   - (★ AGENTS.md "수정 후 재실행" 체크리스트 준수)
 - **회수**: step23 → `rezero/core.py`에 Config + using_config + no_grad + fill_grad(retain_grad) 승격.
   Config는 별도 모듈(`rezero/core.py` 또는 `rezero/config.py`)로 둘지 core에 넣을지 그때 결정.
+
+### #028 — ★ name 매개변수 키워드 전용 (`*, name=None`) (step19)
+- **위치**: step19~
+- **상태**: ✅ 반영 (2026-08-07)
+- **종류**: 🔵 라이브러리성 ★ (API 설계 — 매개변수 전달 방식)
+- **브로 결정**:
+  > "name 인자의 경우 흠,.... 추후를 생각하면,.... 걍,... 키워드 인자 방식이 나을듯,...."
+  → `name`을 키워드 전용(`*` 뒤)으로 둬서 `Variable(data, name='x')` 식으로만 호출 가능하게.
+- **내용**:
+  ```python
+  # 책 원본 — 일반 매개변수 (위치/키워드 둘 다 OK)
+  class Variable:
+      def __init__(self, data, name=None):
+          ...
+  Variable(data, 'x')        # 위치 전달 허용 (애매)
+  Variable(data, name='x')   # 키워드 전달
+
+  # rezero — 키워드 전용 (★ `*` 사용)
+  class Variable:
+      def __init__(self, data: Optional[np.ndarray], *, name: Optional[str] = None):
+          ...
+  Variable(data, 'x')        # ❌ TypeError (위치 안 됨)
+  Variable(data, name='x')   # ✅ 키워드만 가능
+  ```
+- **★ 왜 키워드 전용인가 (3가지 이유)**:
+  1. **호출부 가독성** — `Variable(data, name='x')`는 `name='x'`가 눈에 보임.
+     `Variable(data, 'x')`는 `'x'`가 뭔지 코드만 보면 모름. 문서 봐야 앎.
+  2. **위치 인자 실수 방지** — 나중에 `__init__` 매개변수 늘어나면 헷갈림 방지.
+     `Variable(data, True, 'x')` ← `True`가 뭔지 `'x'`가 뭔지 모름.
+  3. **API 진화에 안전** — 키워드 전용 매개변수는 순서 바꿔도 호출 코드 안 깨짐.
+- **★ step18 retain_grad와의 일관성 (패턴 관찰)**:
+  step18 fill_grad에서 이미 키워드 전용 매개변수 채택:
+  ```python
+  def fill_grad(start_var, upstream_grad=None, *, retain_grad=False): ...
+  ```
+  step19 name도 같은 패턴 → 2사례 누적. **★ 하지만 아직 "원칙"은 아님** (브로 결정):
+  > "키워드 전용 매개변수 원칙은,..... 흠,.... 근데,.... 이게 원칙까지 갈지는,....ㅍㅋㅋㅋ
+  >  근데 뭐 나중에 코드가 진화하면서 그런 문법을 적용해도 괜춘한 부분들은 도출될 수 있을 것 같기는하네,...."
+  → 관찰 수준으로 보류. "부가 속성은 키워드로" 패턴이 3~4곳 쌓이면 그때 원칙화 검토.
+- **Python 3 문법 — `*` 매개변수**:
+  `*` 뒤에 오는 매개변수는 반드시 키워드로만 전달. PEP 3102 (Python 3.0+).
+  자주 쓰는 예: `sorted(iterable, *, key=None, reverse=False)` 도 같은 패턴.
+- **검증**: `Variable(data, name='x')` 정상, `Variable(data, 'x')` TypeError ✅
+- **회수**: step23 → `rezero/core.py` Variable 승격 시 name 키워드 전용 유지.
+
+### #029 — ★ property/`__len__` data=None 가드 (방어막 일관성) (step19)
+- **위치**: step19~
+- **상태**: ✅ 반영 (2026-08-07)
+- **종류**: 🔵 라이브러리성 ★ (검증/방어막 — step09 방어막 3겹 연장)
+- **브로 결정**:
+  > "프라퍼티 가드는 '방어막 일관성'이 있게 이전 세션의 코드처럼 진행을 해주는게 좋을 듯,...."
+  → 책 원본은 `__repr__`만 None 처리. 우리는 property/len에도 None 가드 넣어 일관성 확보.
+- **내용**:
+  책 원본 step19.py는 `__repr__`에서만 `if self.data is None: return 'variable(None)'`.
+  `shape`/`ndim`/`size`/`dtype`/`__len__`은 가드 없이 `self.data.shape` 직접 접근.
+  → `data=None`인 Variable에서 `x.shape` 호출하면 ndarray가 아니라 NoneType이라 애매한 에러.
+  rezero는 `_ensure_data()` 헬퍼로 모두 가드:
+  ```python
+  def _ensure_data(self) -> np.ndarray:
+      if self.data is None:
+          raise RuntimeError(
+              f"{self!r}의 data가 None입니다 — data에 접근하는 연산(shape/len/dtype 등)을 수행할 수 없습니다."
+          )
+      return self.data
+
+  @property
+  def shape(self) -> tuple[int, ...]:
+      return self._ensure_data().shape      # ★ None 가드 후 위임
+
+  def __len__(self) -> int:
+      return len(self._ensure_data())       # ★ 마찬가지
+  ```
+- **★ 방어막 일관성 원칙 (step09 방어막 3겹 연장)**:
+  step09에서 "as_array + wrapper + isinstance" 방어막 3겹 도입. 이후 step들에서 일관되게:
+  - Function.backward: `assert self.inputs is not None`
+  - fill_grad: `if start_var.creator is None: raise RuntimeError` (항목 016)
+  - weakref 역참조: `if output is None: raise RuntimeError`
+  - 이번: property/len도 같은 결 — data가 None이면 명확한 RuntimeError.
+  → 핵심: **None이 될 수 있는 속성에 접근할 땐 항상 가드**. 케이스별로 뒀다 안 뒀다 하면 안 됨.
+- **★ RuntimeError 메시지 구조 (항목 016 친절 에러 메시지 패턴 준수)**:
+  - "무슨 문제인지" (data가 None)
+  - "무엇을 하려 했는지" (shape/len/dtype 등 연산)
+  - f-string의 `{self!r}`로 Variable repr → `Variable(None)`으로 자연스럽게 식별 가능
+- **★ `__repr__`은 헬퍼 안 쓰는 비대칭 (자연스러움)**:
+  repr은 "데이터가 없다"는 상태 자체를 표현해야 함 → `'Variable(None)'`으로 출력.
+  property/len은 "데이터에 접근"이 목적이라 None이면 에러.
+  → 역할이 달라서 비대칭이 자연스러움 (repr=표현, property=접근).
+- **★ `_ensure_data` 네이밍** (브로 & AI 합의):
+  "ensure" = "보장하다" — 이 연산을 하려면 data가 있음을 보장해야 한다. 가드 역할에 정확.
+  ★ 후보 검토 토론 (브로가 "무난한 거 맞냐?" 재질문 → 재검토):
+  | 후보 | 평가 |
+  |---|---|
+  | `_require_data` | "요구하다" — 동작은 맞으나 require가 강한 뉘앙스. data 타입 인코딩 느낌 |
+  | `_data_or_raise` | 동작 정확히 서술하나 verbose |
+  | `_check_data` | "체크"가 뭘 하는지 애매 (에러? 반환?) |
+  | `_ensure_data` ★ | "보장한다" — data 있음을 보장. require보다 가드 역할에 정확. 브로 & AI 합의 |
+  | `_get_data` | 일반 getter처럼 보여 "없으면 에러"가 안 드러남 |
+  | `_validated_data` | 일회성인데 과거분사 `-ed` 어색 |
+  → `_ensure_` 접두사는 다른 곳에서도 재사용 가능한 패턴 (예: `_ensure_grad()`).
+- **검증**:
+  - 정상 데이터: `x.shape=(2,3)`, `x.ndim=2`, `x.size=6`, `len(x)=2` ✅
+  - data=None: repr → `'Variable(None)'` ✅, `x.shape` → RuntimeError ✅
+- **회수**: step23 → `rezero/core.py` Variable 승격 시 `_ensure_data` 헬퍼와 가드 함께 유지.
+
+### #030 — ★ `__repr__` 소문자 → 대문자 (`'variable(' → 'Variable('`) (step19)
+- **위치**: step19
+- **상태**: ✅ 반영 (2026-08-07)
+- **종류**: 🟢 step 한정 ★ (사소하지만 브로 결정에 따른 변형, 학습 흔적 기록)
+- **브로 결정**:
+  AI: "repr이 `variable(...)` (소문자)로 표시되는데, 브로 느낌엔 어때? (a) Variable(...) 클래스명 그대로 / (b) variable(...) 책 방식"
+  브로: "'Variable(...) 로 클래스명 그대로 표시'하는 것으로 하자,...."
+  → 클래스명(`Variable`)과 repr 출력(`Variable(...)`)을 일치시키는 게 자연스럽고 혼란이 적음.
+- **내용**:
+  ```python
+  # 책 원본 — 소문자 'variable(' 하드코딩 (클래스명 Variable과 불일치)
+  def __repr__(self):
+      p = str(self.data).replace('\n', '\n' + ' ' * 9)
+      return 'variable(' + p + ')'
+
+  # rezero — 클래스명 그대로 'Variable(' 사용
+  def __repr__(self) -> str:
+      p = str(self.data).replace('\n', '\n' + ' ' * 9)
+      return 'Variable(' + p + ')'
+  ```
+- **★ 왜 책은 소문자인가 (추측)**:
+  책 원본의 dezero 최종 버전(`dezero/core.py:80`)도 `'variable(' + p + ')'` 소문자 사용.
+  PyTorch의 `repr(tensor)`는 클래스명 안 나옴 (`tensor([...])` 로 표시).
+  chainer (DeZero의 레퍼런스) 는 `variable(...)` 소문자 — 책이 chainer 관례를 따랐을 가능성.
+  즉 생태계/관례를 따른 선택. rezero는 학습용이라 **"클래스명 일치" 우선**.
+- **★ 우연의 일치 — 들여쓰기 숫자 안 바뀜**:
+  `'variable('`도 9글자, `'Variable('`도 9글자라서 들여쓰기 숫자(`' ' * 9`)는 그대로.
+  우연이지만, 만약 `MyVar` 같은 짧은 클래스명이었다면 숫자도 바뀌어야 했을 것.
+  → 이 디테일이 문서화 가치 있는 이유: "들여쓰기 매직 넘버가 클래스명 길이에 의존한다"는 사실 기록.
+- **★ data=None 케이스 일관성 (항목 029 헬퍼 에러 메시지와 시너지)**:
+  `__repr__`에서 `'Variable(None)'` 반환 → 항목 029 `_ensure_data` 에러 메시지의 `{self!r}`가
+  자동으로 `Variable(None)`로 표시 → "이 Variable의 data가 None" 즉시 식별 가능.
+  대소문자 통일한 덕분에 repr과 에러 메시지가 일관되게 연결됨.
+- **검증**:
+  - `repr(Variable(np.array([1,2,3])))` → `'Variable([1 2 3])'` ✅
+  - `repr(Variable(None))` → `'Variable(None)'` ✅
+  - 들여쓰기 9칸 정답지와 동일 (대소문자만 다름) ✅
+- **회수**: step23 → `rezero/core.py` Variable 승격 시 `Variable(` 대문자 유지.
+  단, 최종 dezero와 출력이 달라지는 점 인식 필요 (학습용 변형 명시).
 
 ---
 
