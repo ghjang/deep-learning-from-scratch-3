@@ -25,8 +25,8 @@ rezero — 『밑바닥부터 시작하는 딥러닝 3』 직접 구현 학습 �
   rezero/steps/ — 학습 흔적 전부 (step01~60). 과거 step은 수정 금지.
 
 진행 상황:
-  - 현재 단계: step23 진행 중 (2고지 "자연스러운 코드로" — 패키지로 정리, rezero v1 생성)
-  - 완료한 step: step01 ~ step22 ✅ (제 1 고지 + step11~14 가변 인수/누적 gradient + step15 그래프 이론 + step16 generation/visited + step17 weakref 순환 참조 해결 + step18 Config/no_grad 메모리 절약 + step19 변수 사용성 개선 + step20~22 연산자 오버로드 3부작)
+  - 현재 단계: 2고지 완료! step25 대기 (3고지 "고차 미분 계산")
+  - 완료한 step: step01 ~ step24 ✅ (제 1 고지 + 제 2 고지 "자연스러운 코드로" — 가변 인수, 누적 gradient, 복잡 그래프, weakref, Config/no_grad, 변수 사용성, 연산자 오버로드 3부작, 패키지화, 벤치마크 함수)
 """
 
-__version__ = "0.1.13"  # step23 진행 중 (패키지로 정리 — rezero/v1/ 패키지 생성, 빈 템플릿 11개 삭제)
+__version__ = "0.2.0"  # ★ 2고지 완료 (step24 — 복잡한 함수의 미분. Sphere/Matyas/Goldstein. MINOR bump)

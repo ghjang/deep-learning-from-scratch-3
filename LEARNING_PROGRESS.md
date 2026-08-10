@@ -24,10 +24,10 @@
 
 ## 📈 전체 요약
 
-- **완료**: 23 / 60 (step01~23 ✅)
+- **완료**: 24 / 60 (step01~24 ✅)
 - **진행 중**: 0
 - **막힘**: 0
-- **마지막 업데이트**: 2026-08-10 — step23 완료 (패키지로 정리 — rezero/v1/ 패키지 생성, 버전 폴더 전략 도입, 순환 참조 해결)
+- **마지막 업데이트**: 2026-08-10 — step24 완료 (복잡한 함수의 미분 — Sphere/Matyas/Goldstein. ★ 2고지 점령! 14/14스텝 완료)
 
 ---
 
@@ -71,7 +71,7 @@
 | step21 | 연산자 오버로드(2) | ✅ | [#26](https://github.com/ghjang/deep-learning-from-scratch-3/issues/26) | 2026-08-10 | __radd__/__rmul__ 클래스 안 정의(항목 034); __array_priority__=200 버림(항목 033, 탐구 25); wrapper as_array 중복 제거; 탐구 25번 작성(__array_priority__/ufunc 역사); 문서 대공사 11건 + 이슈 27 등록 |
 | step22 | 연산자 오버로드(3) | ✅ | [#28](https://github.com/ghjang/deep-learning-from-scratch-3/issues/28) | 2026-08-10 | Neg/Sub/Div/Pow 4종 + 매직메서드 7종 (항목 031/033/034 자동 적용 검증); Pow super().__init__ DRY(항목 035); Neg 단순화(브로드캐스팅); Div derivative hook(항목 013 재평가 통과); 탐구 26번(숫자 계보/오일러/무한미분↔기울기소실) |
 | step23 | 패키지로 정리 | ✅ | [#29](https://github.com/ghjang/deep-learning-from-scratch-3/issues/29) | 2026-08-10 | rezero/v1/ 패키지 생성(브로 버전 폴더 전략); 순환 참조 해결(지연 import); 빈 템플릿 11개 삭제; 주석 정리(API화); 항목 #036 회수 |
-| step24 | 복잡한 함수 표현 (Sphere, Rosenbrock) | ⏳ | - | - | - |
+| step24 | 복잡한 함수의 미분 | ✅ | [#30](https://github.com/ghjang/deep-learning-from-scratch-3/issues/30) | 2026-08-10 | Sphere/Matyas/Goldstein 벤치마크; v1 패키지 사용 증명 (step 한정 함수, vX 승격 안 함); gradient check 통과; ★ 2고지 점령! |
 
 ## 🏔 제 3 고지 — 고차 미분 계산 (step25 ~ 36)
 

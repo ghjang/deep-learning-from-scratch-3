@@ -11,11 +11,13 @@ from rezero.v1 import Variable, add, div, mul, neg, pow, rdiv, rsub, sub
 # ===== 교환법칙 O: +, * (step20) ===============================================
 class TestCommutativeOperators:
     def test_add_variable_variable(self):
+        """Variable + Variable."""
         a = Variable(np.array(3.0))
         b = Variable(np.array(2.0))
         assert (a + b).data == np.array(5.0)
 
     def test_mul_variable_variable(self):
+        """Variable * Variable."""
         a = Variable(np.array(3.0))
         b = Variable(np.array(2.0))
         assert (a * b).data == np.array(6.0)
@@ -26,6 +28,7 @@ class TestCommutativeOperators:
         assert (x + 3.0).data == np.array(5.0)
 
     def test_mul_variable_scalar(self):
+        """Variable * scalar."""
         x = Variable(np.array(2.0))
         assert (x * 3.0).data == np.array(6.0)
 
@@ -64,10 +67,12 @@ class TestCommutativeOperators:
 # ===== 단항 - (step22) =========================================================
 class TestNegOperator:
     def test_neg(self):
+        """단항 부호: -x."""
         x = Variable(np.array(2.0))
         assert (-x).data == np.array(-2.0)
 
     def test_neg_zero(self):
+        """-0 = 0."""
         x = Variable(np.array(0.0))
         assert (-x).data == np.array(0.0)
 
@@ -75,11 +80,13 @@ class TestNegOperator:
 # ===== 비교환: - (step22) =====================================================
 class TestSubOperator:
     def test_sub_variable_variable(self):
+        """Variable - Variable."""
         a = Variable(np.array(4.0))
         b = Variable(np.array(2.0))
         assert (a - b).data == np.array(2.0)
 
     def test_sub_variable_scalar(self):
+        """Variable - scalar."""
         x = Variable(np.array(2.0))
         assert (x - 1.0).data == np.array(1.0)
 
@@ -98,11 +105,13 @@ class TestSubOperator:
 # ===== 비교환: / (step22) =====================================================
 class TestDivOperator:
     def test_div_variable_variable(self):
+        """Variable / Variable."""
         a = Variable(np.array(6.0))
         b = Variable(np.array(2.0))
         assert (a / b).data == np.array(3.0)
 
     def test_div_variable_scalar(self):
+        """Variable / scalar."""
         x = Variable(np.array(6.0))
         assert (x / 2.0).data == np.array(3.0)
 
@@ -121,18 +130,22 @@ class TestDivOperator:
 # ===== 거듭제곱 ** (step22) ===================================================
 class TestPowOperator:
     def test_pow_positive(self):
+        """x ** 3 (양수 지수)."""
         x = Variable(np.array(2.0))
         assert (x ** 3).data == np.array(8.0)
 
     def test_pow_zero(self):
+        """x ** 0 = 1."""
         x = Variable(np.array(2.0))
         assert (x ** 0).data == np.array(1.0)
 
     def test_pow_negative(self):
+        """x ** -1 (음수 지수)."""
         x = Variable(np.array(2.0))
         assert (x ** -1).data == np.array(0.5)
 
     def test_pow_fraction(self):
+        """x ** 0.5 (분수 지수)."""
         x = Variable(np.array(9.0))
         assert (x ** 0.5).data == np.array(3.0)
 

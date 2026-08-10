@@ -57,22 +57,27 @@ class TestVariableCreation:
 # ===== property 4종 + __len__ (step19) =========================================
 class TestVariableProperties:
     def test_shape(self):
+        """shape property — data.shape 위임."""
         x = Variable(np.array([[1, 2, 3], [4, 5, 6]]))
         assert x.shape == (2, 3)
 
     def test_ndim(self):
+        """ndim property — data.ndim 위임."""
         x = Variable(np.array([[1, 2, 3], [4, 5, 6]]))
         assert x.ndim == 2
 
     def test_size(self):
+        """size property — data.size 위임."""
         x = Variable(np.array([[1, 2, 3], [4, 5, 6]]))
         assert x.size == 6
 
     def test_dtype(self):
+        """dtype property — data.dtype 위임."""
         x = Variable(np.array([1, 2, 3]))
         assert x.dtype == np.dtype('int64')
 
     def test_len(self):
+        """__len__ — data의 첫 번째 차원 크기."""
         x = Variable(np.array([[1, 2, 3], [4, 5, 6]]))
         assert len(x) == 2
 
@@ -94,10 +99,12 @@ class TestVariableProperties:
 # ===== __repr__ (step19 항목 030 — Variable( 대문자) ===========================
 class TestVariableRepr:
     def test_repr_scalar(self):
+        """스칼라 repr — 'Variable(value)'."""
         x = Variable(np.array(2.0))
         assert repr(x) == 'Variable(2.0)'
 
     def test_repr_none(self):
+        """data=None repr — 'Variable(None)'."""
         x = Variable(None)
         assert repr(x) == 'Variable(None)'
 

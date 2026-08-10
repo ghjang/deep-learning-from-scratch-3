@@ -1660,26 +1660,44 @@ fill_grad(y)
 
 ---
 
-## Step 24 — [2고지] 복잡한 함수 표현 (Sphere, Rosenbrock)
+## Step 24 — [2고지] 복잡한 함수의 미분
 
-**Issue**: (링크)
-**완료일**: -
-**상태**: ⏳
+**Issue**: [#30](https://github.com/ghjang/deep-learning-from-scratch-3/issues/30)
+**완료일**: 2026-08-10
+**상태**: ✅
 
 ### 📖 요약 (한 줄)
 
-
-### ❓ 질문 / 막힌 점
-
+v1 패키지를 사용해 3개 최적화 벤치마크 함수(Sphere/Matyas/Goldstein-Price) 구현 + 자동 미분. ★ step23 패키지화의 가치 증명 — 복잡한 수식도 연산자 오버로딩으로 자연스럽게 + fill_grad로 자동 미분. 2고지 마지막 step 완료 → 2고지 점령!
 
 ### 💡 통찰 / 배운 점
 
+- **★★★ v1 패키지 사용 증명** — `from rezero.v1 import Variable, fill_grad`로 패키지를 사용자 코드로 활용. step23 패키지화가 "실제로 잘 작동한다"를 증명. Goldstein-Price 같은 복잡한 다항식도 `x ** 2 + ...` 식으로 자연스럽게 표현.
+- **step 한정 함수** — sphere/matyas/goldstein은 v1 패키지 핵심이 아니므로 steps/에만 작성 (AGENTS.md "코드 위치 결정 가이드" 적용 첫 사례).
+- **gradient check로 검증** — Goldstein-Price 역전파 오차 8.66e-05. 수치 미분과 해석 역전파 일치 확인.
+- **최적화 벤치마크** — Sphere(볼록, 단순) vs Goldstein-Price(비볼록, 많은 지역 최솟값). step28+ 경사하강법 테스트용.
 
 ### 🔗 관련 링크
 
+- [Issue #30](https://github.com/ghjang/deep-learning-from-scratch-3/issues/30) — step24 진행 추적
 
 ### 📝 코드 / 수식 메모
 
+```python
+from rezero.v1 import Variable, fill_grad
+
+def sphere(x, y):
+    return x ** 2 + y ** 2       # ★ 패키지 연산자 사용
+
+x = Variable(np.array(1.0))
+y = Variable(np.array(1.0))
+z = sphere(x, y)
+fill_grad(z)                     # x.grad=2.0, y.grad=2.0
+
+# Goldstein(1,1): z=1876, x.grad=-5376, y.grad=8064 (정답지와 일치)
+```
+
+**키워드**: `#2고지` `#복잡한함수의미분` `#Sphere` `#Matyas` `#Goldstein` `#최적화벤치마크` `#v1패키지사용` `#2고지점령` `#MINOR_bump`
 
 ---
 
