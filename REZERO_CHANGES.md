@@ -32,7 +32,7 @@
 
 ## 🗂 분류 (주제별 색인 — 항목 번호순 물리 배치는 유지, 이 표로 그룹 탐색)
 
-> ★ 2026-07-31 그룹화 — 34개 항목 쌓여 주제별 색인 추가 (step23 회수 전 정리).
+> ★ 2026-07-31 그룹화 — 35개 항목 쌓여 주제별 색인 추가 (step23 회수 전 정리).
 > 항목 자체는 append-only 정책 존중 — **번호순 물리 배치는 유지 + 이 표로 그룹 탐색**.
 > 한 항목이 여러 그룹에 걸칠 수 있으나 "주된 결" 하나로 분류. 상세는 각 항목 본문 참조.
 
@@ -45,7 +45,7 @@
 | **구조 / 추상화 (Function 핵심 설계)** | #003, #004, #010, #011, #013, #014 | 6 | ABC, @override, derivative/apply hook 대칭, backward→fill_grad 전역 함수 |
 | **검증 / 방어막** | #016, #029 | 2 | assert vs RuntimeError 구분, property/len None 가드 |
 | **메모리 관리** | #026, #027, #033 | 3 | weakref 순환 끊기, Config/no_grad 절약 모드, __array_priority__ 버림 |
-| **API 설계 (매개변수/표현/연산자)** | #028, #030, #031, #034 | 4 | name 키워드 전용, Variable( 대문자 repr, 매직메서드 클래스 안 정의, __radd__/wrapper 정리 |
+| **API 설계 (매개변수/표현/연산자)** | #028, #030, #031, #034, #035 | 5 | name 키워드 전용, Variable( 대문자 repr, 매직메서드 클래스 안 정의, __radd__/wrapper 정리, 3원칙 자동 적용 + Pow DRY + Neg 단순화 |
 | **유틸 / step 한정 / 문서 정비** | #005, #006, #009, #012, #018, #020, #024, #032 | 8 | name shadowing, numerical_diff docstring, backward docstring, set_creator 복선, pipe(FP), 주석 정비, fill_grad 통합, Mul derivative hook 재평가 |
 
 ### 회수 분류와의 관계 (step23 패키지화 시)
@@ -60,7 +60,7 @@ step23 회수 시: 각 항목마다 "주제별 그룹 + 회수 분류" 둘 다 �
 
 | 상태 | 항목 수 | 비고 |
 |---|---|---|
-| ✅ 반영 | 31 | 대부분 (#028~#030 step19, #031~#032 step20, #033~#034 step21 신규 추가) |
+| ✅ 반영 | 32 | 대부분 (#028~#030 step19, #031~#032 step20, #033~#034 step21, #035 step22 신규 추가) |
 | 🔄 보류 | 2 | #018 (pipe, step23 재도입), #020 (주석 정비, step23 회수) |
 | ⏭ 철회 | 1 | #025 (크로스참조 네이밍 시도/철회, 교훈은 영구 보존) |
 
@@ -1466,6 +1466,71 @@ step23 회수 시: 각 항목마다 "주제별 그룹 + 회수 분류" 둘 다 �
 - **회수**: step23 → `rezero/core.py`/`functions.py` 승격 시:
   - `__radd__`/`__rmul__`은 Variable 클래스 안 정의 유지
   - wrapper(`add`/`mul`)는 as_array 없이 단순한 형태 유지
+
+### #035 — ★★ 3원칙 자동 적용 검증 + Pow super().__init__ DRY + Neg 단순화 (step22)
+- **위치**: step22~
+- **상태**: ✅ 반영 (2026-08-10)
+- **종류**: 🔵 라이브러리성 ★★ (메타 — 원칙 준수 사이클 검증 + DRY + 브로드캐스팅)
+- **내용 (3가지 결합)**:
+
+  **(A) ★★★ 3원칙 자동 적용 검증** — step20/21에서 확립한 원칙들이 대량 적용:
+  | 원칙 | 확립 step | step22 적용 |
+  |---|---|---|
+  | 항목 031: 매직메서드 클래스 안 정의 | step20 | ★ 7개 매직메서드 전부 클래스 안 |
+  | 항목 033: `__array_priority__` 버림 | step21 (탐구 25) | ★ 안 넣음 |
+  | 항목 034: wrapper as_array 제거 | step21 | ★ wrapper는 단순하게 |
+
+  ★ 핵심 가치 — "원칙 수립 ≠ 원칙 준수"에서 드디어 **대량 준수** 단계:
+  - step15~18: 브로가 4연속 원칙 위반 캐치 (AGENTS.md 학습 시 반복 실수 방지 배경)
+  - step20: 항목 031 확립 (pyright 11 에러 실증)
+  - step21: 항목 031 첫 자동 적용 (`__radd__`/`__rmul__` 2개)
+  - step22: 항목 031 대량 적용 (7개 매직메서드) + 033/034도 자동
+  → 사전에 세운 원칙이 시스템으로 작동함을 증명. AGENTS.md "사전 의무 체크리스트"의 가치 실증.
+
+  **(B) Pow `super().__init__()` 호출 (DRY)** — 브로 리뷰에서 파생:
+  ```python
+  # 브로 지적: ".c 설정 외엔 Function init과 중복 아닌가? 베이스 호출하라"
+  # Before (중복)
+  class Pow(Function):
+      def __init__(self, c):
+          self.c = c
+          self.inputs = None       # ← 부모와 중복
+          self.output = None       # ← 중복
+          self.generation = 0      # ← 중복
+
+  # After (DRY)
+  class Pow(Function):
+      def __init__(self, c):
+          self.c = c               # 커스텀 — c만 이 클래스에서
+          super().__init__()       # inputs/output/generation은 부모가
+  ```
+  ★ "커스텀은 c만, 나머지는 베이스가" — 부모-자식 역할 분담 원칙 (브로).
+
+  **(C) Neg derivative 단순화 (브로드캐스팅에 위임)** — 브로 리뷰에서 파생:
+  ```python
+  # 브로 지적: "자동 브로드캐스팅 되면 코드 단순화가 좋겠지"
+  # Before (과잉 브랜치)
+  return lambda x: np.array(-1.0) if np.isscalar(x) or x.ndim == 0 else -np.ones_like(x)
+
+  # After (NumPy 브로드캐스팅에 위임)
+  return lambda x: np.float64(-1.0) * x
+  ```
+  ★ 핵심 — NumPy 브로드캐스팅이 스칼라/배열 관계없이 알아서 처리.
+  실험으로 검증: 스칼라/1d/2d 입력 전부 동일 결과.
+  ★ pyright 시그니처 엄격성 때문에 `np.float64(-1.0) * x` 형태 (단순 `-1`은 int로 추론돼 에러).
+
+- **★ 부수 발견 — pyright 시그니처 엄격성**:
+  - `Callable[[ndarray], ndarray]` 단일 반환형은 **엄격** (int/float 반환 시 에러)
+  - `tuple[Callable, ...]` 튜플 반환형은 **관대** (Add/Sub의 `lambda _: 1` 통과)
+  - Square는 `2 * x`가 자동 float64 승격돼서 우연히 통과한 거였음
+  - 향후 단일 입력 함수(Neg/Pow/Square 스타일) 작성 시 주의점
+- **검증**:
+  - 실행: 7 케이스 전부 기대 일치 (neg/sub/div/pow + 복합 식 + 연산자 우선순위 + 비교환 역전파)
+  - pyright: 0 errors, 0 warnings ✅
+- **회수**: step23 → `rezero/core.py`/`functions.py` 승격 시:
+  - 4개 클래스(Neg/Sub/Div/Pow) + wrapper 7종 함께 승격
+  - Pow는 `super().__init__()` DRY 패턴 유지
+  - 3원칙(031/033/034)은 여기서도 자동 적용
 
 ---
 

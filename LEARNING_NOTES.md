@@ -1556,24 +1556,54 @@ def add(x0, x1):
 
 ## Step 22 — [2고지] 연산자 오버로드(3)
 
-**Issue**: (링크)
-**완료일**: -
-**상태**: ⏳
+**Issue**: [#28](https://github.com/ghjang/deep-learning-from-scratch-3/issues/28)
+**완료일**: 2026-08-10
+**상태**: ✅
 
 ### 📖 요약 (한 줄)
 
-
-### ❓ 질문 / 막힌 점
-
+나머지 산술 연산자 전부 추가 — `-x`, `x - y`, `x / y`, `x ** c`. 4개 함수 클래스(Neg/Sub/Div/Pow) + 7개 매직메서드. 연산자 오버로딩 3부작 대미. ★ step20/21 원칙들(항목 031/033/034)이 대량(7개 매직메서드)으로 자동 적용 — "원칙 수립 → 준수" 사이클 검증.
 
 ### 💡 통찰 / 배운 점
 
+- **★★★ 원칙 자동 적용 검증** — step20(항목 031: 매직메서드 클래스 안), step21(항목 033: `__array_priority__` 버림, 항목 034: wrapper as_array 제거)에서 확립한 3 원칙이 step22에서 **대량 7개 매직메서드**로 한 번에 적용. 사전에 세운 원칙이 시스템으로 작동함을 증명.
+- **Div derivative hook** — `1/x1, -x0/x1²` (제곱 항). Mul(step20)보다 복잡한데도 hook으로 표현 가능 → 항목 013 재평가 또 통과.
+- **Pow 특수 구조** — `__init__(c)`로 상수 c 저장. ★ 브로 리뷰 "커스텀은 c만, 나머지는 베이스가" → `super().__init__()` 호출로 DRY (부모에게 inputs/output/generation 위임).
+- **Neg 단순화** — `lambda x: np.float64(-1.0) * x`로 브로드캐스팅에 위임 (브로 리뷰). 복잡한 브랜치 제거.
+- **비교환 연산의 역순 처리** — rsub/rdiv는 순서 뒤집기. `rsub(x0, x1) = Sub()(x1, x0)`.
+- **`__truediv__`의 "true"** — 파이썬 2 vs 3 나눗셈 역사. 탐구 26번에서 파생 → 오일러 공식 → "무한 미분 ↔ 기울기 소실" 통찰로 확장.
+- **★ 부수 발견 — pyright 시그니처 엄격성** — `Callable[[ndarray], ndarray]` 단일 반환형은 엄격(int/float 에러), `tuple[Callable, ...]`는 관대. Square는 `2*x`가 float64 승격돼서 우연히 통과한 거였음. 향후 단일 입력 함수 작성 시 주의.
 
 ### 🔗 관련 링크
 
+- [Issue #28](https://github.com/ghjang/deep-learning-from-scratch-3/issues/28) — step22 진행 추적
+- [exploration_26_numbers_complex.md](./notes/exploration_26_numbers_complex.md) — 파이썬 숫자 계보 + 오일러 + ★★★ "무한 미분 ↔ 기울기 소실" 통찰
+- `REZERO_CHANGES.md` 항목 #035 (Pow `super().__init__` DRY + Neg 단순화 + 3원칙 자동 적용 검증)
 
 ### 📝 코드 / 수식 메모
 
+```python
+# 비교환 연산의 역순 — 순서 뒤집기
+def rsub(x0, x1):
+    return Sub()(x1, x0)    # ★ x0 자리에 x1, x1 자리에 x0
+
+# Pow — c는 상수 (Variable 아님)
+class Pow(Function):
+    def __init__(self, c):
+        self.c = c                # 커스텀
+        super().__init__()        # ★ DRY (브로 리뷰)
+    def derivative(self):
+        c = self.c
+        return lambda x: c * x ** (c - 1)    # c·x^(c-1)
+
+# derivative hook 4종 (복잡도 순)
+Neg: lambda x: np.float64(-1.0) * x         # 단일, 브로드캐스팅
+Sub: (lambda _: 1, lambda _: -1)           # Add 변형
+Div: (lambda _: 1/x1, lambda _: -x0/x1**2) # 가장 복잡 (제곱)
+Pow: lambda x: self.c * x**(self.c-1)      # self.c 참조
+```
+
+**키워드**: `#2고지` `#연산자오버로드` `#Neg` `#Sub` `#Div` `#Pow` `#__neg__` `#__sub__` `#__truediv__` `#__pow__` `#비교환` `#rsub_rdiv_순서뒤집기` `#super_init_DRY` `#원칙자동적용` `#항목031_033_034` `#탐구26` `#2고지대미`
 
 ---
 

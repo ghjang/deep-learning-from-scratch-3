@@ -32,6 +32,7 @@
 | 23 | [exploration_23_contextmanager.md](./exploration_23_contextmanager.md) | step18 | 컨텍스트 매니저와 contextlib — yield가 with를 만드는 마법 (__enter__/__exit__ vs @contextmanager+yield) |
 | 24 | [exploration_24_strategy_iterator_config.md](./exploration_24_strategy_iterator_config.md) | step18 | 전략 패턴, 이터레이터 패턴, "결정 시점"의 딜레마 (Config if문=인라인 전략, DI, PyTorch 합리적 타협) |
 | 25 | [exploration_25_array_priority.md](./exploration_25_array_priority.md) | step21 | `__array_priority__`의 정체 — 책의 매직 넘버 200은 왜 불필요해졌나 (ufunc/rmul 역사, NEP 13, "책 코드도 검증하라" 교훈) |
+| 26 | [exploration_26_numbers_complex.md](./exploration_26_numbers_complex.md) | step22 | 파이썬 숫자 계보 (int 임의 정밀도 / float 64비트 / complex), 오일러 공식, ★★★ "무한 번 미분 가능성 ↔ 기울기 소실" 연결 (부드러움의 역설, sigmoid vs ReLU) |
 
 > 파일 번호 = **생성 순서** (탐구 역사 보존)
 > 아래 "추천 읽는 순서"는 처음 읽을 때 논리적 흐름 기준
