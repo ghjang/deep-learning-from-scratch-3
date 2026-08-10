@@ -45,30 +45,27 @@
 | **참고 방향** | `rezero` 작성 중 막힐 때 참조 | `dezero`를 보고 이해한 뒤 내 손으로 재구현 |
 | **이름 유래** | Deep + Zero | Re:Zero (다시 시작하는 zero) 오마주 + "다시"의 의미 |
 
-### `rezero/` 디렉터리 구조 (dezero 미러 + steps)
+### `rezero/` 디렉터리 구조 (버전 폴더 전략 — step23 도입)
+
+> ★ **step23에서 구조 변경됨**. 이전 구조(dezero 미러 11종 빈 템플릿)는 폐기.
+> 상세는 아래 **"📁 디렉터리 구조"** 섹션 + **"★★ rezero 버전 폴더 전략"** 참조.
 
 ```
 rezero/
-├── __init__.py
-├── core.py         # Variable, Function, Config 등 핵심 (대응: dezero/core.py)
-├── core_simple.py  # step23~32 학습용 단순 코어
-├── functions.py    # sin, add, matmul 등 연산 함수
-├── functions_conv.py  # Conv2d, Pooling, im2col
-├── layers.py       # Layer, Linear
-├── models.py       # Model, MLP, VGG16, ResNet
-├── optimizers.py   # SGD, Momentum, Adam
-├── datasets.py     # Dataset, Spiral, MNIST
-├── dataloaders.py  # DataLoader
-├── cuda.py         # GPU 백엔드 추상화 (현재 NumPy fallback, 향후 MLX 후보)
-├── transforms.py   # 데이터 변환 파이프라인
-├── utils.py        # 그래프 시각화, gradient_check 등
-└── steps/
-    ├── step01.py ~ step60.py   # 책 각 단계를 직접 재구현하는 자리
+├── __init__.py       # 버전 정보 + 진행 상황
+├── steps/            # 학습 흔적 (step01~60, 과거 step 수정 금지)
+│   └── stepNN.py     # 실행: uv run python rezero/steps/stepNN.py
+└── v1/               # ★ 버전 폴더 — 제 1~2고지 (step01~22) 패키지
+    ├── __init__.py   # re-export (Variable, fill_grad, numerical_diff 등 26 심볼)
+    ├── core.py       # Variable, Function, Config, fill_grad, as_array, as_variable
+    ├── functions.py  # Square/Add/Mul/Neg/Sub/Div/Pow + wrapper 9종
+    ├── utils.py      # numerical_diff (gradient check용)
+    └── tests/        # v1 회귀 테스트 (pytest, 80개)
 ```
 
-→ 모든 파일은 현재 **빈 껍데기**(상단에 "무엇을 구현할 자리인지" 주석만 있음).
-→ 브로가 책을 읽으며 직접 채워나가는 구조.
-→ 실행 예: `uv run python rezero/steps/step01.py`
+→ `from rezero.v1 import Variable, fill_grad` 로 사용.
+→ `v2/`(3고지), `v3/`(4고지+)는 미래 폴더 (아직 없음).
+→ 과거 구조(`rezero/core.py`, `rezero/tests/` 등)는 step23에서 삭제됨.
 
 ### `rezero` 학습 원칙
 
@@ -409,7 +406,7 @@ step 전환은 **오직 브로의 명시적 선언**으로만 발생.
 ```
 1. [진행 요약] 이번 step/탐구에서 뭘 했는지 한두 문장 요약
 
-2. [문서 점검] 이번 단계에서 만들거나 수정한 문서/코드 목록化
+2. [문서 점검] 이번 단계에서 만들거나 수정한 문서/코드 목록화
    - 새로 작성한 notes/, LEARNING_*.md, rezero/ 등
    - 산재한 "보충" 라벨, 중복 내용, 번호 불일치 점검
    - 응집도/흐름 자체 평가 (한 섹션이 너무 길진 않은지 등)
@@ -509,7 +506,7 @@ step 전환은 **오직 브로의 명시적 선언**으로만 발생.
   - ★ 분리 기준: **"무엇에 대한 변경인가?"** 가 다르면 분리. 같은 의미 단위면 묶기.
   - 예: 코드+메타(=step 완료) / 작업 원칙 보강(AGENTS.md) / 파생 탐구 노트
   - 분리 시점은 브로가 랩업 6단계에서 결정. AI가 독단 분리 금지.
-  - 실例 (step16, 2026-07-31): A(step16 완료) + B(AGENTS.md 보강) + C(탐구 노트 3종)
+  - 실례 (step16, 2026-07-31): A(step16 완료) + B(AGENTS.md 보강) + C(탐구 노트 3종)
 - **미완성 변경사항은 커밋하지 않는다**: step 진행 중엔 로컬에 쌓아두고, 랩업 6단계 승인 시점에 정리 커밋.
 - **커밋 메시지 형식** (Conventional Commits 스타일 권장):
   - `stepNN 완료 - {주제}` 또는
@@ -580,9 +577,9 @@ uv run python your_script.py
 
 # 단위 테스트 실행
 uv run python -m unittest discover tests            # 원본 dezero 테스트 (unittest)
-uv run pytest rezero/                               # ★ rezero 테스트는 pytest (국룰, 탐구 17번)
-uv run pytest rezero/steps/stepNN.py -v             # 개별 step 테스트 상세 출력
-uv run python -m unittest discover rezero/tests     # (레거시 unittest 명령 — pytest 권장)
+uv run pytest rezero/v1/tests/                       # ★ rezero v1 패키지 회귀 테스트 (pytest 국룰, 탐구 17번)
+uv run pytest rezero/v1/tests/ -v                    # 상세 출력
+uv run pytest rezero/v1/tests/test_operators.py -v   # 개별 파일
 
 # 새 의존성 추가 (pyproject.toml + uv.lock 자동 갱신)
 uv add scipy pillow opencv-python   # examples 일부에 필요할 때
@@ -601,7 +598,7 @@ uv add scipy pillow opencv-python   # examples 일부에 필요할 때
 ## 📁 디렉터리 구조
 
 ```
-dezero/        DeZero 프레임워크 소스 (책이 완성해가는 결과물)
+dezero/        DeZero 프레임워크 소스 (책이 완성해가는 결과물) — 원본, 수정 금지
 ├── core.py         Variable, Function 등 핵심 클래스 (step33 이후)
 ├── core_simple.py  단순화된 코어 (step23~32용)
 ├── functions.py    함수 구현 (sin, add, matmul 등)
@@ -620,8 +617,12 @@ examples/      DeZero 응용 예제 (VGG, GAN, VAE, style transfer 등) — 원�
 tests/         단위 테스트 — 원본
 
 rezero/        ✍️ 학습 노트 — dezero/를 정답지로 삼아 직접 재구현 (자유 수정 가능)
-├── steps/     step01.py ~ step60.py (빈 템플릿, 브로가 채워나감)
-└── tests/     test_*.py (원본 tests/와 1:1 대응, 현재 전부 @skip)
+├── steps/        step01.py ~ step60.py (학습 흔적, 과거 step 수정 금지)
+└── v1/           ★ 버전 폴더 — 제 1~2고지 (step01~22) 패키지
+    ├── core.py       Variable, Function, Config, fill_grad, as_array, as_variable
+    ├── functions.py  Square/Add/Mul/Neg/Sub/Div/Pow + wrapper 9종
+    ├── utils.py      numerical_diff (gradient check용)
+    └── tests/        v1 회귀 테스트 (pytest, 80개)
 
 .github/       이슈/PR 템플릿 (Issue Forms + PR 템플릿)
 pyproject.toml uv 프로젝트 명세
@@ -632,6 +633,61 @@ LEARNING_NOTES.md     📝 학습 step 요약 노트 (가벼움)
 REZERO_CHANGES.md     🔧 rezero 개선 회계 (책 대비 변형 추적, step23 회수)
 notes/                🧪 보충 탐구 노트 (주제별 개별 파일, 깊이 파는 주제)
 ```
+
+### ★★ rezero 버전 폴더 전략 (step23 도입, 브로 제안)
+
+> **새 세션은 반드시 이 섹션을 읽을 것 — rezero 구조가 dezero와 다름.**
+
+**왜 버전 폴더인가?**
+책은 60스텝에 걸쳐 `dezero/` 하나를 계속 진화시킴. 하지만 고지가 바뀔 때마다
+코드 구조가 크게 뜯어고쳐져서(특히 step37 Variable.data 의미 변화),
+"이전 고지에서 배운 코드가 어디 있지?" 찾기 어려워짐.
+
+→ rezero는 **각 고지별로 별도 폴더(v1/v2/v3)** 로 스냅샷을 둠.
+  - `rezero/v1/` — 제 1~2고지 (step01~22). 스칼라 Variable + 자동 역전파.
+  - `rezero/v2/` — (미래) 제 3고지 (step25~36). 고차 미분. v1을 복사해서 시작.
+  - `rezero/v3/` — (미래) 제 4고지+ (step37~60). 신경망.
+  - 각 vN은 영구히 남아 언제든 import 가능 — "박제"가 아니라 **사용 가능한 패키지**.
+
+**사용법:**
+```python
+from rezero.v1 import Variable, fill_grad
+x = Variable(np.array(2.0))
+y = x ** 2 + 1
+fill_grad(y)
+```
+
+### dezero ↔ rezero 구조 대응표 (★ 새 세션 필수 참조)
+
+| dezero (정답지) | rezero v1 (우리 구현) | 비고 |
+|---|---|---|
+| `dezero/core.py` | `rezero/v1/core.py` | Variable, Function, Config, fill_grad |
+| `dezero/functions.py` | `rezero/v1/functions.py` | Square/Add/Mul/Neg/Sub/Div/Pow + wrapper |
+| `dezero/utils.py` | `rezero/v1/utils.py` | numerical_diff |
+| `dezero/__init__.py` | `rezero/v1/__init__.py` | re-export |
+| `dezero/core_simple.py` | (없음) | rezero는 core 하나로 (is_simple_core 스위치 안 씀) |
+| `dezero/layers.py` | (v3에서 예정) | 신경망은 4고지에서 |
+| `dezero/models.py` | (v3에서 예정) | |
+| `dezero/optimizers.py` | (v3에서 예정) | |
+| `tests/` | `rezero/v1/tests/` | pytest 스타일 (함수 + assert) |
+
+★ 핵심: **`dezero/`를 볼 때 대응되는 `rezero/v1/` 파일을 같이 보면 이해 빠름.**
+반대로 rezero 코드가 궁금할 때도 dezero 정답지를 대응표에서 찾으면 됨.
+
+### ★ rezero 정체성 (dezero와 구조적으로 다른 점)
+
+rezero는 dezero를 그대로 베낀 게 아니라 **학습하며 변형 실험**한 결과.
+패키지화 단계에서도 다음 정체성을 유지함:
+
+| 정체성 | dezero | rezero | 근거 |
+|---|---|---|---|
+| 역전파 위치 | `Variable.backward()` 메서드 | `fill_grad()` 전역 함수 | 관심사 분리 (항목 014) |
+| 매직메서드 | `setup_variable()`에서 밖 대입 | 클래스 안 정의 + 지연 import | 정적 분석 호환 (항목 031) |
+| `__array_priority__` | `= 200` | 버림 | 현대 NumPy에선 __rmul__로 충분 (항목 033, 탐구 25) |
+| `setup_variable()` | 있음 | 없음 | 클래스 안 정의라 불필요 |
+| `is_simple_core` | 있음 | 없음 | core 하나로 |
+
+★ 자세한 변형 내역은 `REZERO_CHANGES.md` (항목 014, 031, 033, 036 등) 참조.
 
 ---
 
@@ -649,11 +705,11 @@ notes/                🧪 보충 탐구 노트 (주제별 개별 파일, 깊이
 
 → **이 11개 실패는 정상입니다.** DeZero 자체 기능 이상이 아님. 나머지 66개는 통과합니다.
 
-> 참고: `rezero/tests/`는 현재 전부 `@unittest.skip("rezero 구현 대기 중")` 상태입니다.
-> ★ **rezero 테스트는 pytest로 실행** (국룰, 탐구 17번). 단 현재 skip 상태라:
-> - `uv run pytest rezero/` → 전부 skipped (pytest가 unittest 스타일도 역호환 실행)
-> - `uv run python -m unittest discover rezero/tests` → `OK (skipped=21)` (레거시 명령)
-> 브로가 rezero 모듈을 구현하면서 skip을 풀고 pytest 스타일(함수 + assert)로 테스트를 채워나갑니다.
+> 참고: `rezero/tests/` (원본 mirror, 전부 `@skip`)는 step23에서 삭제됨.
+> 각 버전 패키지 하위에 실제 테스트를 둠 (예: `rezero/v1/tests/`).
+> ★ **rezero 테스트는 pytest로 실행** (국룰, 탐구 17번).
+> - `uv run pytest rezero/v1/tests/` → v1 패키지 회귀 테스트 실행
+> 브로가 vX 패키지를 구현하며 pytest 스타일(함수 + assert)로 테스트를 채워나감.
 
 ### 2. CuPy / GPU 백엔드 (macOS 미지원)
 
@@ -669,7 +725,7 @@ CuPy가 없으면 `gpu_enable = False`로 빠져 자동으로 NumPy로 fallback�
 
 `dezero/datasets.py:234`에서 `label_type is 'fine'` 코드가 Python 3.12에서
 SyntaxWarning을 냅니다 (원본 코드 자체 버그). 동작에는 영향 없음.
-원본 코드 보존 원칙에 따라 일단러두되, 별도 이슈로 추적 중인 상태.
+원본 코드 보존 원칙에 따라 일단 두되, 별도 이슈로 추적 중인 상태.
 
 ### 4. NumPy 2.x 마이그레이션
 

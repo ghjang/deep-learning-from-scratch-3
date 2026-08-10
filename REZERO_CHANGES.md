@@ -32,7 +32,7 @@
 
 ## 🗂 분류 (주제별 색인 — 항목 번호순 물리 배치는 유지, 이 표로 그룹 탐색)
 
-> ★ 2026-07-31 그룹화 — 35개 항목 쌓여 주제별 색인 추가 (step23 회수 전 정리).
+> ★ 2026-07-31 그룹화 — 36개 항목 쌓여 주제별 색인 추가 (step23 완료 후 정리).
 > 항목 자체는 append-only 정책 존중 — **번호순 물리 배치는 유지 + 이 표로 그룹 탐색**.
 > 한 항목이 여러 그룹에 걸칠 수 있으나 "주된 결" 하나로 분류. 상세는 각 항목 본문 참조.
 
@@ -46,6 +46,7 @@
 | **검증 / 방어막** | #016, #029 | 2 | assert vs RuntimeError 구분, property/len None 가드 |
 | **메모리 관리** | #026, #027, #033 | 3 | weakref 순환 끊기, Config/no_grad 절약 모드, __array_priority__ 버림 |
 | **API 설계 (매개변수/표현/연산자)** | #028, #030, #031, #034, #035 | 5 | name 키워드 전용, Variable( 대문자 repr, 매직메서드 클래스 안 정의, __radd__/wrapper 정리, 3원칙 자동 적용 + Pow DRY + Neg 단순화 |
+| **패키지 구조** | #036 | 1 | 버전 폴더(v1/v2/v3) + 순환 참조 해결(지연 import) + 주석 정리 기준 |
 | **유틸 / step 한정 / 문서 정비** | #005, #006, #009, #012, #018, #020, #024, #032 | 8 | name shadowing, numerical_diff docstring, backward docstring, set_creator 복선, pipe(FP), 주석 정비, fill_grad 통합, Mul derivative hook 재평가 |
 
 ### 회수 분류와의 관계 (step23 패키지화 시)
@@ -60,8 +61,8 @@ step23 회수 시: 각 항목마다 "주제별 그룹 + 회수 분류" 둘 다 �
 
 | 상태 | 항목 수 | 비고 |
 |---|---|---|
-| ✅ 반영 | 32 | 대부분 (#028~#030 step19, #031~#032 step20, #033~#034 step21, #035 step22 신규 추가) |
-| 🔄 보류 | 2 | #018 (pipe, step23 재도입), #020 (주석 정비, step23 회수) |
+| ✅ 반영 | 33 | 대부분 (#028~#030 step19, #031~#032 step20, #033~#034 step21, #035 step22, #036 step23 신규 추가) |
+| 🔄 보류 | 2 | #018 (pipe, step23 재도입 검토 → step24+로 연기), #020 (주석 정비, step23 회수 완료?) |
 | ⏭ 철회 | 1 | #025 (크로스참조 네이밍 시도/철회, 교훈은 영구 보존) |
 
 ---
@@ -1531,6 +1532,74 @@ step23 회수 시: 각 항목마다 "주제별 그룹 + 회수 분류" 둘 다 �
   - 4개 클래스(Neg/Sub/Div/Pow) + wrapper 7종 함께 승격
   - Pow는 `super().__init__()` DRY 패턴 유지
   - 3원칙(031/033/034)은 여기서도 자동 적용
+
+### #036 — ★★★ 버전 폴더 전략 (v1/v2/v3) + 순환 참조 해결 + 주석 정리 기준 (step23)
+- **위치**: step23~
+- **상태**: ✅ 반영 (2026-08-10)
+- **종류**: 🔵 라이브러리성 ★★★ (패키지 구조 전면 재설계 — rezero 프로젝트 구조의 전환점)
+- **브로 제안**:
+  > "이 책은 총 60스텝인데, 뒤쪽을 보면 기존 코드를 재활용이라기보다 뜯어고치는 느낌.
+  >  추후에 기억이 날아간 상태로 돌아오면 아무 기억도 안 날 것 같다.
+  >  현재 폴더 내 rezero 하위에 v1 같은 폴더를 더 두어, 제2고지까지의 작업 결과를 프리징하자."
+  → "최종 버전" 개념을 버리고, **고지별 스코프 패키지** 유지.
+- **내용 (3가지 결합)**:
+
+  **(A) ★★★ 버전 폴더 전략 — v1/v2/v3 고지별 스냅샷**:
+  ```
+  rezero/
+  ├── v1/              ← 제 1~2고지 (step01~22) — 스칼라 Variable + 자동 역전파
+  │   ├── core.py      ← Variable, Function, Config, fill_grad, as_array, as_variable
+  │   ├── functions.py ← Square/Add/Mul/Neg/Sub/Div/Pow + wrapper 9종
+  │   └── __init__.py  ← re-export
+  ├── v2/              ← (미래) 제 3고지 — 고차 미분
+  ├── v3/              ← (미래) 제 4고지+ — 신경망
+  ├── steps/           ← 학습 흔적 전부 (step01~60). 과거 step 수정 금지.
+  └── tests/           ← 원본 테스트 1:1 mirror (전부 @skip)
+  ```
+  - 각 고지 완료 시점에 새 vN 폴더 생성 (복사 후 진화)
+  - v1은 영구히 남아 언제든 import 가능 — "박제"가 아니라 **사용 가능한 패키지**
+  - "v1 버전의 사용특징이 있는 문제 상황" — 고지별로 다루는 스코프가 다름 (스칼라/고차미분/신경망)
+  - ★ git tag가 아니라 폴더인 이유 — 파일 시스템에서 바로 보임. 학습자가 즉시 탐색 가능.
+  - 사용: `from rezero.v1 import Variable, fill_grad`
+
+  **(B) ★★ 순환 참조 해결 — 지연 import (lazy import)**:
+  - 문제: core.py의 Variable 매직메서드가 functions.py의 wrapper 호출. functions.py는 core.py import → 순환 참조.
+  - 해결: 매직메서드 안에서 지연 import.
+    ```python
+    class Variable:
+        def __add__(self, other):
+            from rezero.v1.functions import add  # ★ 호출 시점에 로드
+            return add(self, other)
+    ```
+  - ★ dezero의 해법 vs rezero의 해법:
+    | | dezero | rezero |
+    |---|---|---|
+    | 방식 | `setup_variable()`에서 클래스 밖 대입 | 매직메서드 안에서 지연 import |
+    | 배경 | 클래스 밖 대입이라 순환 참조 안 남 | 클래스 안 정의 원칙(항목 031)이라 순환 참조 발생 |
+    | pyright | 클래스 밖 대입이라 인식 못 함 (항목 031 경고) | ★ 0 에러 (클래스 안이라 인식) |
+  - ★ 항목 031(매직메서드 클래스 안)의 패키지화 시점 복병이었으나, 지연 import로 우아하게 해결.
+  - 성능: Python 모듈 캐싱으로 최초 1회만 실행. 영향 없음.
+
+  **(C) ★ 주석 정리 기준 (API화)**:
+  - step 파일(학습 흔적)은 상세 주석. v1/ 패키지는 API라 간결.
+  - 제거 대상: step 번호 참조(`step19:`), 항목 참조(`항목 014`), "브로 통찰" 서사, 탐구 노트 상세 참조.
+  - 유지 대상: 핵심 아키텍처 설명(fill_grad 정체성 등), docstring.
+  - 원칙: "모르면 steps/에서 뒤지기" — 학습 흔적은 steps/에 영구 보존.
+- **★ 부산물 — 빈 템플릿 11개 삭제**:
+  기존 rezero/core.py 등 11개 빈 파일이 헷갈림 유발. v1/이 진짜 패키지니까 과감히 삭제.
+  (core.py, core_simple.py, cuda.py, dataloaders.py, datasets.py, functions.py, functions_conv.py, layers.py, models.py, optimizers.py, transforms.py, utils.py)
+- **★ 회수 항목들**:
+  이 step에서 대부분의 라이브러리성 항목이 v1/ 패키지로 회수됨:
+  - 항목 014 (fill_grad 전역 함수) → core.py
+  - 항목 031 (매직메서드 클래스 안) → core.py Variable
+  - 항목 033 (__array_priority__ 버림) → core.py Variable (안 넣음으로)
+  - 항목 034 (wrapper as_array 제거) → functions.py wrapper
+  - 항목 035 (3원칙 자동 적용 + Pow DRY + Neg 단순화) → core.py + functions.py
+- **검증**:
+  - 실행: 4 케이스 전부 기대 일치 (정답지 동일 시나리오, 전 연산자, no_grad, 혼합 연산)
+  - pyright: 0 errors, 0 warnings (지연 import로 순환 참조 해결 후)
+  - `from rezero.v1 import Variable, fill_grad` 정상 동작
+- **회수**: ★ 이 항목 자체가 "회수" 작업의 결과. v1/ 패키지가 향후 v2/v3의 기반이 됨.
 
 ---
 

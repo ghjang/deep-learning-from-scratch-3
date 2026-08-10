@@ -1607,26 +1607,56 @@ Pow: lambda x: self.c * x**(self.c-1)      # self.c 참조
 
 ---
 
-## Step 23 — [2고지] packages로 묶기 (dezero 패키지화)
+## Step 23 — [2고지] 패키지로 정리
 
-**Issue**: (링크)
-**완료일**: -
-**상태**: ⏳
+**Issue**: [#29](https://github.com/ghjang/deep-learning-from-scratch-3/issues/29)
+**완료일**: 2026-08-10
+**상태**: ✅
 
 ### 📖 요약 (한 줄)
 
-
-### ❓ 질문 / 막힌 점
-
+step01~22 코드를 `rezero/v1/` 패키지로 승격. ★ 브로 통찰 "고지별 버전 폴더(v1/v2/v3)" 구조 도입 — 학습 흔적 박제 + 재사용 가능한 패키지. 빈 템플릿 11개 삭제 + 순환 참조 해결(지연 import).
 
 ### 💡 통찰 / 배운 점
 
+- **★★★ 버전 폴더 전략 (브로 제안)** — 각 고지 완료 시점의 프레임워크를 별도 폴더(v1/v2/v3)로 스냅샷. "최종 버전" 개념을 버리고, 고지별 스코프에 맞는 패키지를 유지. 추후 기억 날아가도 폴더만 보면 "아, v1은 2고지구나" 즉시 파악. git tag보다 파일 시스템에서 바로 보이는 게 학습자 관점에서 중요.
+- **★★★ 순환 참조 — core.py ↔ functions.py** — core.py의 Variable 매직메서드가 functions.py의 wrapper를 호출하는데, functions.py는 core.py를 import함 → 순환 참조. ★ 해결: **지연 import(lazy import)** — 매직메서드 안에서 `from rezero.v1.functions import add` 호출. core.py 로드 시점엔 functions.py 안 부르고, 실제 연산 시점에 로드. dezero는 `setup_variable()`(클래스 밖 대입)로 해결했지만, 우린 클래스 안 정의 원칙(항목 031) 유지를 위해 지연 import 택함.
+- **★ 주석 정리 기준 (API화)** — step 파일은 학습 흔적(상세 주석), v1/ 패키지는 API(간결). step 번호 참조/항목 참조/브로 서사 제거, 핵심 아키텍처 설명은 유지. 모르면 steps/에서 뒤지기.
+- **★ 빈 템플릿 11개 삭제** — 기존 rezero/core.py 등 빈 템플릿이 헷갈림 유발. v1/이 진짜 패키지니까 과감히 삭제. 추후 vX 없이 export할 일 생기면 그때 더미 만들면 됨.
+- **rezero 정체성 3종 패키지화에서도 유지** — fill_grad 전역 함수(항목 014), 매직메서드 클래스 안(항목 031), __array_priority__ 버림(항목 033). dezero와 다른 구조를 패키지 레벨에서도 관철.
+- **★★ AGENTS.md 디렉터리 구조 섹션 전면 개서** — ★ 새 세션이 rezero 구조를 즉시 이해하도록: 버전 폴더 전략 설명 + dezero↔rezero 대응표 + rezero 정체성 5종 표. "왜 rezero/core.py가 없지?" 헤매는 것 방지. 브로 "추후 신규 세션에서 원본 소스가 어디와 대응되는지 알아야" 통찰 반영.
 
 ### 🔗 관련 링크
 
+- [Issue #29](https://github.com/ghjang/deep-learning-from-scratch-3/issues/29) — step23 진행 추적
+- `REZERO_CHANGES.md` 항목 #036 (버전 폴더 전략 + 순환 참조 해결 + 주석 정리 기준)
 
 ### 📝 코드 / 수식 메모
 
+```python
+# ★ 순환 참조 해결 — 지연 import
+class Variable:
+    def __add__(self, other):
+        from rezero.v1.functions import add  # ★ 호출 시점에 로드
+        return add(self, other)
+
+# ★ 버전 폴더 구조
+rezero/
+├── v1/              ← 2고지 (step01~22) 패키지
+│   ├── core.py      ← Variable, Function, Config, fill_grad
+│   ├── functions.py ← Square/Add/Mul/Neg/Sub/Div/Pow + wrapper
+│   └── __init__.py  ← re-export
+├── v2/              ← (미래) 3고지
+├── steps/           ← 학습 흔적 전부 (그대로)
+└── tests/
+
+# 사용
+from rezero.v1 import Variable, fill_grad
+y = (x + 3) ** 2
+fill_grad(y)
+```
+
+**키워드**: `#2고지` `#패키지로정리` `#버전폴더전략` `#v1` `#순환참조` `#지연import` `#lazy_import` `#주석정리` `#API화` `#빈템플릿삭제` `#정체성유지` `#setup_variable_안씀` `#항목036`
 
 ---
 
