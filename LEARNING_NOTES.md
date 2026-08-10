@@ -64,6 +64,8 @@
 | 22 | step17 진행 중 | weakref와 GC (약한 참조의 마법, CPython Py_INCREF 스킵 + ob_weakreflist 구독자 모델, 참조 카운팅 vs 순환 감지 세대별 GC, 딥러닝 큰 ndarray 특수성, C++/Rust 비교) | [notes/exploration_22_weakref_gc.md](./notes/exploration_22_weakref_gc.md) |
 | 23 | step18 진행 중 | 컨텍스트 매니저와 contextlib (yield가 with를 만드는 마법, __enter__/__exit__ vs @contextmanager+yield, 제어 양보 지점으로서 yield, _GeneratorContextManager 내부, async with, PyTorch no_grad 패턴) | [notes/exploration_23_contextmanager.md](./notes/exploration_23_contextmanager.md) |
 | 24 | step18 진행 중 | 전략/이터레이터 패턴 + "결정 시점" 딜레마 (Config if문=인라인 전략 선택, 이터레이터 vs 전략 경계 모호성, 결정 시점 4층위 if문/생성시점/wrapper/전역, with no_grad가 런타임 if문 요구하는 이유, DI/PyTorch 합리적 타협, 브로 머리 꼬임=패턴 인식) | [notes/exploration_24_strategy_iterator_config.md](./notes/exploration_24_strategy_iterator_config.md) |
+| 25 | step21 진행 중 | `__array_priority__`의 정체 (책 매직 넘버 200은 왜 불필요해졌나, ufunc/rmul 3세대 역사, NEP 13, "책 코드도 검증하라" 교훈) | [notes/exploration_25_array_priority.md](./notes/exploration_25_array_priority.md) |
+| 26 | step22 진행 중 | 파이썬 숫자 계보 + 오일러 공식 + ★★★ "무한 번 미분 가능성 ↔ 기울기 소실" (부드러움의 역설, sigmoid vs ReLU) | [notes/exploration_26_numbers_complex.md](./notes/exploration_26_numbers_complex.md) |
 
 ### 🎨 디자인 패턴 (횡단 관심사, 누적형)
 
