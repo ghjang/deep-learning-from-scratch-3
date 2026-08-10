@@ -24,10 +24,10 @@
 
 ## 📈 전체 요약
 
-- **완료**: 20 / 60 (step01~20 ✅)
+- **완료**: 21 / 60 (step01~21 ✅)
 - **진행 중**: 0
 - **막힘**: 0
-- **마지막 업데이트**: 2026-08-10 — step20 완료 (연산자 오버로드(1) — __add__/__mul__ 클래스 안 정의 + Mul derivative hook)
+- **마지막 업데이트**: 2026-08-10 — step21 완료 (연산자 오버로드(2) — __radd__/__rmul__ + __array_priority__ 버림 + wrapper as_array 중복 제거)
 
 ---
 
@@ -68,7 +68,7 @@
 | step18 | 메모리 절약 모드 | ✅ | [#23](https://github.com/ghjang/deep-learning-from-scratch-3/issues/23) | 2026-07-31 | Config 전역 플래그 + contextlib 컨텍스트 매니저(no_grad); retain_grad 중간 grad 버리기(항목 014 확장); 탐구 23(contextmanager/yield)+24(전략/팩토리/결정시점 5층위); AGENTS.md 보강(제목 확인 절차/원칙); pyproject.toml pyright 설정 |
 | step19 | 변수 사용성 개선 | ✅ | [#24](https://github.com/ghjang/deep-learning-from-scratch-3/issues/24) | 2026-08-10 | name + __len__/__repr__ + shape/ndim/size/dtype (위임 패턴); _ensure_data None 가드(항목 029); name 키워드 전용(항목 028); Variable( 대문자 repr(항목 030) |
 | step20 | 연산자 오버로드(1) | ✅ | [#25](https://github.com/ghjang/deep-learning-from-scratch-3/issues/25) | 2026-08-10 | __add__/__mul__ 클래스 안 정의(항목 031, pyright 11→0 에러); Mul derivative hook 확장(항목 032, 항목 013 재평가 통과); coding_style 섹션 7 + AGENTS.md 작업 원칙 추가 |
-| step21 | 연산자 오버로드(2) | ⏳ | - | - | - |
+| step21 | 연산자 오버로드(2) | ✅ | [#26](https://github.com/ghjang/deep-learning-from-scratch-3/issues/26) | 2026-08-10 | __radd__/__rmul__ 클래스 안 정의(항목 034); __array_priority__=200 버림(항목 033, 탐구 25); wrapper as_array 중복 제거; 탐구 25번 작성(__array_priority__/ufunc 역사); 문서 대공사 11건 + 이슈 27 등록 |
 | step22 | 연산자 오버로드(3) | ⏳ | - | - | - |
 | step23 | packages로 묶기 (dezero 패키지화) | ⏳ | - | - | - |
 | step24 | 복잡한 함수 표현 (Sphere, Rosenbrock) | ⏳ | - | - | - |

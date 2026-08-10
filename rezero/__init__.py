@@ -16,8 +16,8 @@ rezero — 『밑바닥부터 시작하는 딥러닝 3』 직접 구현 학습 �
   4. 변종 실험 환영. 더 좋은 이름, 더 좋은 구조를 상상해볼 것.
 
 진행 상황:
-  - 현재 단계: step21 대기 (2고지 "자연스러운 코드로" — 연산자 오버로드(2))
-  - 완료한 step: step01 ~ step20 ✅ (제 1 고지 + step11~14 가변 인수/누적 gradient + step15 그래프 이론 + step16 generation/visited + step17 weakref 순환 참조 해결 + step18 Config/no_grad 메모리 절약 + step19 변수 사용성 개선 + step20 연산자 오버로드(1))
+  - 현재 단계: step22 대기 (2고지 "자연스러운 코드로" — 연산자 오버로드(3))
+  - 완료한 step: step01 ~ step21 ✅ (제 1 고지 + step11~14 가변 인수/누적 gradient + step15 그래프 이론 + step16 generation/visited + step17 weakref 순환 참조 해결 + step18 Config/no_grad 메모리 절약 + step19 변수 사용성 개선 + step20~21 연산자 오버로드(1)(2))
 """
 
-__version__ = "0.1.10"  # step20 완료 (연산자 오버로드(1) — __add__/__mul__ 클래스 안 정의 + Mul derivative hook)
+__version__ = "0.1.11"  # step21 완료 (연산자 오버로드(2) — __radd__/__rmul__ + __array_priority__ 버림 + wrapper as_array 중복 제거; 탐구 25번)

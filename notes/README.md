@@ -25,6 +25,13 @@
 | 16 | [exploration_16_side_effect.md](./exploration_16_side_effect.md) | step08 진행 중 | "부작용"이라는 번역이 사고를 지배한다: side effect 재프로그래밍 (번역어 감정색 왜곡, 순수 함수, 최적화 충돌) |
 | 17 | [exploration_17_python_testing.md](./exploration_17_python_testing.md) | step10 준비 중 | 파이썬 테스팅 패러다임 진화: unittest에서 pytest로 (책의 교육적 선택 vs 실무 국룰, hypothesis property-based testing) |
 | 18 | [exploration_18_graph_traversal.md](./exploration_18_graph_traversal.md) | step15 | 그래프 기본과 순회 — DAG, DFS/BFS 파이썬 구현, 위상 정렬(Kahn's). step16 generation 이해 위한 배경지식 (확장 후보 open-ended) |
+| 19 | [exploration_19_naming_hungarian.md](./exploration_19_naming_hungarian.md) | step16 | 네이밍과 헝가리안 표기법 — 변수명에 타입을 박을 것인가? (Systems Hungarian vs 현대 Pythonic, creator_func 시도/철회에서 도출) |
+| 20 | [exploration_20_node_class_idea.md](./exploration_20_node_class_idea.md) | step16 | 계산 그래프 추상화 경계 — Node 클래스와 순회 이터레이터 (Function/Variable 역할 분담 심화) |
+| 21 | [exploration_21_yield_generator_coroutine.md](./exploration_21_yield_generator_coroutine.md) | step16 | yield, 제너레이터, 코루틴 — 파이썬의 "일시정지 가능한 함수" 계보 (step18 contextmanager 배경) |
+| 22 | [exploration_22_weakref_gc.md](./exploration_22_weakref_gc.md) | step17 | weakref와 GC — 약한 참조의 마법과 CPython 내부 (참조 카운팅, 순환 감지 GC, ob_weakreflist 구독자 모델) |
+| 23 | [exploration_23_contextmanager.md](./exploration_23_contextmanager.md) | step18 | 컨텍스트 매니저와 contextlib — yield가 with를 만드는 마법 (__enter__/__exit__ vs @contextmanager+yield) |
+| 24 | [exploration_24_strategy_iterator_config.md](./exploration_24_strategy_iterator_config.md) | step18 | 전략 패턴, 이터레이터 패턴, "결정 시점"의 딜레마 (Config if문=인라인 전략, DI, PyTorch 합리적 타협) |
+| 25 | [exploration_25_array_priority.md](./exploration_25_array_priority.md) | step21 | `__array_priority__`의 정체 — 책의 매직 넘버 200은 왜 불필요해졌나 (ufunc/rmul 역사, NEP 13, "책 코드도 검증하라" 교훈) |
 
 > 파일 번호 = **생성 순서** (탐구 역사 보존)
 > 아래 "추천 읽는 순서"는 처음 읽을 때 논리적 흐름 기준
@@ -89,6 +96,7 @@
 - **처음부터 끝까지 읽기**: 1 → 2 → 3 → 4 → 5 → 6 → 7 (기본)
 - **특정 주제만**: 각 탐구는 독립적으로도 읽을 수 있음 (필요시 다른 탐구 링크로 연결)
 - **키워드 검색**: 각 항목의 `#키워드` 태그로 검색해서 찾기
+- **#8~24 (step 진행 파생)**: step08~18 진행 중 자연스럽게 파생된 주제별 심화. step 진도에 맞춰 읽기. 기본기(#1~7) 먼저 본 뒤 관심 가는 step 탐구로.
 
 ## 📖 공통 용어 안내 (모든 탐구에서 인용)
 

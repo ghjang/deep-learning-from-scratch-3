@@ -688,7 +688,7 @@ guard가 "빠른 실패"뿐 아니라 "타입 안전성"까지 보너스로. 좋
 - 브로: *"assert가 디버깅 언어 도구라면 저런 제약 체크를 지금 assert로 하는 게 맞냐? 점검 위치도 맞아?"*
 - 분석 결과 — 3개 검증 중 (A)만 assert 부적절:
   - (A) start_var.creator None → **사용자 오용** (런타임 케이스) → if/raise RuntimeError ★
-  - (B)(C) f.input/output, y.grad None → **불변조건** (프로그래먘 논리 버그) → assert 유지
+  - (B)(C) f.input/output, y.grad None → **불변조건** (프로그래머 논리 버그) → assert 유지
 - ★★ **브로 2차 지적 — 위치를 함수 도입부 맨 앞으로** (fail-fast / guard clause):
   - 처음엔 upstream 설정 **뒤에** 검증 → 에러 내기 전에 `start_var.grad`를 변경하는 부작용
   - 도입부로 옮기니 **fail-fast**(wasted work 없이 즉시 실패) + **부작용 회피**(transactional) 동시 달성
@@ -727,7 +727,7 @@ def fill_grad(start_var, upstream_grad=None):
     while funcs:
         f = funcs.pop()
         x, y = f.input, f.output            # ★ y = f.output 회수 (step07 복선)
-        assert x is not None and y is not None   # 불변조건 (B) — 프로그래먘 논리 가정
+        assert x is not None and y is not None   # 불변조건 (B) — 프로그래머 논리 가정
         assert y.grad is not None                # 불변조건 (C)
         x.grad = f.backward(y.grad)         # 단일 노드 fold step
         if x.creator is not None:
@@ -1504,24 +1504,53 @@ class Mul(Function):
 
 ## Step 21 — [2고지] 연산자 오버로드(2)
 
-**Issue**: (링크)
-**완료일**: -
-**상태**: ⏳
+**Issue**: [#26](https://github.com/ghjang/deep-learning-from-scratch-3/issues/26)
+**완료일**: 2026-08-10
+**상태**: ✅
 
 ### 📖 요약 (한 줄)
 
-
-### ❓ 질문 / 막힌 점
-
+Variable에 `__radd__`/`__rmul__` 역순 연산자 + `as_variable` 헬퍼 추가 → `x + 3.0`, `3.0 * x + 1.0`처럼 ndarray/scalar와 자유롭게 섞어 쓰는 수학 식. ★ `__array_priority__ = 200`은 탐구 25번으로 불필요 증명되어 버림.
 
 ### 💡 통찰 / 배운 점
 
+- **★★★ `__array_priority__ = 200`은 현대에 불필요** — 책이 쓴 매직 넘버는 과거 NumPy(NotImplemented 안 반환하던 시절)용 핵. 현대엔 `__rmul__`만으로 충분. 실험(NaiveVar)으로 증명. 탐구 25번으로 영구 보존. **"책 코드도 검증하라" 교훈의 결정적 사례.**
+- **역순 연산자 `__radd__`/`__rmul__`** — `3.0 * x` → float.__mul__ 실패 → `x.__rmul__(3.0)`. 교환법칙 성립 연산(+, *)이라 `add`/`mul` wrapper와 동일.
+- **as_variable 헬퍼 2층 구조** — as_variable(ndarray/scalar → Variable) 위에 as_array(스칼라 → ndarray). Function.__call__ 도입부에서 입력 정규화.
+- **wrapper as_array 중복 제거** — 브로 "중복은 없애는 게 좋다" + 실험 검증. Function.__call__의 as_variable이 변환 책임을 지면 wrapper에서 또 변환할 필요 없음. ★ 점진적 설계의 잔재 정리 — 책은 step20까지의 as_array를 step21에서도 그대로 둠 (정리 누락), 우리는 제거.
+- **step20 작업 원칙 자동 적용 첫 사례** — `__radd__`/`__rmul__`을 클래스 안에 정의. AGENTS.md "매직메서드는 클래스 안에 (필수)"가 시스템으로 작동.
 
 ### 🔗 관련 링크
 
+- [Issue #26](https://github.com/ghjang/deep-learning-from-scratch-3/issues/26) — step21 진행 추적
+- [exploration_25_array_priority.md](./notes/exploration_25_array_priority.md) — `__array_priority__` 200 불필요 + ufunc/rmul 역사 (★ 이번 step 최대 성과)
+- `REZERO_CHANGES.md` 항목 #033 (`__array_priority__` 버림), #034 (`__radd__`/`__rmul__` 클래스 안 + wrapper as_array 중복 제거)
 
 ### 📝 코드 / 수식 메모
 
+```python
+# as_variable 헬퍼 (2층 변환 구조)
+def as_variable(obj):
+    if isinstance(obj, Variable): return obj
+    return Variable(as_array(obj))      # Variable 생성자 → as_array
+
+# Function.__call__ 도입부에서 입력 정규화
+def __call__(self, *inputs):
+    inputs_vars = tuple(as_variable(x) for x in inputs)   # ★ 여기서 변환 책임
+    xs = [x.data for x in inputs_vars]
+    ...
+
+# 역순 연산자 (클래스 안 정의 — step20 항목 031 원칙 자동 적용)
+def __radd__(self, other): return add(self, other)   # 교환법칙 → add와 동일
+def __rmul__(self, other): return mul(self, other)
+
+# ★ wrapper는 단순하게 (as_array 중복 제거)
+def add(x0, x1):
+    result = Add()(x0, x1)   # x1 스칼라/ndarray여도 Function.__call__이 처리
+    ...
+```
+
+**키워드**: `#2고지` `#연산자오버로드` `#역순연산자` `#__radd__` `#__rmul__` `#as_variable` `#2층변환구조` `#__array_priority__버림` `#탐구25` `#중복제거` `#점진적설계잔재` `#책검증교훈` `#항목033` `#항목034`
 
 ---
 

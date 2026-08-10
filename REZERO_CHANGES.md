@@ -32,7 +32,7 @@
 
 ## 🗂 분류 (주제별 색인 — 항목 번호순 물리 배치는 유지, 이 표로 그룹 탐색)
 
-> ★ 2026-07-31 그룹화 — 32개 항목 쌓여 주제별 색인 추가 (step23 회수 전 정리).
+> ★ 2026-07-31 그룹화 — 34개 항목 쌓여 주제별 색인 추가 (step23 회수 전 정리).
 > 항목 자체는 append-only 정책 존중 — **번호순 물리 배치는 유지 + 이 표로 그룹 탐색**.
 > 한 항목이 여러 그룹에 걸칠 수 있으나 "주된 결" 하나로 분류. 상세는 각 항목 본문 참조.
 
@@ -44,8 +44,8 @@
 | **네이밍 (의미 투명성)** | #002, #007, #015, #017, #019, #021, #022, #023, #025 | 9 | input_var, upstream_grad, fill_grad, worklist, output 단수, clear_grad, visited, schedule, 크로스참조 시도/철회 |
 | **구조 / 추상화 (Function 핵심 설계)** | #003, #004, #010, #011, #013, #014 | 6 | ABC, @override, derivative/apply hook 대칭, backward→fill_grad 전역 함수 |
 | **검증 / 방어막** | #016, #029 | 2 | assert vs RuntimeError 구분, property/len None 가드 |
-| **메모리 관리** | #026, #027 | 2 | weakref 순환 끊기, Config/no_grad 절약 모드 |
-| **API 설계 (매개변수/표현/연산자)** | #028, #030, #031 | 3 | name 키워드 전용, Variable( 대문자 repr, 매직메서드 클래스 안 정의 |
+| **메모리 관리** | #026, #027, #033 | 3 | weakref 순환 끊기, Config/no_grad 절약 모드, __array_priority__ 버림 |
+| **API 설계 (매개변수/표현/연산자)** | #028, #030, #031, #034 | 4 | name 키워드 전용, Variable( 대문자 repr, 매직메서드 클래스 안 정의, __radd__/wrapper 정리 |
 | **유틸 / step 한정 / 문서 정비** | #005, #006, #009, #012, #018, #020, #024, #032 | 8 | name shadowing, numerical_diff docstring, backward docstring, set_creator 복선, pipe(FP), 주석 정비, fill_grad 통합, Mul derivative hook 재평가 |
 
 ### 회수 분류와의 관계 (step23 패키지화 시)
@@ -60,7 +60,7 @@ step23 회수 시: 각 항목마다 "주제별 그룹 + 회수 분류" 둘 다 �
 
 | 상태 | 항목 수 | 비고 |
 |---|---|---|
-| ✅ 반영 | 29 | 대부분 (#028~#030 step19, #031~#032 step20 신규 추가) |
+| ✅ 반영 | 31 | 대부분 (#028~#030 step19, #031~#032 step20, #033~#034 step21 신규 추가) |
 | 🔄 보류 | 2 | #018 (pipe, step23 재도입), #020 (주석 정비, step23 회수) |
 | ⏭ 철회 | 1 | #025 (크로스참조 네이밍 시도/철회, 교훈은 영구 보존) |
 
@@ -530,12 +530,12 @@ step23 회수 시: 각 항목마다 "주제별 그룹 + 회수 분류" 둘 다 �
   | 검증 | 상황 | 이전(step08 초안) | 이후(step08 개선) |
   |---|---|---|---|
   | (A) start_var.creator None | 입력 변수에 fill_grad 호출 = **사용자 오용** | pop 후 assert | **if/raise RuntimeError**, 초기화 시점 ★ |
-  | (B) f.input/f.output None | __call__ 미실행 = 프로그래먘 논리 버그 | assert | assert 유지 |
-  | (C) y.grad None | 이전 반복 미충족 = 프로그래먘 논리 버그 | assert | assert 유지 |
+  | (B) f.input/f.output None | __call__ 미실행 = 프로그래머 논리 버그 | assert | assert 유지 |
+  | (C) y.grad None | 이전 반복 미충족 = 프로그래머 논리 버그 | assert | assert 유지 |
 - **★ 핵심 원칙 (debugging.md 교훈 2 직접 적용)**:
   - **사용자 오용 / 런타임 데이터** → `if ...: raise` (★ `-O` 모드에서도 살아남아야)
-  - **프로그래먘 불변조건** → `assert` (`-O`에서 사라져도 로직 안전)
-  - (A)는 "creator 없는 변수에 역전파 호출" — 이건 프로그래먘 논리 버그가 아니라 **사용자 오용**.
+  - **프로그래머 불변조건** → `assert` (`-O`에서 사라져도 로직 안전)
+  - (A)는 "creator 없는 변수에 역전파 호출" — 이건 프로그래머 논리 버그가 아니라 **사용자 오용**.
     따라서 assert 부적절. RuntimeError가 맞음.
 - **★ 위치 개선**: pop **이후**에 검사하면 이미 None을 스택에 넣은 뒤. 더 근본 위치는 **함수 도입부 맨 앞**.
   → (A)를 맨 앞으로 옮김 (fail-fast / guard clause). **브로 2차 지적** — upstream 설정 후 검사하면
@@ -1362,6 +1362,110 @@ step23 회수 시: 각 항목마다 "주제별 그룹 + 회수 분류" 둘 다 �
   - `y = a * b` (a=3, b=2) → `y=6.0, a.grad=2.0(=b), b.grad=3.0(=a)` ✅
   - pyright: 0 errors (assert 추가로 타입 좁히기 해결) ✅
 - **회수**: step23 → `rezero/core.py` Function + `functions.py` Mul 승격 시 derivative hook 유지.
+
+### #033 — ★★★ `__array_priority__ = 200` 버림 (탐구 25번 — "책 코드도 검증하라") (step21)
+- **위치**: step21
+- **상태**: ✅ 반영 (2026-08-10)
+- **종류**: 🔵 라이브러리성 ★★★ (메커니즘 이해 + 매직 넘버 제거 — 이번 step 최대 성과)
+- **브로 트리거**:
+  > "200이란 매직스러운 숫자값의 의미도 잘 모르겠고, 어떻게 저렇게 돼는 것인지에 대한 설명이 전혀없으니"
+  > "200을 사용하는 부분이 뭔가 굉장히 부자연스럽게 느껴지기도"
+  → 브로 직감("찜찜함")이 파낸 진실: **200은 과거 NumPy 핵, 현대엔 불필요**.
+- **내용**:
+  책 원본 step21은 `class Variable: __array_priority__ = 200`을 클래스 속성으로 둠.
+  "ndarray와 연산 시 Variable이 우선"을 보장하는 NumPy 특수 메커니즘.
+  rezero는 **이 줄을 버림** — 현대 NumPy에선 `__rmul__`만으로 충분함을 실험으로 증명.
+  ```python
+  # 책 (과거 NumPy 핵)
+  class Variable:
+      __array_priority__ = 200    # ← rezero는 버림
+
+  # rezero (현대 NumPy — __rmul__만으로 충분)
+  class Variable:
+      def __rmul__(self, other): return mul(self, other)
+  ```
+- **★ 세 가지 메커니즘 역사적 계층** (탐구 25번에서 깊이):
+  | 세대 | 메커니즘 | 시대 | 역할 |
+  |---|---|---|---|
+  | 1세대 | `__rmul__`/`__radd__` (Python 표준) | 파이썬 태초 | 좌변이 NotImplemented 반환 → 역순 |
+  | 2세대 | `__array_priority__` | NumPy 고대 (~2017) | 과거 NumPy가 NotImplemented 안 반환해서 필요했던 핵 |
+  | 3세대 | `__array_ufunc__` (NEP 13, 2017) | 현대 | ufunc 통째로 가로채기. PyTorch/JAX 사용 |
+- **★ 핵심 — 왜 불필요해졌나**:
+  과거 NumPy는 다른 타입을 만나도 NotImplemented를 안 반환하고 무식하게 삼킴 → `__rmul__` 안 불림.
+  `__array_priority__`는 "NumPy야, 다른 타입 만나면 일단 내비둬"라는 협상 카드.
+  ★ 현대 NumPy는 표준 디스패치 존중 → `__rmul__` 정상 호출 → priority 불필요.
+  참고: [NumPy issue 27348](https://github.com/numpy/numpy/issues/27348) — 최신 NumPy의 NotImplemented 처리 개선 이력.
+- **★ 실험으로 증명** (3케이스 비교):
+  | 케이스 | `ndarray * obj` 결과 | 의미 |
+  |---|---|---|
+  | NaiveVar (`__rmul__`만, priority 없음) | **NaiveVar 유지** ✅ | 현대에선 `__rmul__`만으로 충분 |
+  | PriorityOnly (priority=200만, `__rmul__` 없음) | TypeError | priority만 있다고 역순 안 불림 |
+  | UfuncTest (`__array_ufunc__` 정의) | ufunc 가로채짐 | 3세대 정상 동작 |
+- **★ step21 데모 케이스 4로 코드 실증**:
+  `np.array(3.0) * x` (`__array_priority__` 없이) → `Variable(6.0)` 정상 동작. ★ 탐구 25번 결론을 코드로 확인.
+- **★★★ 핵심 교훈 — "책 코드도 검증하라"**:
+  1. 매직 넘버를 이유 없이 쓰지 말 것 — "왜 200이지?" 의심 → 학습 시작.
+  2. 책/교과서도 시대 지나면 구식 — `__array_priority__`는 과거엔 필수, 현대엔 불필요.
+  3. "왜?" 묻는 습관이 코드 투명하게 만듦 — 브로 "찜찜함" → 실험 → 가설 틀림 인정 → NEP 13 조사 → 진실 파악.
+- **★ AI 가설 틀림 인정 (성실 보고 원칙)**:
+  AI가 처음에 "NumPy가 Variable을 무식하게 삼킨다"고 설명했으나 실험 1로 틀림 증명.
+  → 솔직히 인정하고 재조사 → 진짜 원인(과거 NotImplemented 미반환) 파악. (AGENTS.md "보고 성실성" 원칙 실증)
+- **검증**: 데모 6 케이스 전부 `__array_priority__` 없이 정상 동작 + pyright 0 errors ✅
+- **회수**: step23 → `rezero/core.py` Variable 승격 시 `__array_priority__` **포함 안 함**.
+  ★ 단, 구버전 NumPy 환경에서 rezero를 돌린다면 이 속성이 다시 필요할 수 있음 (탐구 25번에 명시).
+
+### #034 — ★ `__radd__`/`__rmul__` 클래스 안 정의 + wrapper as_array 중복 제거 (step21)
+- **위치**: step21~
+- **상태**: ✅ 반영 (2026-08-10)
+- **종류**: 🔵 라이브러리성 ★ (step20 작업 원칙 첫 자동 적용 + 점진적 설계 잔재 정리)
+- **내용 (두 가지 결합)**:
+
+  **(A) `__radd__`/`__rmul__` 클래스 안 정의** — step20 항목 031 작업 원칙 자동 적용:
+  ```python
+  # 책 (클래스 밖 대입 — 비권장)
+  Variable.__radd__ = add
+  Variable.__rmul__ = mul
+
+  # rezero (클래스 안 정의 — 권장, pyright 0 에러)
+  class Variable:
+      def __radd__(self, other): return add(self, other)
+      def __rmul__(self, other): return mul(self, other)
+  ```
+  ★ step20에서 만든 AGENTS.md 작업 원칙("★ 매직메서드는 클래스 안에 정의 (필수)")이
+    step21에서 자동으로 적용된 첫 사례. "원칙 수립 ≠ 원칙 준수"에서 드디어 **준수** 단계.
+
+  **(B) wrapper의 as_array 중복 제거**:
+  ```python
+  # 책 원본 (step20까지의 잔재 — step21에서 정리 누락)
+  def add(x0, x1):
+      x1 = as_array(x1)    # ★ Function.__call__의 as_variable과 중복
+      return Add()(x0, x1)
+
+  # rezero (중복 제거)
+  def add(x0, x1):
+      result = Add()(x0, x1)   # x1 변환은 Function.__call__ 도입부 as_variable이 처리
+      assert isinstance(result, Variable)
+      return result
+  ```
+- **★ 핵심 — 점진적 설계의 잔재를 우리가 정리**:
+  책 전체가 60 step에 걸쳐 조금씩 기능 추가하는 점진적 설계 방식.
+  장점: 독자가 변화 추적 쉬움. 단점: **리팩터링이 불완전해질 수 있음**.
+  step21에서 as_variable이 Function.__call__ 도입부로 올라갔을 때,
+  작성자는 기존 wrapper의 as_array를 정리하지 않음 (변환 책임 이동 미인식이나 안전망 의도).
+  rezero는 "중복 제거 > 혼란 방지" 원칙(브로)으로 제거.
+- **★ 브로 통찰 — 책의 서사 구조 짚기**:
+  > 브로: "책은 불편한 함수 직접 호출 방식과 연산자 오버로딩 방식을 혼합해서 보여준다"
+  → 이 서사 때문에 "wrapper도 보호해야 할 것 같다"고 착각하기 쉬움.
+  실험으로 증명: 어느 방식으로 호출해도 Function.__call__ 도입부가 처리 → wrapper 중복.
+- **★ 실험으로 검증**:
+  | 케이스 | wrapper as_array 있을 때 | 없을 때 |
+  |---|---|---|
+  | `add(x, 3.0)` (wrapper 직접 호출) | 정상 | ★ 정상 (Function.__call__ 처리) |
+  | `add(x, np.float64(3.0))` | 정상 | ★ 정상 |
+- **검증**: 데모 6 케이스 전부 wrapper as_array 없이 정상 동작 + pyright 0 errors ✅
+- **회수**: step23 → `rezero/core.py`/`functions.py` 승격 시:
+  - `__radd__`/`__rmul__`은 Variable 클래스 안 정의 유지
+  - wrapper(`add`/`mul`)는 as_array 없이 단순한 형태 유지
 
 ---
 
