@@ -919,7 +919,7 @@ def test_square_gradient_check():
 - ★★ **Add = "가장 단순한 다변수 함수"** — `+`를 다변수 함수로 보는 시선 전환 (브로 통찰)
   - 보통: `+`는 "두 수 합치는 연산자". 수학/프레임워크: $\text{Add}: \mathbb{R}^2 \to \mathbb{R}$ 다변수 매핑
   - 모든 이항 연산(`+`, `*`, `max`)은 $\mathbb{R}^2 \to \mathbb{R}$ 함수로 승격 가능 ("연산 = 함수" 동치)
-  - 이 시선이 있으면 step13(Add 역전파), step20(연산자 오버로딩), step54(ResNet skip)까지 이어짐
+  - 이 시선이 있으면 step13(Add 역전파), step20(연산자 오버로드), step54(ResNet skip)까지 이어짐
   - Add 역전파는 "들어온 걸 그대로 흘려보내는" 성질 ($\partial y/\partial x_0 = 1$) → skip connection 기초 (복선)
 - ★ **다변 회수 루프 타입 좁히기 함정** (디버깅 노트 후보)
   - `for x: if x.data is None: raise` 가드 + 별도 `[x.data for x in inputs]` 컴프리헨션 회수 →
@@ -1454,7 +1454,55 @@ def __repr__(self) -> str:
 
 ---
 
-## Step 20 — [2고지] 연산자 오버로딩(1) (__add__, __mul__)
+## Step 20 — [2고지] 연산자 오버로드(1)
+
+**Issue**: [#25](https://github.com/ghjang/deep-learning-from-scratch-3/issues/25)
+**완료일**: 2026-08-10
+**상태**: ✅
+
+### 📖 요약 (한 줄)
+
+Variable에 `__add__`/`__mul__` 매직메서드 추가 → `y = a * b + c` 처럼 수학 식처럼 자연스럽게. Mul 클래스 신규 + 연산자 오버로딩 도입. 2고지 "자연스러운 코드로"의 핵심 달성.
+
+### 💡 통찰 / 배운 점
+
+- **연산자 = 매직메서드의 신택스 슈가** — `a + b` 는 사실 `a.__add__(b)`. 클래스에 매직메서드 정의하면 그 객체에 연산자 사용 가능. 파이썬 데이터 모델의 핵심.
+- **★★ "클래스 밖 대입" vs "클래스 안 정의" — pyright 11 에러 실증** — 책 원본이 `Variable.__add__ = add` (클래스 밖 대입) 방식을 써서 따랐더니 pyright 11 에러 폭발. 정적 분석기가 클래스 밖 대입을 인식 못 함. 클래스 안 정의로 0 에러. **"책 원본 방식이 항상 권장은 아니다"** 교훈. coding_style.md 섹션 7 + AGENTS.md 작업 원칙으로 영구화.
+- **Mul derivative hook (항목 013 재평가 통과)** — Add(상수 1)에서 Mul(다른 입력값 x1/x0)로 확장되어도 derivative hook이 자연스럽게 커버. `derivative() -> (lambda _: x1, lambda _: x0)` — 호출 시점에 값이 고정되므로 상수함수로 표현. step34 행렬 미분이 다음 재평가 시점.
+- **브로 결정 흐름 (초기→실증→확정)** — "책 방식으로 가자" → pyright 11 에러 → "비추라는 소리군" → "본체 클래스 안 + 기록 + 작업 원칙". 코드 짜봐야 가시화되는 트레이드오프.
+
+### 🔗 관련 링크
+
+- [Issue #25](https://github.com/ghjang/deep-learning-from-scratch-3/issues/25) — step20 진행 추적
+- `REZERO_CHANGES.md` 항목 #031 (매직메서드 클래스 안 정의), #032 (Mul derivative hook 재평가)
+- `notes/coding_style.md` 섹션 7 — "매직메서드는 클래스 안에 정의" 작업 원칙
+- `AGENTS.md` — "★ 매직메서드는 클래스 안에 정의 (필수)" 작업 원칙 추가
+
+### 📝 코드 / 수식 메모
+
+```python
+# 연산자 = 매직메서드의 신택스 슈가
+# a + b  →  a.__add__(b)
+# a * b  →  a.__mul__(b)
+
+# 클래스 안 정의 (권장 — pyright 0 에러)
+class Variable:
+    def __add__(self, other: "Variable") -> "Variable":
+        return add(self, other)    # wrapper에 위임
+
+# Mul derivative — 다른 입력값 캡처 (항목 013 재평가 통과)
+class Mul(Function):
+    def derivative(self) -> tuple[Callable, ...]:
+        assert self.inputs is not None    # 정적 분석용 타입 좁히기
+        x0, x1 = self.inputs[0].data, self.inputs[1].data
+        return (lambda _: x1, lambda _: x0)   # ∂y/∂x0=x1, ∂y/∂x1=x0
+```
+
+**키워드**: `#2고지` `#연산자오버로드` `#매직메서드` `#__add__` `#__mul__` `#신택스슈가` `#파이썬데이터모델` `#Mul` `#클래스안정의` `#pyright11에러` `#항목031` `#항목032` `#항목013재평가` `#coding_style섹션7`
+
+---
+
+## Step 21 — [2고지] 연산자 오버로드(2)
 
 **Issue**: (링크)
 **완료일**: -
@@ -1477,30 +1525,7 @@ def __repr__(self) -> str:
 
 ---
 
-## Step 21 — [2고지] Variable 사용성 추가 (인덱스, shape 등)
-
-**Issue**: (링크)
-**완료일**: -
-**상태**: ⏳
-
-### 📖 요약 (한 줄)
-
-
-### ❓ 질문 / 막힌 점
-
-
-### 💡 통찰 / 배운 점
-
-
-### 🔗 관련 링크
-
-
-### 📝 코드 / 수식 메모
-
-
----
-
-## Step 22 — [2고지] 연산자 오버로딩(2) (neg, sub, div, pow)
+## Step 22 — [2고지] 연산자 오버로드(3)
 
 **Issue**: (링크)
 **완료일**: -

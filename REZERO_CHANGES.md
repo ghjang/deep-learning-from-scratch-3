@@ -32,7 +32,7 @@
 
 ## 🗂 분류 (주제별 색인 — 항목 번호순 물리 배치는 유지, 이 표로 그룹 탐색)
 
-> ★ 2026-07-31 그룹화 — 30개 항목 쌓여 주제별 색인 추가 (step23 회수 전 정리).
+> ★ 2026-07-31 그룹화 — 32개 항목 쌓여 주제별 색인 추가 (step23 회수 전 정리).
 > 항목 자체는 append-only 정책 존중 — **번호순 물리 배치는 유지 + 이 표로 그룹 탐색**.
 > 한 항목이 여러 그룹에 걸칠 수 있으나 "주된 결" 하나로 분류. 상세는 각 항목 본문 참조.
 
@@ -45,8 +45,8 @@
 | **구조 / 추상화 (Function 핵심 설계)** | #003, #004, #010, #011, #013, #014 | 6 | ABC, @override, derivative/apply hook 대칭, backward→fill_grad 전역 함수 |
 | **검증 / 방어막** | #016, #029 | 2 | assert vs RuntimeError 구분, property/len None 가드 |
 | **메모리 관리** | #026, #027 | 2 | weakref 순환 끊기, Config/no_grad 절약 모드 |
-| **API 설계 (매개변수/표현)** | #028, #030 | 2 | name 키워드 전용, Variable( 대문자 repr |
-| **유틸 / step 한정 / 문서 정비** | #005, #006, #009, #012, #018, #020, #024 | 7 | name shadowing(step04), numerical_diff docstring, backward docstring, set_creator 복선, pipe(FP), 주석 정비, fill_grad 통합 |
+| **API 설계 (매개변수/표현/연산자)** | #028, #030, #031 | 3 | name 키워드 전용, Variable( 대문자 repr, 매직메서드 클래스 안 정의 |
+| **유틸 / step 한정 / 문서 정비** | #005, #006, #009, #012, #018, #020, #024, #032 | 8 | name shadowing, numerical_diff docstring, backward docstring, set_creator 복선, pipe(FP), 주석 정비, fill_grad 통합, Mul derivative hook 재평가 |
 
 ### 회수 분류와의 관계 (step23 패키지화 시)
 
@@ -56,11 +56,11 @@
 
 step23 회수 시: 각 항목마다 "주제별 그룹 + 회수 분류" 둘 다 보고 승격 결정.
 
-### 상태 분포 (2026-08-07 기준)
+### 상태 분포 (2026-08-10 기준)
 
 | 상태 | 항목 수 | 비고 |
 |---|---|---|
-| ✅ 반영 | 27 | 대부분 (#028, #029, #030 step19 신규 추가) |
+| ✅ 반영 | 29 | 대부분 (#028~#030 step19, #031~#032 step20 신규 추가) |
 | 🔄 보류 | 2 | #018 (pipe, step23 재도입), #020 (주석 정비, step23 회수) |
 | ⏭ 철회 | 1 | #025 (크로스참조 네이밍 시도/철회, 교훈은 영구 보존) |
 
@@ -1271,6 +1271,97 @@ step23 회수 시: 각 항목마다 "주제별 그룹 + 회수 분류" 둘 다 �
   - 들여쓰기 9칸 정답지와 동일 (대소문자만 다름) ✅
 - **회수**: step23 → `rezero/core.py` Variable 승격 시 `Variable(` 대문자 유지.
   단, 최종 dezero와 출력이 달라지는 점 인식 필요 (학습용 변형 명시).
+
+### #031 — ★★ `__add__`/`__mul__` 클래스 안 정의 (책은 클래스 밖 대입) (step20)
+- **위치**: step20~
+- **상태**: ✅ 반영 (2026-08-10)
+- **종류**: 🔵 라이브러리성 ★★ (클래스 설계 — 정적 분석 호환성)
+- **내용**:
+  책 원본 step20은 `Variable.__add__ = add` 식으로 **클래스 정의 밖에서** 매직메서드 대입.
+  rezero는 **클래스 안에 정의** (일반적/권장 방식):
+  ```python
+  # 책 (클래스 밖 대입 — 비권장)
+  class Variable: ...
+  def add(x0, x1): ...
+  Variable.__add__ = add      # 클래스 정의 밖에서 속성 대입
+
+  # rezero (클래스 안 정의 — 권장)
+  class Variable:
+      def __add__(self, other: "Variable") -> "Variable":
+          return add(self, other)
+  ```
+- **★ 핵심 — 왜 클래스 안이 원칙인가 (4가지 이유)**:
+  1. **정적 분석 호환성** ★ — pyright/Pylance/mypy는 클래스 정의를 정적으로 분석. 클래스 밖 대입은 인식 못 함.
+  2. **가독성** — "이 클래스가 지원하는 연산자"를 클래스 정의만 보고 파악 가능.
+  3. **서브클래싱** — `super().__add__()` 패턴이 자연스러움.
+  4. **관행** — NumPy/PyTorch/pandas 등 파이썬 생태계 표준.
+- **★ step20 실증 — pyright 11 에러 (클래스 밖 대입의 치명적 단점)**:
+  1차 코드에서 책 원본 방식(`Variable.__add__ = add`)을 그대로 따랐더니 **pyright 11 에러** 발생:
+  ```
+  Attribute "__add__" is unknown (reportAttributeAccessIssue)
+  Operator "*" not supported for types "Variable" and "Variable" (reportOperatorIssue)
+  ```
+  → 클래스 밖 대입은 pyright가 "Variable에 __add__ 없다"고 판단 → `a * b`를 에러로 봄.
+  → 11곳에 `# type: ignore` 달아야 하는데, 이건 rezero 원칙("정적 분석과 협력")에 정면 위반.
+  **해결**: 클래스 안 정의로 전환 → pyright **0 errors**.
+- **★ 브로 결정 흐름 (초기 → 실증 → 확정)**:
+  - 초기: "간단한 경우 책 방식(클래스 밖 대입)으로 가자. 보통은 내부에 넣는다는 설명 OK"
+  - 실증: pyright 11 에러 폭발 → "비추라는 소리군, 공식 가이드란 소리잖아? 괜히 깰 필요 없겠지"
+  - 확정: "1. 본체 클래스 안쪽에 정의 / 2. 밖 정의 방법도 존재한다는 기록 / 3. 작업 원칙 추가"
+  → 코드 짜보고 나서야 가시화된 트레이드오프. "원칙 수립 ≠ 원칙 준수"의 또 다른 사례.
+- **★ 부산물 1 — coding_style.md 섹션 7 신설** (영구 보존):
+  "매직메서드는 클래스 안에 정의 — 클래스 밖 대입 비권장" 작업 원칙 문서화.
+  4가지 이유 + step20 실증(pyright 11 에러) + 책이 밖 대입 택한 가설.
+- **★ 부산물 2 — AGENTS.md 작업 원칙 추가** (모든 세션 적용):
+  "★ 매직메서드는 클래스 안에 정의 (필수)" — 빈 줄 자동 적용과 같은 형식.
+  향후 모든 AI 세션이 매직메서드 작성 시 자동 클래스 안 정의.
+- **★ 부산물 3 — 교훈**: "책 원본이 택한 방식이 항상 권장 방식은 아니다" (AGENTS.md 배경에 명시).
+  책은 설명/저자 스타일 목적으로 클래스 밖 대입 택했으나, 실용적으론 클래스 안이 압도적.
+- **검증**:
+  - 실행: `y = a * b + c` → `y=7.0, a.grad=2.0, b.grad=3.0, c.grad=1.0` ✅
+  - pyright: 11 errors (클래스 밖) → 0 errors (클래스 안) ✅
+- **회수**: step23 → `rezero/core.py` Variable 승격 시 __add__/__mul__ 클래스 안 정의 유지.
+  ★ 모든 후속 매직메서드(__neg__, __sub__ 등 step22)도 클래스 안 정의로 진행.
+
+### #032 — ★ Mul derivative hook 확장 (항목 013 재평가 통과 — 다른 입력값 의존) (step20)
+- **위치**: step20~
+- **상태**: ✅ 반영 (2026-08-10)
+- **종류**: 🔵 라이브러리성 ★ (항목 013 재평가 — derivative hook 유효 범위 확인)
+- **내용**:
+  step07에서 도입한 derivative hook (항목 013)의 "최종 반영 여부 보류"를 **첫 테스트 케이스에서 통과**.
+  Mul은 Add와 달리 편도함수가 "다른 입력값"에 의존 → derivative hook으로 표현 가능한지가 관건.
+  ```python
+  class Mul(Function):
+      def derivative(self) -> tuple[Callable, ...]:
+          # ★ Add는 (lambda _: 1, lambda _: 1) — 상수 (입력 무시)
+          # ★ Mul은 (lambda _: x1, lambda _: x0) — 다른 입력값 캡처
+          assert self.inputs is not None    # 정적 분석용 타입 좁히기
+          x0 = self.inputs[0].data
+          x1 = self.inputs[1].data
+          return (lambda _: x1, lambda _: x0)
+  ```
+- **★ 핵심 — Add에서 Mul로의 자연스러운 확장**:
+  | 함수 | 편도함수 | derivative() 표현 | 입력값 의존? |
+  |---|---|---|---|
+  | Add | ∂y/∂x0 = 1, ∂y/∂x1 = 1 | `(lambda _: 1, lambda _: 1)` | X (상수) |
+  | Mul | ∂y/∂x0 = x1, ∂y/∂x1 = x0 | `(lambda _: x1, lambda _: x0)` | O (다른 입력값) |
+  → Add의 "상수함수" 통찰(브로, step13)이 Mul로 자연스럽게 확장.
+  핵심: 편도함수값이 derivative() **호출 시점**에 이미 고정되므로 상수함수(lambda _: x1)로 표현 가능.
+- **★ 항목 013 "최종 반영 여부 보류" 재평가**:
+  step07에서 "step13/step34 진입 시점에서 재평가"로 보류했던 조건:
+  - step13 (다변 입력): ✅ 통과 (Add 편도함수 = 상수)
+  - step20 (Mul, 다른 입력값 의존): ✅ 통과 (이 항목)
+  - step34+ (행렬 미분, 야코비안 전치 곱): ⏳ 미래 화두 — derivative hook 붕괴 예상
+  → 현재(step20)까지 derivative hook은 유효. step34+에서 backward 직접 오버라이드로 전환 예상.
+- **★ `assert self.inputs is not None` (정적 분석용 타입 좁히기)**:
+  부모 Function.backward()에서 같은 가드가 있어 **런타임엔 중복**이지만,
+  pyright가 Mul.derivative() 안에서 self.inputs가 Optional임을 좁히려면 이 지점에서 다시 가드 필요.
+  Square/Add.derivative()엔 없음 (self.inputs 안 참조하므로).
+  → "self.inputs를 참조하는 derivative에만 가드" 패턴으로 일관.
+- **검증**:
+  - `y = a * b` (a=3, b=2) → `y=6.0, a.grad=2.0(=b), b.grad=3.0(=a)` ✅
+  - pyright: 0 errors (assert 추가로 타입 좁히기 해결) ✅
+- **회수**: step23 → `rezero/core.py` Function + `functions.py` Mul 승격 시 derivative hook 유지.
 
 ---
 
