@@ -24,10 +24,10 @@
 
 ## 📈 전체 요약
 
-- **완료**: 24 / 60 (step01~24 ✅)
+- **완료**: 25 / 60 (step01~25 ✅)
 - **진행 중**: 0
 - **막힘**: 0
-- **마지막 업데이트**: 2026-08-10 — step24 완료 (복잡한 함수의 미분 — Sphere/Matyas/Goldstein. ★ 2고지 점령! 14/14스텝 완료)
+- **마지막 업데이트**: 2026-08-11 — step25 완료 (계산 그래프 시각화(1) — Graphviz DOT, fold_dot_graph + show_value + output/ 폴더. 3고지 첫 step)
 
 ---
 
@@ -77,8 +77,8 @@
 
 | Step | 주제 | 상태 | Issue | 완료일 | 메모 |
 |---|---|---|---|---|---|
-| step25 | '정답지 같은' 코드 [No code] | ⏳ | - | - | - |
-| step26 | DeZero의 핵심 (core_simple.py 직접 구현) | ⏳ | - | - | - |
+| step25 | 계산 그래프 시각화(1) | ✅ | [#31](https://github.com/ghjang/deep-learning-from-scratch-3/issues/31) | 2026-08-11 | Graphviz DOT 시각화 4종 (fold_dot_graph + plot_dot_graph); 변형 7종 (fold 네이밍, weakref 단수, subprocess 안전, IPython 제거, f-string, output/ 폴더, show_value); 변수명 볼드 (HTML-like label); 포맷 화이트리스트 (png/svg/pdf); 순회 공통화 발견 → 이슈 32번/33번 |
+| step26 | 계산 그래프 시각화(2) | ⏳ | - | - | - |
 | step27 | 지수/로그 함수 (Exp, Log) | ⏳ | - | - | - |
 | step28 | 함수 최적화 (경사하강법) | ⏳ | - | - | - |
 | step29 | 뉴턴 방법 (2차 최적화) | ⏳ | - | - | - |

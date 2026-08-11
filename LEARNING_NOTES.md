@@ -1703,30 +1703,72 @@ fill_grad(z)                     # x.grad=2.0, y.grad=2.0
 
 ---
 
-## Step 25 — [3고지] '정답지 같은' 코드 [No code]
+## Step 25 — [3고지] 계산 그래프 시각화(1)
 
-**Issue**: (링크)
-**완료일**: -
-**상태**: ⏳
+**Issue**: [#31](https://github.com/ghjang/deep-learning-from-scratch-3/issues/31)
+**완료일**: 2026-08-11
+**상태**: ✅
 
 ### 📖 요약 (한 줄)
 
+v1 패키지에 Graphviz DOT 시각화 도구 4종 추가 (`_dot_var`, `_dot_func`, `fold_dot_graph`, `plot_dot_graph`). 정답지 대비 7가지 변형(fold 네이밍, weakref 단수, subprocess 안전, IPython 제거, f-string, ~/.rezero) + 브로 통찰로 `show_value` 옵션 추가. 3고지 첫 step.
 
 ### ❓ 질문 / 막힌 점
 
+- ✅ **"()`가 뭐지?"** — 브로 질문. `v.shape`의 결과로, 스칼라(0차원 ndarray)의 shape이 빈 튜플 `()`라서. v1에선 모든 Variable이 스칼라라 전부 `()`. → verbose 옵션이 v1에선 노이즈, v2 텐서에서 빛을 발. 이 통찰로 show_value와 verbose 분리 결정.
+- ✅ **"값만 출력하기로 한 거 아니었어?"** — 브로 데모 버그 지적. show_value=True인데 verbose도 True여서 shape/dtype이 섞여 나옴. verbose=False 명시로 깔끔하게 수정.
 
 ### 💡 통찰 / 배운 점
 
+- **★★★ `fold_dot_graph` 네이밍** — 정답지 `get_dot_graph`가 사실 fold(역방향 순회하며 DOT 텍스트 누적 합성). rezero fold 계보(step06/07/08)에 이어 일관성. 헬퍼도 `add_func` → `fold_func` (메인이 fold니까).
+- **★★★ 순회 공통화 발견** — `fold_dot_graph`의 worklist + visited 패턴이 `fill_grad`와 거의 동일. 탐구 노트 20번 섹션 6이 예측한 "step25 = 순회 일반화 계기" 회수 시그널 도달. 리팩터는 이슈 32번으로 연기 (step25는 독립 구현, 별도 세션에서 리팩터).
+- **★★★ `show_value` 아이디어 (브로)** — Variable은 "상자"인데 정작 시각화에선 값이 안 보임. verbose(shape/dtype, 정적)와 show_value(값, 동적)를 관심사 분리. 디버깅 가치: NaN 추적, gradient check 실패 원인 파악.
+- **변수명 볼드 강조 (브로)** — DOT HTML-like label로 `<B>x</B> = 1` 형태. 변수명이 시각적 앵커 → 그래프에서 변수 위치 한눈에. 값은 보통 텍스트.
+- **포맷 화이트리스트** — png/svg/pdf만 허용, 그 외는 ValueError. SVG(벡터)는 VSCode에서 텍스트로도 까볼 수 있어 학습에 좋음.
+- **변형 7종** (정답지 대비): fold 네이밍 / weakref 단수 / subprocess `check=True` + 리스트 / 파일 경로 반환 (IPython 제거) / f-string / `output/` 폴더 / `show_value` 추가.
+- **"결정 요청은 1개씩" 원칙 신설** — 8개 결정 폭풍 출력에 브로가 "빠뜨릴 수 있다, 1개씩 물어달라". 전체 목록 예고(OK) → 실제 결정은 1개씩. AGENTS.md 학습 스타일 + 메타 원칙에 추가.
 
 ### 🔗 관련 링크
 
+- [Issue 31번](https://github.com/ghjang/deep-learning-from-scratch-3/issues/31) — step25 진행 추적
+- [Issue 32번](https://github.com/ghjang/deep-learning-from-scratch-3/issues/32) — 순회 제너레이터 추출 리팩터 (step25 이후)
+- [Issue 33번](https://github.com/ghjang/deep-learning-from-scratch-3/issues/33) — fold 과정 단계별 스냅샷 (브로 아이디어, 32번 완료 후)
+- [Issue 21번](https://github.com/ghjang/deep-learning-from-scratch-3/issues/21) — Node + manim (순회 공통화 부분 32번으로 이관)
 
 ### 📝 코드 / 수식 메모
 
+```python
+from rezero.v1 import Variable, fill_grad, plot_dot_graph, fold_dot_graph
+
+x = Variable(np.array(1.0), name='x')
+y = Variable(np.array(1.0), name='y')
+z = goldstein(x, y)   # name='z'
+fill_grad(z)
+
+# 구조만
+fold_dot_graph(z, verbose=False)
+# → 'digraph g { ... x [label="x", color=orange, ...] ... }'
+
+# 값까지 (브로 통찰 — 상자 안의 실제 값 표시)
+fold_dot_graph(z, verbose=False, show_value=True)
+# → 'x = 1', 'z = 1876' 식으로 라벨에 값 추가
+
+# PNG 렌더링 (graphviz dot 바이너리 필요)
+plot_dot_graph(z, verbose=False, show_value=True, to_file='output/goldstein_value.png')
+# 변수명 볼드 + 값 표시 → 그래프에서 변수 위치와 값 동시 파악
+
+# SVG (벡터, VSCode에서 까보기 좋음)
+plot_dot_graph(z, verbose=False, show_value=True, to_file='output/goldstein.svg')
+
+# 미지원 포맷은 ValueError (지원: png/svg/pdf)
+# plot_dot_graph(z, to_file='output/bad.jpg')  → ValueError
+```
+
+**키워드**: `#3고지` `#계산그래프시각화` `#Graphviz` `#DOT언어` `#fold_dot_graph` `#show_value` `#변수명볼드` `#HTML-likelabel` `#포맷화이트리스트` `#SVG` `#순회공통화후보` `#subprocess_check=True` `#결정요청은1개씩` `#output폴더`
 
 ---
 
-## Step 26 — [3고지] DeZero의 핵심 (core_simple.py 직접 구현)
+## Step 26 — [3고지] 계산 그래프 시각화(2)
 
 **Issue**: (링크)
 **완료일**: -

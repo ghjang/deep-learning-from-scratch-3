@@ -83,7 +83,7 @@ from rezero.v1.functions import (
     square,
     sub,
 )
-from rezero.v1.utils import numerical_diff
+from rezero.v1.utils import fold_dot_graph, numerical_diff, plot_dot_graph
 
 __all__ = [
     # core
@@ -114,5 +114,7 @@ __all__ = [
     "Square",
     "Sub",
     # utils
+    "fold_dot_graph",
     "numerical_diff",
+    "plot_dot_graph",
 ]

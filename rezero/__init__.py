@@ -25,8 +25,8 @@ rezero — 『밑바닥부터 시작하는 딥러닝 3』 직접 구현 학습 �
   rezero/steps/ — 학습 흔적 전부 (step01~60). 과거 step은 수정 금지.
 
 진행 상황:
-  - 현재 단계: 2고지 완료! step25 대기 (3고지 "고차 미분 계산")
-  - 완료한 step: step01 ~ step24 ✅ (제 1 고지 + 제 2 고지 "자연스러운 코드로" — 가변 인수, 누적 gradient, 복잡 그래프, weakref, Config/no_grad, 변수 사용성, 연산자 오버로드 3부작, 패키지화, 벤치마크 함수)
+  - 현재 단계: step26 대기 (3고지 "고차 미분 계산" — 계산 그래프 시각화(2))
+  - 완료한 step: step01 ~ step25 ✅ (제 1 고지 + 제 2 고지 + 3고지 첫 step — 시각화 도구 fold_dot_graph/plot_dot_graph 구축, show_value 옵션)
 """
 
-__version__ = "0.2.0"  # ★ 2고지 완료 (step24 — 복잡한 함수의 미분. Sphere/Matyas/Goldstein. MINOR bump)
+__version__ = "0.2.1"  # ★ step25 완료 (계산 그래프 시각화(1) — Graphviz DOT, fold_dot_graph. PATCH bump)
