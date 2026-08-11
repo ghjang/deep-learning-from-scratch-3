@@ -162,6 +162,7 @@ rezero/
 | 원칙 | 위치 | 한 줄 요약 |
 |---|---|---|
 | ★ 정확한 책 제목 확인 | L298 (학습 스타일 > 반복 실수 방지) / L317 (사이클 1단계) | AI 부연설명 괄호 제거. 4곳(이슈/progress/notes/docstring) 일치화 |
+| ★ 정답지 인접 step 비교 | L360 (학습 스타일 > 반복 실수 방지) | stepN-1/N/N+1 세 파일 나란히 비교. 코드 배분 착각 방지 |
 | ★ 코드 스타일 점검 | L379 (랩업 > 절차 2단계) | 빈 줄/PEP8/Pylance 경고 |
 | ★ 분리/이관 작업 시 체크리스트 | L398 (랩업 > 절차 2단계) | 목차/링크/앵커 일치, 깨진 링크 확인 |
 | ★ "1 step = 1 커밋" 정신 | L462 (랩업 > 커밋 단위 정책) | 의미 단위로 묶되 분리가 자연스러우면 분리 |
@@ -357,6 +358,12 @@ AI가 브로에게 결정/선택을 요청할 때, **한 번에 여러 결정 �
   - **4곳에 동일 제목 사용** (일관성): 진행 이슈 제목, LEARNING_PROGRESS step 행,
     LEARNING_NOTES step 헤딩, rezero/steps/stepNN.py docstring 첫 줄
   - 사례: step18 "메모리 절약 모드" (O) vs "메모리 절약 모드 (Config, no_grad)" (X)
+
+- [ ] **정답지 인접 step 비교** (step25/26 코드 배분 착각 사태 반영, 2026-08-11):
+  - 새 step 시작 시 정답지 `steps/stepN-1.py`, `steps/stepN.py`, `steps/stepN+1.py` **세 파일을 나란히 비교** — 어느 step에 실제 코드가 있는지 확실히 파악.
+  - ★ `# No code` 파일과 코드 있는 파일을 **희미한 책 기억으로 추측하지 말 것** — 파일 내용 직접 확인.
+  - 사례: step25에서 정답지 `steps/step25.py`(`# No code`)와 `steps/step26.py`(goldstein 코드)를 비교 안 함 → \"step25에 코드 있다\" 착각 → step25가 step26 영역까지 커버해버림.
+  - 방지: 시작 전 `cat steps/stepN-1.py steps/stepN.py steps/stepN+1.py` 세 파일 나란히 확인.
 
 > 💡 이 체크리스트는 **"step 학습 사이클" 1단계(새 step 시작)** 에서 자동 수행.
 > 상세 절차는 아래 "step 학습 사이클" 1단계 참조.

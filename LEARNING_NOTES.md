@@ -1725,6 +1725,7 @@ v1 패키지에 Graphviz DOT 시각화 도구 4종 추가 (`_dot_var`, `_dot_fun
 - **★★★ `show_value` 아이디어 (브로)** — Variable은 "상자"인데 정작 시각화에선 값이 안 보임. verbose(shape/dtype, 정적)와 show_value(값, 동적)를 관심사 분리. 디버깅 가치: NaN 추적, gradient check 실패 원인 파악.
 - **변수명 볼드 강조 (브로)** — DOT HTML-like label로 `<B>x</B> = 1` 형태. 변수명이 시각적 앵커 → 그래프에서 변수 위치 한눈에. 값은 보통 텍스트.
 - **포맷 화이트리스트** — png/svg/pdf만 허용, 그 외는 ValueError. SVG(벡터)는 VSCode에서 텍스트로도 까볼 수 있어 학습에 좋음.
+- **★ step25/26 코드 배분 착각 (교훈)** — 정답지 `steps/step25.py`는 `# No code`, `steps/step26.py`가 goldstein+plot_dot_graph 코드. 우리는 step25에서 시각화 도구 구축 + Goldstein 그래프 출력(step26 영역)까지 한 번에 커버함. 원인: 정답지 두 파일을 나란히 비교 안 하고 희미한 책 기억에 의존 (브로+AI 둘 다 같은 착각). **다음부론 정답지 stepN-1/N/N+1 세 파일 나란히 비교로 방지**. 실익상 손해는 없음 (코드는 다 작동) — 다만 step26 진행 시 "이미 했음" 처리.
 - **변형 7종** (정답지 대비): fold 네이밍 / weakref 단수 / subprocess `check=True` + 리스트 / 파일 경로 반환 (IPython 제거) / f-string / `output/` 폴더 / `show_value` 추가.
 - **"결정 요청은 1개씩" 원칙 신설** — 8개 결정 폭풍 출력에 브로가 "빠뜨릴 수 있다, 1개씩 물어달라". 전체 목록 예고(OK) → 실제 결정은 1개씩. AGENTS.md 학습 스타일 + 메타 원칙에 추가.
 
