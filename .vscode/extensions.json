@@ -6,7 +6,7 @@
   //   - notes/ 학습 노트의 LaTeX 수학 수식($...$, $$...$$) 렌더링용
   //   - 설치 후 previewTheme 설정 (아래 AGENTS.md #9 참고)
   //
-  // Interactive Graphviz (tintinweb)
+  // Graphviz Interactive Preview (tintinweb)
   //   - output/*.dot 파일 신택스 하이라이트 (노드/엣지/속성 색 구분)
   //   - 인터랙티브 라이브 프리뷰 (줌/팬/엣지 추적, graphviz dot 바이너리 불필요)
   //   - step25 시각화 산출물 까볼 때 진가. Ctrl+Shift+V 로 프리뷰.

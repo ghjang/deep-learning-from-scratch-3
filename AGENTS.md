@@ -1001,7 +1001,7 @@ MPE가 쓰는 markdown-it 계열 파서는 **닫는 괄호/따옴표 다음 `**`
 - `notes/exploration_13_derivative_notation.md` — LaTeX 수식 본격 도입된 첫 노트
 - `notes/exploration_14_derivative_terminology.md` — 인라인 수식만 사용한 모범 사례
 
-### 9.5 DOT 파일 신택스 하이라이트 — Interactive Graphviz (tintinweb)
+### 9.5 DOT 파일 신택스 하이라이트 — Graphviz Interactive Preview (tintinweb)
 
 step25에서 Graphviz DOT 시각화 도구를 구축하면서 `output/*.dot` 파일이 산출물로 생성된다.
 이 파일들을 VSCode에서 텍스트로 까볼 때 **신택스 하이라이트**가 있으면 노드 id, label, color, edge(`->`) 가 색으로 구분돼서 가독성이 크게 올라간다.
@@ -1021,13 +1021,13 @@ step25에서 Graphviz DOT 시각화 도구를 구축하면서 `output/*.dot` 파
 → `output/goldstein.dot` 파일 열고 프리뷰 띄우면, PNG를 따로 생성하지 않아도 그래프 구조를 바로 확인 가능.
 
 **설치/사용 가이드**:
-1. VSCode 확장 탭에서 "Interactive Graphviz" 검색/설치
+1. VSCode 확장 탭에서 "Graphviz Interactive Preview" 검색/설치
    - 또는 `.vscode/extensions.json` 덕분에 레포 열면 자동 권장 팝업
 2. `output/*.dot` 파일 열기
-3. `Cmd+Shift+P` → "Interactive Graphviz: Open Preview to the Side" (또는 `Ctrl+Shift+V`)
+3. `Cmd+Shift+P` → "Graphviz Interactive Preview: Open Preview to the Side" (또는 `Ctrl+Shift+V`)
 
 **관련 파일**:
-- `.vscode/extensions.json` — 추천 확장 목록 (MPE + Interactive Graphviz)
+- `.vscode/extensions.json` — 추천 확장 목록 (MPE + Graphviz Interactive Preview)
 - `rezero/v1/utils.py` — DOT 파일 생성 코드 (`plot_dot_graph`)
 - `output/goldstein.dot` — step25 산출물 (직접 열어볼 것)
 
