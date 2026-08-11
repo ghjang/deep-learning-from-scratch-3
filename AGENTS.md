@@ -1001,6 +1001,36 @@ MPE가 쓰는 markdown-it 계열 파서는 **닫는 괄호/따옴표 다음 `**`
 - `notes/exploration_13_derivative_notation.md` — LaTeX 수식 본격 도입된 첫 노트
 - `notes/exploration_14_derivative_terminology.md` — 인라인 수식만 사용한 모범 사례
 
+### 9.5 DOT 파일 신택스 하이라이트 — Interactive Graphviz (tintinweb)
+
+step25에서 Graphviz DOT 시각화 도구를 구축하면서 `output/*.dot` 파일이 산출물로 생성된다.
+이 파일들을 VSCode에서 텍스트로 까볼 때 **신택스 하이라이트**가 있으면 노드 id, label, color, edge(`->`) 가 색으로 구분돼서 가독성이 크게 올라간다.
+
+**설정**:
+
+| 항목 | 값 |
+|---|---|
+| 확장 ID | `tintinweb.vscode-interactive-graphviz` |
+| 추천 등록 | `.vscode/extensions.json` 에 명시 → 레포 열 때 VSCode가 자동 권장 |
+| 기능 | (1) .dot 신택스 하이라이트 + 스니펫 (2) 인터랙티브 라이브 프리뷰 (줌/팬/엣지 추적) |
+
+**추가 이점 — 라이브 프리뷰**:
+
+이 확장은 단순 하이라이트뿐 아니라 `.dot` 파일을 열고 `Ctrl+Shift+V` (또는 `Cmd+Shift+V`) 를 누르면 **인터랙티브 그래프 프리뷰**를 띄워준다. graphviz `dot` 바이너리 없이도 (Viz.js 사용) 그래프를 시각화. 줌/팬/엣지 추적 지원.
+
+→ `output/goldstein.dot` 파일 열고 프리뷰 띄우면, PNG를 따로 생성하지 않아도 그래프 구조를 바로 확인 가능.
+
+**설치/사용 가이드**:
+1. VSCode 확장 탭에서 "Interactive Graphviz" 검색/설치
+   - 또는 `.vscode/extensions.json` 덕분에 레포 열면 자동 권장 팝업
+2. `output/*.dot` 파일 열기
+3. `Cmd+Shift+P` → "Interactive Graphviz: Open Preview to the Side" (또는 `Ctrl+Shift+V`)
+
+**관련 파일**:
+- `.vscode/extensions.json` — 추천 확장 목록 (MPE + Interactive Graphviz)
+- `rezero/v1/utils.py` — DOT 파일 생성 코드 (`plot_dot_graph`)
+- `output/goldstein.dot` — step25 산출물 (직접 열어볼 것)
+
 ### 10. 커밋 메시지/이슈 본문에서 `#N` 자동 링크 함정 (fork 레포)
 
 이 레포는 **fork** (`parent: WegraLee/deep-learning-from-scratch-3`, 그 상위 `oreilly-japan`)이다.
