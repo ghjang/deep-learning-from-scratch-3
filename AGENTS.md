@@ -1031,6 +1031,14 @@ step25에서 Graphviz DOT 시각화 도구를 구축하면서 `output/*.dot` 파
 - `rezero/v1/utils.py` — DOT 파일 생성 코드 (`plot_dot_graph`)
 - `output/goldstein.dot` — step25 산출물 (직접 열어볼 것)
 
+**💡 참고 — Viz.js (아이디어 메모)**:
+
+Viz.js는 Graphviz(dot)를 Emscripten으로 **WebAssembly/asm.js로 컴파일**한 프로젝트. 즉 그래프 렌더링 알고리즘 전체가 JS 번들 안에 들어있어, **`dot` 바이너리 없이도** 브라우저/Node.js에서 DOT → SVG/PNG 변환이 가능하다.
+
+- 현재 rezero `plot_dot_graph`는 시스템 `dot` 바이너리 의존 (`subprocess.run(['dot', ...])`).
+- Viz.js(또는 Python용 래퍼)를 쓰면 외부 의존성 없이 순수 Python만으로 렌더링 가능 — CI/도커/클론 직후 환경 등에서 유용.
+- rezero 학습 범위에선 오버엔지니어링이지만, **다른 프로젝트에선_DOT_시각화가_유용할_수_있다**는 잡생각 메모. VSCode 확장의 라이브 프리뷰도 내부적으로 Viz.js 사용.
+
 ### 10. 커밋 메시지/이슈 본문에서 `#N` 자동 링크 함정 (fork 레포)
 
 이 레포는 **fork** (`parent: WegraLee/deep-learning-from-scratch-3`, 그 상위 `oreilly-japan`)이다.
