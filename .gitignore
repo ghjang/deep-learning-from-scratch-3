@@ -13,6 +13,11 @@ tmp/
 !.vscode/
 !.vscode/extensions.json
 
+# rezero 시각화 산출물 (PNG, DOT 등) — output/ 폴더 통째로 무시
+# 단 .gitkeep은 폴더 유지용이므로 커밋 대상
+output/*
+!output/.gitkeep
+
 src/.idea/*
 .idea/*
 
