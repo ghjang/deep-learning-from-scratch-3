@@ -211,7 +211,7 @@ def plot_dot_graph(
 
     산출물은 output/ 폴더에 통합:
       - ``{to_file}`` (PNG/PDF/SVG 등 렌더링 결과)
-      - ``{同名}.dot`` (DOT 소스 — 브로가 까볼 수 있도록 산출물로 보존)
+      - ``{같은 이름}.dot`` (DOT 소스 — 브로가 까볼 수 있도록 산출물로 보존)
 
     Args:
         output: 그래프의 최종 출력 Variable.
