@@ -1771,24 +1771,40 @@ plot_dot_graph(z, verbose=False, show_value=True, to_file='output/goldstein.svg'
 
 ## Step 26 — [3고지] 계산 그래프 시각화(2)
 
-**Issue**: (링크)
-**완료일**: -
-**상태**: ⏳
+**Issue**: [#31](https://github.com/ghjang/deep-learning-from-scratch-3/issues/31) (step25가 커버 — 별도 이슈 없음)
+**완료일**: 2026-08-19
+**상태**: ✅
 
 ### 📖 요약 (한 줄)
 
-
-### ❓ 질문 / 막힌 점
-
+★ step25에서 선행 커버 완료. 정답지 step26 코드(goldstein + plot_dot_graph 출력)를 step25 작업 시 전부 구현했고, 브로 책 재확인으로 본문에 코드 외 새 개념 없음 확인 → 별도 구현 없이 공식 ✅ 처리.
 
 ### 💡 통찰 / 배운 점
 
+- **선행 커버 경위** — step25/26 코드 배분 착각(정답지 steps/step25.py가 `# No code`, steps/step26.py가 실제 코드)으로 step25가 step26 영역까지 커버. 코드는 전부 정상 동작(테스트 99개 통과)이라 그대로 승격.
+- **정답지보다 풍성해진 결과** — show_value 옵션, 변수명 볼드(HTML-like label), 포맷 화이트리스트(png/svg/pdf), DOT 소스 보존, SVG 출력까지 step25에서 구현됨.
+- **교훈의 제도화** — 이 사태로 AGENTS.md "정답지 인접 step 비교" 원칙(stepN-1/N/N+1 세 파일 나란히) 신설. 미래 세션 재발 방지.
+- **"이미 했음" 처리 패턴** — rezero/steps/step26.py는 리다이렉트 docstring만 (경위 + 실행 안내). 별도 이슈 생성 대신 step25 이슈 #31 참조로 관리 최소화.
 
 ### 🔗 관련 링크
 
+- [Issue 31번](https://github.com/ghjang/deep-learning-from-scratch-3/issues/31) — step25 진행 (step26 커버 경위 코멘트 포함)
+- LEARNING_NOTES step25 섹션 — 시각화 도구 상세
+- `rezero/steps/step26.py` — 리다이렉트 docstring
 
 ### 📝 코드 / 수식 메모
 
+```python
+# 정답지 steps/step26.py의 전부 — step25 데모에서 이미 실행:
+x = Variable(np.array(1.0), name='x')
+y = Variable(np.array(1.0), name='y')
+z = goldstein(x, y); z.name = 'z'
+fill_grad(z)
+plot_dot_graph(z, verbose=False, to_file='output/goldstein.png')
+# → uv run python rezero/steps/step25.py
+```
+
+**키워드**: `#3고지` `#계산그래프시각화` `#선행커버` `#리다이렉트docstring` `#시각화2부작종결`
 
 ---
 

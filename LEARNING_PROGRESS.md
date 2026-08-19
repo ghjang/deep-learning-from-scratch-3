@@ -24,11 +24,11 @@
 
 ## 📈 전체 요약
 
-- **완료**: 25 / 60 (step01~25 ✅)
+- **완료**: 26 / 60 (step01~26 ✅)
 - **진행 중**: 0
 - **막힘**: 0
-- **마지막 업데이트**: 2026-08-11 — step25 완료 (계산 그래프 시각화(1) — Graphviz DOT, fold_dot_graph + show_value + output/ 폴더. 3고지 첫 step)
-- ★ **step25/26 특이사항**: step25에서 step26 영역(Goldstein 그래프 출력)까지 선행 커버. 정답지 steps/step25.py는 `# No code`, steps/step26.py가 실제 goldstein 코드. step26은 가볍게 "이미 했음" 처리 예정.
+- **마지막 업데이트**: 2026-08-19 — step26 정리 완료 (step25에서 선행 커버된 것 공식 ✅ 처리. 별도 코드 없음)
+- ★ **step25/26 특이사항 (해결됨)**: step25 작업 시 step26 영역(Goldstein 그래프 출력)까지 선행 커버했었음 (정답지 배분 착각). 2026-08-19 브로 책 재확인으로 step26 본문에 코드 외 새 개념 없음 확인 → step26 공식 ✅ 처리 완료. 시각화 2부작 종결.
 
 ---
 
@@ -78,8 +78,8 @@
 
 | Step | 주제 | 상태 | Issue | 완료일 | 메모 |
 |---|---|---|---|---|---|
-| step25 | 계산 그래프 시각화(1) | ✅ | [#31](https://github.com/ghjang/deep-learning-from-scratch-3/issues/31) | 2026-08-11 | Graphviz DOT 시각화 4종 (fold_dot_graph + plot_dot_graph); 변형 7종 (fold 네이밍, weakref 단수, subprocess 안전, IPython 제거, f-string, output/ 폴더, show_value); 변수명 볼드 (HTML-like label); 포맷 화이트리스트 (png/svg/pdf); 순회 공통화 발견 → 이슈 32번/33번. ★ **주의: step25/26 코드 배분 착각** — 정답지 steps/step25.py는 `# No code`, steps/step26.py가 goldstein+plot_dot_graph 코드. 우리는 step25에서 step26 영역(Goldstein 그래프 출력)까지 커버해버림. 상세는 LEARNING_NOTES step25 / 이슈 31번 코멘트 참조. |
-| step26 | 계산 그래프 시각화(2) | ⏳ | - | - | - |
+| step25 | 계산 그래프 시각화(1) | ✅ | [#31](https://github.com/ghjang/deep-learning-from-scratch-3/issues/31) | 2026-08-11 | Graphviz DOT 시각화 4종 (fold_dot_graph + plot_dot_graph); 변형 7종 (fold 네이밍, weakref 단수, subprocess 안전, IPython 제거, f-string, output/ 폴더, show_value); 변수명 볼드 (HTML-like label); 포맷 화이트리스트 (png/svg/pdf); 순회 공통화 발견 → 이슈 32번/33번. ★ step25/26 코드 배분 착각으로 step26 영역(Goldstein 출력)까지 선행 커버 — 2026-08-19 step26 공식 ✅ 처리로 해결. 상세는 LEARNING_NOTES step25 / 이슈 31번 코멘트. |
+| step26 | 계산 그래프 시각화(2) | ✅ | [#31](https://github.com/ghjang/deep-learning-from-scratch-3/issues/31) (step25가 커버) | 2026-08-19 | ★ step25에서 선행 커버 완료 (Goldstein 그래프 출력 = 정답지 step26 코드 전부). 별도 이슈 없음 — step26.py는 리다이렉트 docstring만. 브로 책 재확인: step26 본문에 코드 외 새 개념 없음 |
 | step27 | 지수/로그 함수 (Exp, Log) | ⏳ | - | - | - |
 | step28 | 함수 최적화 (경사하강법) | ⏳ | - | - | - |
 | step29 | 뉴턴 방법 (2차 최적화) | ⏳ | - | - | - |

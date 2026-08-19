@@ -1,18 +1,24 @@
 """
-rezero.steps.step26 — [2고지] DeZero의 핵심 (core_simple.py 직접 구현)
-===============================================
+rezero.steps.step26 — [3고지] 계산 그래프 시각화(2)
+=====================================================
 
-이 파일은 책의 step26을 rezero로 직접 재구현하는 자리입니다.
+★ 본 step의 코드는 step25에서 이미 커버됨 (2026-08-11).
 
-참고 자료:
-  - 원본 구현: steps/step26.py
-  - 프레임워크 자료: dezero/ (필요한 모듈만 펴보기)
+정답지 steps/step26.py의 내용 — goldstein 함수 정의 + 순전파/역전파 +
+name 부여 + plot_dot_graph로 PNG 출력 — 을 step25 작업 시 전부 구현했음.
+심지어 정답지보다 풍성하게: show_value 옵션, 변수명 볼드(HTML-like label),
+포맷 화이트리스트(png/svg/pdf), DOT 소스 보존, SVG 벡터 출력까지.
 
-진행 순서 제안:
-  1. 책 본문 읽기 (이 단계가 무엇을 추가하는지 파악)
-  2. 이 파일에 직접 코드 짜기 (이해가 가는 만큼만)
-  3. 막히면 steps/step26.py 펴서 분석, 다시 내 손으로
-  4. 실행: uv run python rezero/steps/step26.py
+→ 실행은 rezero/steps/step25.py 참고:
+  uv run python rezero/steps/step25.py
+  (output/goldstein.png / goldstein_value.png / goldstein.svg 생성)
+
+★ 경위 (step25/26 코드 배분 착각 — 2026-08-11 기록):
+  step25 작업 당시 정답지 steps/step25.py(# No code)와 steps/step26.py(코드 있음)를
+  나란히 비교하지 않고 진행 → step25가 step26 영역까지 커버.
+  브로가 책 26단계를 다시 보고 발견. 코드는 전부 정상 동작하므로 그대로 승격.
+  방지책: AGENTS.md "정답지 인접 step 비교" 원칙 신설.
+  상세: 이슈 31번 코멘트 / LEARNING_NOTES step25.
+
+이 파일은 위 경위를 기록하는 리다이렉트 역할만 하며, 별도 코드는 없음.
 """
-
-# TODO: 여기에 step26 코드를 직접 구현하세요.
