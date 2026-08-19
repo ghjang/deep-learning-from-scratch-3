@@ -390,10 +390,21 @@ AI가 브로에게 결정/선택을 요청할 때, **한 번에 여러 결정 �
    ├─ .github 의 📌 Step 진행 추적 템플릿으로 이슈 생성 (라벨: step, learning)
    ├─ LEARNING_PROGRESS.md 해당 행: 상태 ⏳→🔄, Issue 컬럼에 링크 등록
    ├─ LEARNING_NOTES.md 해당 step 헤딩 아래 학습 시작 메모
-   └─ ★ **정확한 책 제목 먼저 확인** (사전 의무 체크리스트):
-      - 책 본문/목차에서 정확한 제목 확인 (AI 부연설명 괄호 제거)
-      - 4곳 동일 제목 사용: 진행 이슈, LEARNING_PROGRESS, LEARNING_NOTES 헤딩, stepNN.py docstring
-      - ★ 상세 기준/사례/철학: 위 "학습 철학과 스타일 > 📌 학습 시 반복되는 실수 방지" 섹션 참조
+   ├─ ★ **정확한 책 제목 먼저 확인** (사전 의무 체크리스트):
+   │  - 책 본문/목차에서 정확한 제목 확인 (AI 부연설명 괄호 제거)
+   │  - 4곳 동일 제목 사용: 진행 이슈, LEARNING_PROGRESS, LEARNING_NOTES 헤딩, stepNN.py docstring
+   │  - ★ 상세 기준/사례/철학: 위 "학습 철학과 스타일 > 📌 학습 시 반복되는 실수 방지" 섹션 참조
+   └─ ★ **감동/학습 포인트 사전 도출** (step27~28 패턴 제도화, 2026-08-19):
+      - 가이드 제시 전에 "이 step의 심장/감동 포인트가 무엇인가"를 브로와 대화로 먼저 도출
+      - LEARNING_NOTES 해당 step 섹션에 사전 기록 (헤딩: "학습 시작 전 브로-AI 대화로 도출")
+      - **적합성 메모 (해당 시)**: 알고리즘/기법/설계 선택이 등장하는 step이면
+        "이 방법이 빛나는 경우 / 최악인 경우"를 명시적으로 한 쌍 짚어주기.
+        장단점이 명확히 드러나는 주제에만 (없으면 굳이 안 함 — 억지 표 방지).
+        사례: 경사하강법 — 볼록+조건수 양호하면 강력 / Rosenbrock 같은
+        ill-conditioned 골짜기에선 기어감 (step28). step29+ 최적화 기법 계열에서 지속 축적.
+      - 근거: 학습 목적을 먼저 알면 코드 구현이 "무엇을 위한 것인지" 명확해짐.
+        사례: step27 두 층위 구조 (근사 다항식의 역전파 = cos) /
+        step28 "미분 기계가 처음으로 일을 한다" (학습의 원형)
 
 2. step 진행 중 — ★ step23 이후 작업 흐름 (버전 폴더 전략 반영)
    ├─ 코드는 항상 rezero/steps/stepNN.py에 먼저 작성 (학습 흔적)
@@ -672,6 +683,23 @@ uv run pytest rezero/v1/tests/test_operators.py -v   # 개별 파일
 # 새 의존성 추가 (pyproject.toml + uv.lock 자동 갱신)
 uv add scipy pillow opencv-python   # examples 일부에 필요할 때
 ```
+
+**📄 API 문서 생성 (pdoc — docstring → HTML)**
+
+rezero의 docstring(API 문서)을 HTML로 뽑아볼 때. 브로가 "API 문서 출력해줘"라고 하면 아래 명령 실행 후 열어주면 됨:
+
+```bash
+# 생성 (output/api_doc/ — gitignore 대상, 산출물이라 버전 관리 X)
+PYTHONPATH=. uv run pdoc rezero.v1 -o output/api_doc
+open output/api_doc/rezero/v1.html
+
+# 또는 로컬 서버로 실시간 열어보기 (저장 시 자동 갱신)
+PYTHONPATH=. uv run pdoc rezero.v1
+```
+
+- pdoc은 **dev 의존성** (`uv add --dev pdoc`으로 추가됨 — 배포 영향 없음)
+- `PYTHONPATH=.` 필수 — uv run 시 cwd가 sys.path에 안 들어가서 못 찾음
+- 생성 문서는 버전 관리 제외 (docstring이 진짜, HTML은 재생성 가능한 빌드 산출물 — output/ PNG와 동일 정책)
 
 ### 의존성 정책
 

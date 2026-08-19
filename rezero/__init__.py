@@ -25,8 +25,8 @@ rezero — 『밑바닥부터 시작하는 딥러닝 3』 직접 구현 학습 �
   rezero/steps/ — 학습 흔적 전부 (step01~60). 과거 step은 수정 금지.
 
 진행 상황:
-  - 현재 단계: step28 대기 (3고지 "고차 미분 계산" — 함수 최적화)
-  - 완료한 step: step01 ~ step27 ✅ (제 1~2고지 + 시각화 2부작 + 테일러 급수 미분 — Sin 승격, value_format, dot_label 훅)
+  - 현재 단계: step29 대기 (3고지 "고차 미분 계산" — 뉴턴 방법)
+  - 완료한 step: step01 ~ step28 ✅ (제 1~2고지 + 시각화 2부작 + 테일러 급수 미분 + 함수 최적화 — 경사하강법 갱신 루프)
 """
 
-__version__ = "0.2.3"  # ★ step27 완료 (테일러 급수 미분 — Sin 승격 + my_sin. PATCH bump)
+__version__ = "0.2.4"  # ★ step28 완료 (함수 최적화 — 경사하강법 4단계 루프. PATCH bump)
