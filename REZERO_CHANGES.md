@@ -1603,6 +1603,55 @@ step23 회수 시: 각 항목마다 "주제별 그룹 + 회수 분류" 둘 다 �
 
 ---
 
+### #037 — ★★★ 순회 제너레이터 `iter_reverse_topo` 추출 — fill_grad/fold_dot_graph 공통화 (step25 리팩터, 이슈 32번)
+
+**카테고리**: 구조 (관심사 분리 + DRY)
+
+**배경**:
+step25에서 `fold_dot_graph`(시각화)를 구현하다가, `fill_grad`(역전파)와 **거의 동일한 worklist + visited 순회 패턴**을 사용함을 발견. 탐구 노트 20번 섹션 5에서 예측한 "step25 = 순회 일반화 계기" 회수 시그널 도달.
+
+**변경**:
+- `rezero/v1/core.py`에 `iter_reverse_topo(start_var)` 제너레이터 신설.
+  - 역방향 위상 정렬 순회 (generation 내림차순, visited 중복 방지).
+  - 순회 알고리즘만 담당 — 역전파 계산/grad 누적/retain_grad/output weakref 역참조는 소비자 책임.
+- `fill_grad`가 `iter_reverse_topo`를 소비 (`for f in iter_reverse_topo(start_var)`).
+  - 기존 `schedule` 클로저 + `while worklist` 루프 제거.
+  - 역전파 계산 로직만 남음 (grad 전파, 다변 배분, retain_grad).
+- `fold_dot_graph`도 같은 제너레이터 소비.
+  - 기존 `fold_func` 클로저 + `while funcs` 루프 제거.
+  - DOT 텍스트 누적 로직만 남음.
+
+**vs 탐구 노트 20번 초안 (step16 시점) — 3가지 조정**:
+노트 20번 섹션 4의 초안 코드를 그대로 못 쓰고, 현행 v1 안전장치와 맞추어 조정:
+
+| # | 초안 (노트 20번) | 조정 후 (현행) | 이유 |
+|---|---|---|---|
+| 1 | None 가드 없음 | `start_var.creator is None`이면 빈 순회 | 역전파/시각화 소비자가 시작 전 에러 처리 |
+| 2 | `if f not in visited: visited.add(f); yield f` (yield 직전) | append 시점에 visited 표시 | 중복 append 방지 (v1 패턴과 일관) |
+| 3 | `f.inputs` None 가드 없음 | `assert f.inputs is not None` | pyright (정적 분석 협력 원칙) |
+
+**결과**:
+- fill_grad 본문이 단순해짐 (`schedule` 클로저 사라짐, 명시적 루프 → `for` 문).
+- fold_dot_graph도 마찬가지 (`fold_func` 클로저 사라짐).
+- 순회 알고리즘 변경 시 한 곳(`iter_reverse_topo`)만 고치면 됨 (DRY).
+
+**검증**:
+- 테스트 99개 전부 통과 (회귀 없음).
+- Goldstein 그래프 구조 100% 동일 (노드 109개, 엣지 108개, Function 분포 Mul 17/Add 10/Pow 6/Sub 5 — 리팩터 전후 id 정규화 diff 0).
+- pyright 0 errors.
+
+**추가 결정 사항**:
+- `iter_reverse_topo` 위치: `core.py` (graph.py 별도 모듈 아님). 순환 참조 회피 + 현재 알고리즘 1개뿐이라 YAGNI. 미래에 순회 알고리즘 여러 개 생기면 그때 graph.py로 분리 (지연 import 한 줄로 순환 참조 해결 가능).
+- re-export 안 함 (공개 API 아님). `from rezero.v1.core import iter_reverse_topo` 풀 경로로만 접근. 추후 성숙 후 결정.
+
+**관련**:
+- 이슈 32번 (본 리팩터 추적 — 이것으로 회수 완료)
+- 이슈 33번 (fold 스냅샷 아이디어 — 본 제너레이터 위에서 자연스럽게 구현 가능)
+- 탐구 노트 20번 섹션 4/5/9 (설계 + 회수)
+- 탐구 노트 21번 (yield/제너레이터 심화)
+
+---
+
 > 생각나는 대로 한 줄씩. 구체화되면 위 항목으로 승격.
 
 - (아직 없음 — 떠오르는 대로 추가)

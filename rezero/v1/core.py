@@ -15,7 +15,7 @@ rezero 정체성 (dezero와의 차이):
 import contextlib
 import weakref
 from abc import ABC
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Iterator
 from typing import Optional, override
 
 import numpy as np
@@ -267,6 +267,50 @@ class Function(ABC):
         )
 
 
+# ===== iter_reverse_topo — 역방향 위상 정렬 순회 제너레이터 ====================
+# fill_grad(역전파), fold_dot_graph(시각화)가 공유하는 순회 알고리즘.
+# 순회 알고리즘을 분리함으로써 두 소비자가 동일한 "어떻게 순회할까" 로직을 공유 (DRY).
+#
+# ★ 리팩터 배경 (이슈 32번 — step25 이후 회수):
+#   step25에서 fold_dot_graph가 fill_grad와 거의 동일한 worklist + visited 패턴을
+#   사용함을 발견. 탐구 노트 20번 섹션 4/5에서 제안된 옵션 I (이터레이터 추출) 회수.
+#   노트 20번 초안(step16 시점)에서 3가지 조정 — None 가드, visited 표시 시점(append
+#   시점으로 통일), f.inputs None 가드. 자세한 내용은 이슈 32번 / 노트 20번 참조.
+def iter_reverse_topo(start_var: Variable) -> Iterator[Function]:
+    """start_var에서 역방향으로 계산 그래프를 위상 정렬 순회하는 제너레이터.
+
+    output Variable에서 creator를 따라 역방향으로 Function들을 generation 내림차순으로
+    yield. fill_grad(역전파)와 fold_dot_graph(시각화)가 공유하는 순회 알고리즘.
+
+    순회만 담당 — 역전파 계산/grad 누적/retain_grad 등의 부작용은 소비자가 처리.
+    Function.output weakref 역참조도 소비자 책임 (순회 자체는 output 안 씀).
+
+    Args:
+        start_var: 순회 시작점 (보통 최종 출력 Variable).
+
+    Yields:
+        Function: 역방향 위상 정렬 순서대로 (generation 큰 것부터 = 루트에 가까운 것부터).
+    """
+    if start_var.creator is None:
+        # 역전파할 계산 그래프 없음 — 빈 순회 (소비자가 시작 전 None 체크로 에러 처리)
+        return
+
+    worklist: Worklist = [start_var.creator]
+    visited: set[Function] = {start_var.creator}  # append 시점에 표시 (중복 append 방지)
+
+    while worklist:
+        worklist.sort(key=lambda f: f.generation)
+        f = worklist.pop()
+
+        assert f.inputs is not None, "f.inputs must be set"
+        yield f
+
+        for x in f.inputs:
+            if x.creator is not None and x.creator not in visited:
+                visited.add(x.creator)
+                worklist.append(x.creator)
+
+
 # ===== fill_grad — 자동 역전파 (전역 함수, rezero 정체성) ======================
 def fill_grad(
     start_var: Variable,
@@ -274,9 +318,10 @@ def fill_grad(
     *,
     retain_grad: bool = False,
 ) -> None:
-    """자동 역전파 (반복문 — worklist algorithm + 위상 정렬).
+    """자동 역전파 (iter_reverse_topo 제너레이터 + chain rule fold).
 
-    Variable은 순수 데이터 상자로 두고, 그래프 순회는 이 전역 함수가 담당.
+    Variable은 순수 데이터 상자로 두고, 그래프 순회는 iter_reverse_topo 제너레이터가
+    담당. 이 함수는 순회하며 grad를 전파하는 역전파 계산만 담당 (관심사 분리).
 
     Args:
         start_var: 역전파 시작점 (보통 최종 출력 Variable).
@@ -298,24 +343,8 @@ def fill_grad(
             raise RuntimeError(f"{start_var!r}의 data가 None입니다 — 역전파에 사용할 수 없습니다.")
         start_var.grad = np.ones_like(start_var.data)
 
-    # 메인 루프 상태 (worklist + visited)
-    worklist: Worklist = []
-    visited: set[Function] = set()
-
-    def schedule(f: Function) -> None:
-        """미방문 Function을 worklist에 예약 (generation 내림차순 정렬 유지)."""
-        if f not in visited:
-            worklist.append(f)
-            visited.add(f)
-            worklist.sort(key=lambda func: func.generation)
-
-    schedule(start_var.creator)
-
-    # 메인 루프: 계산 그래프 역방향 순회
-    while worklist:
-        f = worklist.pop()
-
-        assert f.inputs is not None, "f.inputs must be set"
+    # 역전파 메인 루프 — iter_reverse_topo가 순회를 담당 (worklist + visited 알고리즘 캡슐화)
+    for f in iter_reverse_topo(start_var):
         assert f.output is not None, "f.output must be set"
 
         # weakref 역참조로 output Variable 획득
@@ -335,14 +364,12 @@ def fill_grad(
             downstream_grads = (downstream_grads,)
 
         # 다변 배분: 입력과 grad 짝지어 할당 (누적 — 같은 Variable 여러 입력와도 합산)
+        assert f.inputs is not None, "f.inputs must be set"
         for x, downstream_grad in zip(f.inputs, downstream_grads):
             if x.grad is None:
                 x.grad = downstream_grad
             else:
                 x.grad = x.grad + downstream_grad
-
-            if x.creator is not None:
-                schedule(x.creator)
 
         # retain_grad=False면 중간 output grad 버리기 (메모리 절약)
         if not retain_grad:

@@ -9,7 +9,7 @@ from collections.abc import Callable
 
 import numpy as np
 
-from rezero.v1.core import Function, Variable, as_array
+from rezero.v1.core import Function, Variable, as_array, iter_reverse_topo
 
 
 def numerical_diff(
@@ -121,8 +121,8 @@ def fold_dot_graph(
 ) -> str:
     """output에서 역방향으로 그래프를 순회하며 DOT 텍스트를 합성(fold).
 
-    fill_grad의 순회 패턴(worklist + visited)과 동일하나,
-    gradient 전파 대신 DOT 텍스트를 누적한다는 점이 다름.
+    순회 알고리즘은 fill_grad와 공유 (iter_reverse_topo 제너레이터).
+    이 함수는 순회하며 DOT 텍스트를 누적하는 시각화 로직만 담당 (관심사 분리).
 
     Args:
         output: 그래프의 최종 출력 Variable (순회 시작점).
@@ -132,32 +132,16 @@ def fold_dot_graph(
     Returns:
         완성된 DOT 텍스트 ("digraph g { ... }").
     """
-    txt = ''
-    funcs: list[Function] = []
-    seen: set[Function] = set()
+    # output 노드는 순회 시작 전 먼저 찍기 (iter_reverse_topo가 yield하는 건 Function뿐)
+    txt = _dot_var(output, verbose, show_value)
 
-    def fold_func(f: Function) -> None:
-        """fold 대상 Function을 funcs에 등록 (중복 방지)."""
-        if f not in seen:
-            funcs.append(f)
-            seen.add(f)
-
-    txt += _dot_var(output, verbose, show_value)
-
-    # output.creator가 None이면 output 단일 노드 그래프 (시각화는 역전파와 무관)
-    if output.creator is not None:
-        fold_func(output.creator)
-
-    while funcs:
-        func = funcs.pop()
+    # 역방향 순회하며 각 Function + inputs를 DOT 텍스트로 누적
+    for func in iter_reverse_topo(output):
         assert func.inputs is not None, "func.inputs must be set"
         assert func.output is not None, "func.output must be set"
         txt += _dot_func(func)
         for x in func.inputs:
             txt += _dot_var(x, verbose, show_value)
-
-            if x.creator is not None:
-                fold_func(x.creator)
 
     return f'digraph g {{\n{txt}}}'
 
