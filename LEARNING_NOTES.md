@@ -1808,25 +1808,70 @@ plot_dot_graph(z, verbose=False, to_file='output/goldstein.png')
 
 ---
 
-## Step 27 — [3고지] 지수/로그 함수 (Exp, Log)
+## Step 27 — [3고지] 테일러 급수 미분
 
-**Issue**: (링크)
-**완료일**: -
-**상태**: ⏳
+**Issue**: [#34](https://github.com/ghjang/deep-learning-from-scratch-3/issues/34)
+**완료일**: 2026-08-19
+**상태**: ✅
+
+★ 제목 정정 (2026-08-19): 기존 "지수/로그 함수 (Exp, Log)"는 오등록 — 브로가 교재 실제 제목 "테일러 급수 미분" 확인 전달.
+
+### 💡 통찰 / 배운 점 (★ 학습 시작 전 브로-AI 대화로 도출 — 이 step의 심장)
+
+- **★★★ 두 층위 구조 — 이 step의 감동 포인트 (브로 자각)**:
+  - **층위 1 (당연함)**: `Sin` 클래스 — `derivative`에 cos를 **직접 가르쳐 줌**. 도함수를 아는 함수의 미분. "시험 문제에 답 적어놓고 시험 본 격".
+  - **층위 2 (대서사)**: `my_sin` — **cos라는 단어를 코드 어디에도 모르는** +, **, * 만의 다항식 합성. 그런데 계산 그래프를 역전파하면 **cos 값이 나온다**.
+- **★ 수학적 정체 — 테일러 항별 미분 = cos의 테일러 전개**:
+  $$\frac{d}{dx}\Big[x - \frac{x^3}{3!} + \frac{x^5}{5!} - \cdots\Big] = 1 - \frac{3x^2}{3!} + \frac{5x^4}{5!} - \cdots = 1 - \frac{x^2}{2!} + \frac{x^4}{4!} - \cdots$$
+  (3/3! = 1/2!, 5/5! = 1/4!) — sin↔cos의 미분 관계가 chain rule fold로 **저절로 재현**됨.
+- **★ 핵심 문장**: "무엇의 도함수인지 가르쳐 준 함수만 미분할 수 있는 게 아니라, **그래프를 만들 수만 있다면 그 그래프의 도함수가 저절로 나온다**." — Define-by-Run의 본질. Sin 클래스(층위 1)는 이 문장의 대조군.
+- **v1 연산자 3부작 총동원**: `y = 0; y = y + t` → `__radd__` (step21). `c * x ** n` → `__rmul__` (step21) + `Pow` (step22). step20~22 구축물의 첫 실전 합성.
+- **rezero 관점 — derivative hook의 간결함**: 책은 `backward` 직접 오버라이드 (`gy * np.cos(x)`), rezero는 `derivative` 한 줄 (`lambda x: np.cos(x)`) — chain rule 곱셈은 부모 `Function.backward`가 담당하므로.
 
 ### 📖 요약 (한 줄)
 
+Sin 승격 (v1 첫 수학 함수, derivative hook 한 줄) + my_sin 테일러 근사 데모. ★ 근사 다항식의 역전파 = cos — "그래프를 만들면 도함수가 저절로"라는 Define-by-Run 본질 실증. 시각화 도구 2건 개선 (value_format, Pow dot_label) + 책 마지막 예제(1e-150, 노드 377개) 재현.
 
 ### ❓ 질문 / 막힌 점
 
+- ✅ **"Sin은 그냥 추가하는 건데, 테일러 다항식 전체의 미분이 cos가 된다는 게 대서사?"** — 브로 자각. 맞음. 두 층위 구조 (위 통찰).
+- ✅ **"풀버전(1e-150) PNG에서 값 라벨은 의미없지 않나?"** — 브로 지적. 노드 377개에선 숫자가 안 읽힘 → 구조 감상용으로 show_value=False 적용.
 
-### 💡 통찰 / 배운 점
+### 💡 통찰 / 배운 점 (진행 중 도출 — 구현/리뷰 과정)
 
+- **value_format (적응형)** — 값 라벨 제각각 문제(브로 지적) → `1e-4 ≤ |v| < 1e5`는 고정 소수점 4자리 + trailing 0 제거, 밖은 지수. NaN/inf 명시 표기 (디버깅 추적 단서). 커스텀 스펙(`.2f` 등)도 `value_format` 파라미터로 지원.
+- **Pow.dot_label 훈** — Pow 박스들이 전부 "Pow"라서 어떤 항인지 구분 안 됨(브로 지적) → `dot_label(show_param)` 훅 (derivative hook과 같은 패턴). 표시 조건 `verbose or show_value` — 값 추적 시 c는 해석 맥락이므로. 기본(구조만)은 책 방식 유지.
+- **threshold=1e-150 그래프** — 노드 377개. ★ 렌더링이 "뒤집힌 직각 삼각형" — 삼각함수 근사 그래프가 삼각형 (브로 관찰, 책 마지막 웃픈 포인트). 항마다 Pow→Mul→Add 체인이 y 재사용하며 계단으로 쌓이는 구조.
+- **pyright와 협력 2건** — `y: Variable | int = 0` + 루프 후 assert (my_sin의 `y = 0` 시작, `__radd__` 학습 포인트 유지). 테스트의 Optional 가드 (`assert x.grad is not None`).
 
 ### 🔗 관련 링크
 
+- [Issue 34번](https://github.com/ghjang/deep-learning-from-scratch-3/issues/34) — step27 진행 추적
+- `output/my_sin.png` (기본 threshold) / `output/my_sin_full.png` (1e-150, 삼각형)
 
 ### 📝 코드 / 수식 메모
+
+```python
+from rezero.v1 import Variable, fill_grad, sin
+
+# 층위 1: 도함수를 가르쳐 준 함수
+x = Variable(np.array(np.pi / 4)); y = sin(x); fill_grad(y)
+# y = 0.70711, x.grad = 0.70711 (cos)
+
+# 층위 2: cos를 모르는 테일러 다항식 — 같은 결과!
+def my_sin(x, threshold=0.0001):
+    y: Variable | int = 0
+    for i in range(100000):
+        c = (-1) ** i / math.factorial(2 * i + 1)
+        t = c * x ** (2 * i + 1)     # __rmul__ + Pow
+        y = y + t                    # int 0 + Variable → __radd__
+        if abs(t.data) < threshold: break
+    assert isinstance(y, Variable)
+    return y
+# y = 0.70711 (5자리 일치), x.grad = 0.70710 ★ 저절로 cos
+```
+
+**키워드**: `#3고지` `#테일러급수미분` `#Sin` `#my_sin` `#두층위구조` `#근사함수도미분된다` `#Define-by-Run본질` `#__radd__총동원` `#value_format` `#dot_label훅` `#Pow(c=N)` `#1e-150삼각형` `#제목정정`
 
 
 ---

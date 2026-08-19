@@ -71,6 +71,7 @@ from rezero.v1.functions import (
     Mul,
     Neg,
     Pow,
+    Sin,
     Square,
     Sub,
     add,
@@ -80,6 +81,7 @@ from rezero.v1.functions import (
     pow,
     rdiv,
     rsub,
+    sin,
     square,
     sub,
 )
@@ -103,6 +105,7 @@ __all__ = [
     "pow",
     "rdiv",
     "rsub",
+    "sin",
     "square",
     "sub",
     # functions (클래스 — 고급 사용자용)
@@ -111,6 +114,7 @@ __all__ = [
     "Mul",
     "Neg",
     "Pow",
+    "Sin",
     "Square",
     "Sub",
     # utils

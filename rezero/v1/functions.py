@@ -1,6 +1,6 @@
-"""rezero.v1.functions — 구체 함수들 (Square/Add/Mul/Neg/Sub/Div/Pow + wrapper).
+"""rezero.v1.functions — 구체 함수들 (Square/Add/Mul/Neg/Sub/Div/Pow/Sin + wrapper).
 
-rezero v1 스코프(제 1~2고지)의 구체 함수 모음.
+rezero v1 스코프의 구체 함수 모음.
 core.Function을 상속해 apply + derivative hook 구현.
 
 ★ derivative hook 패턴 — 스칼라 출력 가정:
@@ -14,6 +14,7 @@ core.Function을 상속해 apply + derivative hook 구현.
     - Mul: (lambda _: x1, lambda _: x0)      (다변, 다른 입력값 의존)
     - Div: (lambda _: 1/x1, lambda _: -x0/x1**2)  (가장 복잡, 제곱 항)
     - Pow: lambda x: self.c * x**(self.c-1)  (단일, c 상수 참조)
+    - Sin: lambda x: np.cos(x)               (단일, np 수학 함수 — step27. 첫 수학 함수)
 """
 
 from collections.abc import Callable
@@ -125,6 +126,27 @@ class Pow(Function):
         c = self.c
         return lambda x: c * x ** (c - 1)
 
+    @override
+    def dot_label(self, show_param: bool = False) -> str:
+        return f'Pow(c={self.c})' if show_param else 'Pow'
+
+
+class Sin(Function):
+    """사인: x → sin(x). 미분: f'(x) = cos(x).
+
+    v1의 첫 수학 함수 (step27). np.sin/np.cos 사용 — C 구현이라 빠르고 정확.
+    책은 backward를 직접 구현하지만, rezero는 derivative hook 한 줄로 끝
+    (chain rule 곱셈은 부모 Function.backward가 담당).
+    """
+
+    @override
+    def apply(self, x: np.ndarray) -> np.ndarray:  # type: ignore[override]
+        return np.sin(x)
+
+    @override
+    def derivative(self) -> Callable[[np.ndarray], np.ndarray]:
+        return lambda x: np.cos(x)
+
 
 # ===== wrapper 함수 ============================================================
 # wrapper는 단순하게 (Function.__call__ 도입부의 as_variable이 변환 처리).
@@ -194,4 +216,11 @@ def pow(x: Variable, c: "int | float") -> Variable:
     """거듭제곱 wrapper: x ** c. c는 상수 (Variable 아님)."""
     result = Pow(c)(x)
     assert isinstance(result, Variable), "Pow는 단일 출력이므로 Variable이어야 함"
+    return result
+
+
+def sin(x: Variable) -> Variable:
+    """사인 wrapper: sin(x)."""
+    result = Sin()(x)
+    assert isinstance(result, Variable), "Sin은 단일 출력이므로 Variable이어야 함"
     return result

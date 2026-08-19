@@ -3,6 +3,7 @@
 gradient check 등 검증용 헬퍼 + 계산 그래프 시각화 (Graphviz DOT).
 """
 
+import math
 import os
 import subprocess
 from collections.abc import Callable
@@ -57,7 +58,42 @@ def numerical_diff(
 #
 # ★ fold_dot_graph의 순회 패턴(worklist + visited)은 fill_grad와 거의 동일.
 #   공통화 리팩터 후보 → 이슈 32번 (step25 이후 회수).
-def _dot_var(v: Variable, verbose: bool = False, show_value: bool = False) -> str:
+def _format_value(v: float, fmt: "str | None" = None) -> str:
+    """show_value용 값 포맷팅 — 디버깅 관점 설계.
+
+    기본(fmt=None): 적응형 — 사람이 읽기 좋은 범위(1e-4 ≤ |v| < 1e5)는
+    고정 소수점 4자리 (trailing 0 제거), 밖은 지수 표기 2자리.
+    작은 값을 강제 고정 소수점하면 0.0000으로 죽어버려 정보 손실 → 지수로 보존.
+
+    NaN/inf는 명시적 표기 — 디버깅 시 역전파 어디서 터졌는지 추적하는 단서.
+
+    Args:
+        v: 포맷팅할 값.
+        fmt: 커스텀 포맷 스펙 (f-string format spec. 예: '.2f', '.6e', '.3g').
+            None이면 적응형 기본.
+    """
+    if fmt is not None:
+        return f'{v:{fmt}}'
+
+    if math.isnan(v):
+        return 'nan'
+    if math.isinf(v):
+        return 'inf'
+    if v == 0:
+        return '0'
+
+    # 적응형: 읽기 좋은 범위는 고정 소수점, 밖은 지수
+    if 1e-4 <= abs(v) < 1e5:
+        return f'{v:.4f}'.rstrip('0').rstrip('.')
+    return f'{v:.2e}'
+
+
+def _dot_var(
+    v: Variable,
+    verbose: bool = False,
+    show_value: bool = False,
+    value_format: "str | None" = None,
+) -> str:
     """Variable을 DOT 노드 문자열로 인코딩 (주황색 원).
 
     변수명은 볼드로 강조 (DOT HTML-like label 사용) → 그래프에서 변수 위치를
@@ -68,6 +104,7 @@ def _dot_var(v: Variable, verbose: bool = False, show_value: bool = False) -> st
         verbose: True면 라벨에 shape/dtype 추가 (정적 정보, v2 텐서에서 빛을 발).
         show_value: True면 라벨에 값 추가 (동적 정보, 디버깅용).
             verbose와 독립 — 정적 구조 정보와 동적 상태 정보는 관심사 분리.
+        value_format: 값 포맷 스펙 (None이면 적응형 기본). 상세는 _format_value.
     """
     parts: list[str] = []
 
@@ -82,7 +119,7 @@ def _dot_var(v: Variable, verbose: bool = False, show_value: bool = False) -> st
 
     # 값 (동적 정보) — 변수명(또는 info) 뒤면 " = "로 연결
     if show_value and v.data is not None:
-        value = f'{float(v.data):.4g}'
+        value = _format_value(float(v.data), value_format)
         parts.append(f' = {value}' if len(parts) > 0 else value)
 
     # HTML-like label: '<...>' 로 감싸면 Graphviz가 HTML 해석.
@@ -91,15 +128,19 @@ def _dot_var(v: Variable, verbose: bool = False, show_value: bool = False) -> st
     return f'{id(v)} [label=<{label}>, color=orange, style=filled]\n'
 
 
-def _dot_func(f: Function) -> str:
+def _dot_func(f: Function, verbose: bool = False, show_value: bool = False) -> str:
     """Function을 DOT 노드 문자열로 인코딩 (파란 박스) + 입력/출력 간선.
 
+    라벨은 f.dot_label(show_param) 훅 — 기본은 클래스명(구조만, 책 방식).
+    파라미터 표시 조건: verbose(정적 상세) **또는** show_value(값의 해석 맥락 —
+    값 추적 시 Pow의 c가 있어야 어떤 항의 값인지 해석 가능).
     v1은 단출력(스칼라) 가정이므로 f.output은 weakref.ref 단수.
     """
     assert f.inputs is not None, "f.inputs must be set"
     assert f.output is not None, "f.output must be set"
 
-    ret = f'{id(f)} [label="{f.__class__.__name__}", color=lightblue, style=filled, shape=box]\n'
+    show_param = verbose or show_value
+    ret = f'{id(f)} [label="{f.dot_label(show_param)}", color=lightblue, style=filled, shape=box]\n'
 
     # 입력 간선: 각 input Variable → 이 Function
     dot_edge = '{} -> {}\n'
@@ -118,6 +159,7 @@ def fold_dot_graph(
     output: Variable,
     verbose: bool = True,
     show_value: bool = False,
+    value_format: "str | None" = None,
 ) -> str:
     """output에서 역방향으로 그래프를 순회하며 DOT 텍스트를 합성(fold).
 
@@ -128,20 +170,21 @@ def fold_dot_graph(
         output: 그래프의 최종 출력 Variable (순회 시작점).
         verbose: True면 Variable 노드에 shape/dtype 추가 (정적 정보).
         show_value: True면 Variable 노드에 값 추가 (동적 정보, 디버깅용).
+        value_format: 값 포맷 스펙 (None이면 적응형 기본). 상세는 _format_value.
 
     Returns:
         완성된 DOT 텍스트 ("digraph g { ... }").
     """
     # output 노드는 순회 시작 전 먼저 찍기 (iter_reverse_topo가 yield하는 건 Function뿐)
-    txt = _dot_var(output, verbose, show_value)
+    txt = _dot_var(output, verbose, show_value, value_format)
 
     # 역방향 순회하며 각 Function + inputs를 DOT 텍스트로 누적
     for func in iter_reverse_topo(output):
         assert func.inputs is not None, "func.inputs must be set"
         assert func.output is not None, "func.output must be set"
-        txt += _dot_func(func)
+        txt += _dot_func(func, verbose, show_value)
         for x in func.inputs:
-            txt += _dot_var(x, verbose, show_value)
+            txt += _dot_var(x, verbose, show_value, value_format)
 
     return f'digraph g {{\n{txt}}}'
 
@@ -156,6 +199,7 @@ def plot_dot_graph(
     output: Variable,
     verbose: bool = True,
     show_value: bool = False,
+    value_format: "str | None" = None,
     to_file: str = 'output/graph.png',
 ) -> str:
     """계산 그래프를 DOT로 인코딩하여 Graphviz로 렌더링, 파일로 저장.
@@ -173,6 +217,7 @@ def plot_dot_graph(
         output: 그래프의 최종 출력 Variable.
         verbose: True면 Variable 노드에 shape/dtype 추가 (정적 정보).
         show_value: True면 Variable 노드에 값 추가 (동적 정보, 디버깅용).
+        value_format: 값 포맷 스펙 (None이면 적응형 기본). 상세는 _format_value.
         to_file: 출력 파일 경로. **확장자가 렌더링 포맷 결정**.
             지원 포맷: png (범용/문서), svg (벡터/VSCode에서 텍스트로도 까볼 수 있음),
             pdf (인쇄/발표). 그 외 확장자는 ValueError.
@@ -194,7 +239,7 @@ def plot_dot_graph(
             f"지원 포맷: {sorted(SUPPORTED_FORMATS)} (png/svg/pdf)"
         )
 
-    dot_graph = fold_dot_graph(output, verbose, show_value)
+    dot_graph = fold_dot_graph(output, verbose, show_value, value_format)
 
     # 산출물 디렉터리 보장 — to_file이 'output/foo.png'면 같은 폴더에 DOT도 저장
     out_dir = os.path.dirname(to_file) or '.'

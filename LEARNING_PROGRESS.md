@@ -24,10 +24,10 @@
 
 ## 📈 전체 요약
 
-- **완료**: 26 / 60 (step01~26 ✅)
+- **완료**: 27 / 60 (step01~27 ✅)
 - **진행 중**: 0
 - **막힘**: 0
-- **마지막 업데이트**: 2026-08-19 — step26 정리 완료 (step25에서 선행 커버된 것 공식 ✅ 처리. 별도 코드 없음)
+- **마지막 업데이트**: 2026-08-19 — step27 완료 (테일러 급수 미분 — Sin 승격 + my_sin. ★ 근사 다항식의 역전파 = cos 실증. 시각화 도구 2건 개선)
 - ★ **step25/26 특이사항 (해결됨)**: step25 작업 시 step26 영역(Goldstein 그래프 출력)까지 선행 커버했었음 (정답지 배분 착각). 2026-08-19 브로 책 재확인으로 step26 본문에 코드 외 새 개념 없음 확인 → step26 공식 ✅ 처리 완료. 시각화 2부작 종결.
 
 ---
@@ -80,7 +80,7 @@
 |---|---|---|---|---|---|
 | step25 | 계산 그래프 시각화(1) | ✅ | [#31](https://github.com/ghjang/deep-learning-from-scratch-3/issues/31) | 2026-08-11 | Graphviz DOT 시각화 4종 (fold_dot_graph + plot_dot_graph); 변형 7종 (fold 네이밍, weakref 단수, subprocess 안전, IPython 제거, f-string, output/ 폴더, show_value); 변수명 볼드 (HTML-like label); 포맷 화이트리스트 (png/svg/pdf); 순회 공통화 발견 → 이슈 32번/33번. ★ step25/26 코드 배분 착각으로 step26 영역(Goldstein 출력)까지 선행 커버 — 2026-08-19 step26 공식 ✅ 처리로 해결. 상세는 LEARNING_NOTES step25 / 이슈 31번 코멘트. |
 | step26 | 계산 그래프 시각화(2) | ✅ | [#31](https://github.com/ghjang/deep-learning-from-scratch-3/issues/31) (step25가 커버) | 2026-08-19 | ★ step25에서 선행 커버 완료 (Goldstein 그래프 출력 = 정답지 step26 코드 전부). 별도 이슈 없음 — step26.py는 리다이렉트 docstring만. 브로 책 재확인: step26 본문에 코드 외 새 개념 없음 |
-| step27 | 지수/로그 함수 (Exp, Log) | ⏳ | - | - | - |
+| step27 | 테일러 급수 미분 | ✅ | [#34](https://github.com/ghjang/deep-learning-from-scratch-3/issues/34) | 2026-08-19 | Sin 승격 (v1 첫 수학 함수) + my_sin 테일러 근사; ★ 근사 다항식 역전파 = cos (Define-by-Run 본질 실증); 시각화 개선 2건 (value_format 적응형 + Pow dot_label 훅); 1e-150 풀버전 (노드 377, 삼각형); 테스트 105개 |
 | step28 | 함수 최적화 (경사하강법) | ⏳ | - | - | - |
 | step29 | 뉴턴 방법 (2차 최적화) | ⏳ | - | - | - |
 | step30 | 최적화 자동화 (2차 미분 자동) | ⏳ | - | - | - |

@@ -266,6 +266,15 @@ class Function(ABC):
             "도함수(derivative)를 구현하거나, backward()를 직접 오버라이드하세요."
         )
 
+    def dot_label(self, show_param: bool = False) -> str:
+        """시각화(graphviz)용 라벨. 기본: 클래스명 (구조만 볼 때 — 책 방식).
+
+        show_param=True면 파라미터 포함 — 파라미터를 가진 자식(Pow의 c 등)은
+        오버라이드해서 파라미터를 포함할 것. 예: Pow(c=3).
+        호출 측(_dot_func)이 verbose or show_value 조건으로 결정해 전달.
+        """
+        return type(self).__name__
+
 
 # ===== iter_reverse_topo — 역방향 위상 정렬 순회 제너레이터 ====================
 # fill_grad(역전파), fold_dot_graph(시각화)가 공유하는 순회 알고리즘.
