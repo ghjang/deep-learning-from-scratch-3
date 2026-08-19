@@ -33,6 +33,8 @@
 | 24 | [exploration_24_strategy_iterator_config.md](./exploration_24_strategy_iterator_config.md) | step18 | 전략 패턴, 이터레이터 패턴, "결정 시점"의 딜레마 (Config if문=인라인 전략, DI, PyTorch 합리적 타협) |
 | 25 | [exploration_25_array_priority.md](./exploration_25_array_priority.md) | step21 | `__array_priority__`의 정체 — 책의 매직 넘버 200은 왜 불필요해졌나 (ufunc/rmul 역사, NEP 13, "책 코드도 검증하라" 교훈) |
 | 26 | [exploration_26_numbers_complex.md](./exploration_26_numbers_complex.md) | step22 | 파이썬 숫자 계보 (int 임의 정밀도 / float 64비트 / complex), 오일러 공식, ★★★ "무한 번 미분 가능성 ↔ 기울기 소실" 연결 (부드러움의 역설, sigmoid vs ReLU) |
+| 27 | [exploration_27_rosenbrock.md](./exploration_27_rosenbrock.md) | step28 | Rosenbrock 해부 — 골짜기 바닥이 포물선인 이유(A/B항 역할), "낙하→크롤링" 궤적 실증, 조건수/lr딜레마, ★ 시험 함수 디자인 = 알고리즘 실패 모드의 역설계 (벤치마크 계보), ★★ NFL 정리 — 만능 알고리즘 없음, 선택 지도, 뉴턴 vs SGD (이론적 우위 ≠ 실제 선택) |
+| 28 | [exploration_28_directional_derivative.md](./exploration_28_directional_derivative.md) | step28 | 방향 미분 — "gradient가 가장 가파른 방향"인 이유를 당연시하지 않고 증명 (방향미분 → 내적 → 코사인 3단 유도), ★ 1변수 미분 = 선택지 2개짜리 방향미분, ★ 경사하강법 코드에 내적이 안 보이는 이유 (증명 why와 실행 how의 분리), 등고선 ⊥ gradient 귀결 |
 
 > 파일 번호 = **생성 순서** (탐구 역사 보존)
 > 아래 "추천 읽는 순서"는 처음 읽을 때 논리적 흐름 기준
