@@ -2064,16 +2064,35 @@ x.data -= x.grad / gx2(x.data)   # 크기까지 f''가 결정
 
 ---
 
-## Step 31 — [3고지] 다른 최적화 기법 (직접 구현) [No code]
+## Step 31 — [3고지] 고차 미분(이론 편) [No code]
 
-**Issue**: (링크)
-**완료일**: -
-**상태**: ⏳
+**Issue**: [#37](https://github.com/ghjang/deep-learning-from-scratch-3/issues/37)
+**완료일**: 2026-08-20
+**상태**: ✅
 
 ### 📖 요약 (한 줄)
 
+2번 이상 미분하려면? — grad를 ndarray에서 Variable로 바꾸고, 역전파가 미분 계산식 자체의 계산 그래프를 구성하게 한 뒤, 그 계산 그래프에 다시 역전파를 흘린다 (double backprop).
 
-### ❓ 질문 / 막힌 점
+### 💡 통찰 / 배운 점 (★ 학습 시작 전 브로-AI 대화로 도출)
+
+- **브로 사전 파악 (책 재독)**: 실제 코드 수정은 없고, 30단계 다이어그램을 확장한 설명 중심. "2번 이상의 미분을 반복할 경우 DeZero 구현을 어떻게 변경할 것인가에 대한 고찰"
+- **핵심 아이디어 (브로 도출)**: 현재 `Variable.grad`는 단순 numpy ndarray → 이걸 **Variable로** 바꾼다. 역전파 시 미분 계산식에 대한 계산 그래프를 구성하게 한 후, 그 계산 그래프에 대해 다시 역전파를 흘린다
+- **"머리 꼬임"의 정체 규명** — 꼬임 3지점: (A) backward가 forward를 만든다? (B) gy 시작점의 정체 (상수도 리프 노드) (C) 2층 그래프 구조. 전부 "역전파는 특별한 작업이 아니라 그냥 실행"이라는 전환으로 해소됨
+- **Define-by-Run의 자기 참조** — "실행하면 그래프가 생긴다" 원칙(step07~09)을 backward 자신에게 적용. 순전파/역전파 비대칭이 사라지고 "모든 실행은 그래프를 낳는다" 완전 대칭 성립 — 프레임워크에 특별 모드를 추가한 게 아니라 기존 설계를 일관되게 밀어붙인 결과가 고차 미분
+- **create_graph 옵션 (기본 False)의 존재 이유** — step18 retain_grad/no_grad와 같은 lean 철학: 기본은 버리고 필요할 때만 남긴다 (일반 SGD 학습에 2차 미분 그래프는 메모리만 2배)
+
+### 🔗 관련 링크
+
+- [Issue 37번 — step31 진행 추적](https://github.com/ghjang/deep-learning-from-scratch-3/issues/37)
+- [탐구 노트 30 — double backprop 이론](./notes/exploration_30_double_backprop.md) — 3단 논법, 2층 그래프 ASCII, 꼬임 3지점 해부, step32 미리보기 표
+- 정답지: `steps/step31.py` (`# No code`), `steps/step33.py` (`create_graph=True` 뉴턴 자동화 — 이론의 수확 예고)
+
+### 📝 코드 / 수식 메모
+
+- 코드 없음 (구현은 step32). `rezero/steps/step31.py`는 기록용 docstring만
+- 핵심 수식: d²y/dx² = d/dx(dy/dx) — **dy/dx를 "값"이 아니라 "함수"로 보는 것이 이론의 인식론적 뿌리**
+
 
 
 ### 💡 통찰 / 배운 점

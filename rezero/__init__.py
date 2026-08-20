@@ -25,8 +25,8 @@ rezero — 『밑바닥부터 시작하는 딥러닝 3』 직접 구현 학습 �
   rezero/steps/ — 학습 흔적 전부 (step01~60). 과거 step은 수정 금지.
 
 진행 상황:
-  - 현재 단계: step31 대기 (3고지 고차 미분 3부작 — 이론 편)
-  - 완료한 step: step01 ~ step30 ✅ (+ 고차 미분(준비 편) — 코드 없는 복습 장)
+  - 현재 단계: step32 대기 (3고지 고차 미분 3부작 — 구현 편)
+  - 완료한 step: step01 ~ step31 ✅ (+ 고차 미분(이론 편) — double backprop: 미분도 계산이다)
 """
 
-__version__ = "0.2.6"  # ★ step30 완료 (고차 미분(준비 편) — 복습 장. PATCH bump)
+__version__ = "0.2.7"  # ★ step31 완료 (고차 미분(이론 편) — double backprop. PATCH bump)
