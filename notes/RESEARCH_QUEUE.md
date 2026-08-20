@@ -205,6 +205,20 @@
   - step47 (학습 루프) — 전체 학습 사이클 완성 시
   - 또는 step 진도 여유 생길 때 (step06 탐구 폭발 경험 반영, 무리하지 말 것)
 
+### #7. Define-by-Run의 역사 — Chainer에서 PyTorch까지 (프레임워크 계보)
+
+- **출처**: step31 랩업 중 브로 질문 (2026-08-20) — *"DeZero가 뭔가 모양새가 체이너와 비슷한가봐?"* + *"Chainer는 몇 년 전에 사망(?)했잖아?"*
+- **브로 직감 검증**: ✅ 정확 — DeZero는 사실상 **교육용 미니 Chainer**
+- **핵심**:
+  - 저자 사이토 고키 = **PFN(Preferred Networks, Chainer 개발사) 출신** — `Variable`/`Function` 네이밍 계승
+  - **"Define-by-Run"이라는 용어 자체가 Chainer(2015) 발명** — 동적 계산 그래프 최초 구현
+  - 계보: Chainer(2015) → **PyTorch(2017, 사실상 계승** — "PyTorch is basically Chainer"라는 말이 돌 정도) → 밑딥3 DeZero(2019)
+  - Chainer는 2021~23년 개발 종료("사망")했지만 Define-by-Run은 PyTorch로 **업계 표준** — ★ "프레임워크는 죽어도 패러다임은 승리한다"의 교과서적 케이스
+  - 우리 레포 tests/가 레퍼런스 비교 상대로 PyTorch가 아니라 **Chainer**를 쓰는 것 (Known Gotcha 1)도 혈연의 증거
+  - 확장 주제: double backprop 용어도 Chainer 문서 유래 / TF 1.x→2.x의 Define-by-Run 전환 / 후보 #6 (autograd 패러다임 비교)와 자연 연결
+- **키워드**: `#Chainer` `#PFN` `#사이토고키` `#Define-by-Run역사` `#PyTorch계승` `#프레임워크계보` `#죽었지만이긴` `#double-backprop용어유래` `#TF2.x전환`
+- **회수 조건**: 4고지(step37+, PyTorch 스타일 API 본격화) 진입 시, 또는 후보 #6 회수 시 함께
+
 ---
 
 ## 회수 이력

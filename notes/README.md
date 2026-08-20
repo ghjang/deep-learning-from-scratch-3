@@ -36,6 +36,7 @@
 | 27 | [exploration_27_rosenbrock.md](./exploration_27_rosenbrock.md) | step28 | Rosenbrock 해부 — 골짜기 바닥이 포물선인 이유(A/B항 역할), "낙하→크롤링" 궤적 실증, 조건수/lr딜레마, ★ 시험 함수 디자인 = 알고리즘 실패 모드의 역설계 (벤치마크 계보), ★★ NFL 정리 — 만능 알고리즘 없음, 선택 지도, 뉴턴 vs SGD (이론적 우위 ≠ 실제 선택) |
 | 28 | [exploration_28_directional_derivative.md](./exploration_28_directional_derivative.md) | step28 | 방향 미분 — "gradient가 가장 가파른 방향"인 이유를 당연시하지 않고 증명 (방향미분 → 내적 → 코사인 3단 유도), ★ 1변수 미분 = 선택지 2개짜리 방향미분, ★ 경사하강법 코드에 내적이 안 보이는 이유 (증명 why와 실행 how의 분리), 등고선 ⊥ gradient 귀결 |
 | 29 | [exploration_29_newton_method.md](./exploration_29_newton_method.md) | step29 | 뉴턴 방법 — "곡률을 알면 점프할 수 있다". 1차/2차 근사 대비 (직선엔 바닥 없음, 포물선엔 있음), 갱신식 유도, 원조=방정식 근 찾기(f'에 적용), 2차 수렴 (오차 제곱, 유효숫자 배가 실증 7 iters), ★ "수동 계산"=f'' 손유도 (step30 고차 미분 복선), 국소 최대 함정(f''≤0) 실험, 선택 지도 두 번째 좌표 |
+| 30 | [exploration_30_double_backprop.md](./exploration_30_double_backprop.md) | step31 | double backprop 이론 — "미분도 계산이다" 3단 논법 (미분=계산 → 실행하면 그래프 → 그래프는 재미분 가능). grad ndarray의 기억 상실 문제 (값 vs 식 대비), backward 내부를 Variable 연산으로 (before/after), y=x² 2층 그래프 ASCII 풀코스, ★ 머리 꼬임 3지점 해부 (backward가 forward를 만든다 / gy도 리프 / 2층 구조), Define-by-Run 자기 참조 ("모든 실행은 그래프를 낳는다" 완전 대칭). 후속 질문 3연타로 확장된 3개 좌표 — ★ 수학 좌표: Hessian은 특수한 야코비안 (gradient의 Jacobian + 슈발츠 정리 대칭성), ★ 실무 좌표: 사용 빈도의 진실 (1차 압도적/2차 간혹/3차+ 없음 — 능력 시연 ≠ 실무 빈도), ★ 역사 좌표: double backprop 용어의 Chainer 계보 (죽었지만 이긴 프레임워크) |
 
 > 파일 번호 = **생성 순서** (탐구 역사 보존)
 > 아래 "추천 읽는 순서"는 처음 읽을 때 논리적 흐름 기준
