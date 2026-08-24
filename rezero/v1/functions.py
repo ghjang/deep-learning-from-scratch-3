@@ -8,7 +8,7 @@ core.Function을 상속해 apply + derivative hook 구현.
     자식은 apply(순수 수학) + derivative(도함수 hook)만 구현.
 
     복잡도 순:
-    - Neg: lambda x: np.float64(-1.0) * x   (단일, 단항)
+    - Neg: lambda _: -1.0                    (단일, 상수 도함수 — step34 버그 수정)
     - Add: (lambda _: 1, lambda _: 1)        (다변, 상수)
     - Sub: (lambda _: 1, lambda _: -1)       (다변, Add 변형)
     - Mul: (lambda _: x1, lambda _: x0)      (다변, 다른 입력값 의존)
@@ -66,16 +66,23 @@ class Mul(Function):
 
 
 class Neg(Function):
-    """단항 부호: x → -x. 미분: f'(x) = -1."""
+    """단항 부호: x → -x. 미분: f'(x) = -1 (상수).
+
+    ★ step34 버그 수정 (2026-08-24): 이전 `lambda x: np.float64(-1.0) * x`는
+    도함수(-1 상수)가 아니라 원 함수(-x)를 반환하는 버그였다. y = -x의 미분이
+    -x가 되어버림. sin 고차 미분(step34)에서 3차부터 발동해 발견 — v1~v2 공통.
+    은신 이유: 기존 테스트는 순전파 값만 검사 (역전파 테스트 부재).
+    """
 
     @override
     def apply(self, x: np.ndarray) -> np.ndarray:  # type: ignore[override]
         return -x
 
     @override
-    def derivative(self) -> Callable[[np.ndarray], np.ndarray]:
-        # np.float64(-1.0) * x — NumPy 브로드캐스팅이 스칼라/배열 처리.
-        return lambda x: np.float64(-1.0) * x
+    def derivative(self) -> Callable[[np.ndarray], "np.ndarray | float"]:
+        # 도함수는 상수 -1 (float) — Add의 lambda _: 1과 같은 상수 패턴.
+        # 반환 타입에 float 허용 (상수 도함수) — backward에서 ndarray와 곱해짐.
+        return lambda _: -1.0
 
 
 class Sub(Function):

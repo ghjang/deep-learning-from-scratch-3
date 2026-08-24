@@ -5,7 +5,7 @@ step20~22에서 검증한 핵심 케이스를 pytest 스타일로 정리.
 
 import numpy as np
 
-from rezero.v2 import Variable, add, div, mul, neg, pow, rdiv, rsub, sub
+from rezero.v2 import Variable, add, div, fill_grad, mul, neg, pow, rdiv, rsub, sub
 
 
 # ===== 교환법칙 O: +, * (step20) ===============================================
@@ -75,6 +75,38 @@ class TestNegOperator:
         """-0 = 0."""
         x = Variable(np.array(0.0))
         assert (-x).data == np.array(0.0)
+
+    def test_neg_backward(self):
+        """★ y = -x → dy/dx = -1 (상수) — step34 버그 회귀 테스트 (v1~v2 공통 버그).
+
+        derivative가 -1 상수가 아니라 -1.0 * x (원 함수)를 반환해 x.grad = -x가
+        되었음. sin 고차 미분 3차(Neg.backward 첫 호출 시점)에서 발견 (2026-08-24).
+        """
+        x = Variable(np.array(2.0))
+        y = -x
+        fill_grad(y)
+        assert x.grad is not None
+        assert x.grad.data == np.array(-1.0)   # -2.0이면 버그 재발
+
+    def test_neg_backward_higher(self):
+        """★ 상수 도함수의 재미분 — gx 그래프에 x가 없어 x.grad는 None.
+
+        y = -x의 도함수는 상수 -1 → gx = -1·1 그래프의 리프는 ones뿐,
+        원본 x로 가는 간선이 없다 → 재미분이 x에 도달 못 함.
+        수학적으론 d²y/dx² = 0이지만 autodiff는 "연결 없음"으로 표현.
+        dezero 정답지와 동일 동작 (실증 확인 2026-08-24).
+        """
+        x = Variable(np.array(3.0))
+        y = -x
+        fill_grad(y, create_graph=True)
+
+        gx = x.grad
+        assert gx is not None and gx.data is not None
+        assert gx.data == np.array(-1.0)
+
+        x.clear_grad()
+        fill_grad(gx)
+        assert x.grad is None   # 그래프 연결 없음 — 0이 아니라 None
 
 
 # ===== 비교환: - (step22) =====================================================

@@ -5,7 +5,7 @@ step20~22에서 검증한 핵심 케이스를 pytest 스타일로 정리.
 
 import numpy as np
 
-from rezero.v1 import Variable, add, div, mul, neg, pow, rdiv, rsub, sub
+from rezero.v1 import Variable, add, div, fill_grad, mul, neg, pow, rdiv, rsub, sub
 
 
 # ===== 교환법칙 O: +, * (step20) ===============================================
@@ -75,6 +75,19 @@ class TestNegOperator:
         """-0 = 0."""
         x = Variable(np.array(0.0))
         assert (-x).data == np.array(0.0)
+
+    def test_neg_backward(self):
+        """★ y = -x → dy/dx = -1 (상수) — step34 버그 회귀 테스트.
+
+        버그 이력: derivative가 -1 상수가 아니라 -1.0 * x (원 함수)를
+        반환해 x.grad = -x가 되었음. sin 고차 미분 3차에서 발견 (2026-08-24).
+        (2차 미분 검증은 v2 tests — v1은 create_graph 미지원)
+        """
+        x = Variable(np.array(2.0))
+        y = -x
+        fill_grad(y)
+        assert x.grad is not None
+        assert x.grad == np.array(-1.0)   # -2.0이면 버그 재발
 
 
 # ===== 비교환: - (step22) =====================================================

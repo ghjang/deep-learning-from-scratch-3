@@ -21,6 +21,9 @@ v1 (제 1~2고지 스코프)을 step32에서 브랜칭 — 고차 미분(double 
   2. ★ create_graph — fill_grad(y, create_graph=True)로 역전파가 미분 계산
      그래프(2층)를 구성. 기본 False (lean — step18 철학 연장).
      gx = x.grad는 Variable이므로 fill_grad(gx) 재호출이 2차 미분.
+     ★ 재미분 결과가 **None이면 상수 도함수** 신호 — 도함수가 상수가 되는 순간
+     gx 그래프에서 x로 가는 간선이 사라져, x.grad는 0이 아니라 None
+     (dezero와 동일 특성, step34 실증. 수학적으론 dⁿy/dxⁿ = 0).
   3. ★ derivative hook — Callable[[Variable], Variable | float].
      도함수 계산이 Variable 연산으로 수행됨 (Mul/Div/Pow 등이 그래프 생성).
   4. 스칼라 출력 — v1 계승. data는 0차원 스칼라 ndarray, 출력 1개만.

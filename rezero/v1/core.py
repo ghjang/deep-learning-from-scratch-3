@@ -257,8 +257,11 @@ class Function(ABC):
 
         return tuple(downstream_grads)
 
-    def derivative(self) -> Callable[[np.ndarray], np.ndarray] | tuple[Callable, ...]:
+    def derivative(self) -> Callable[[np.ndarray], "np.ndarray | float"] | tuple[Callable, ...]:
         """도함수 hook. 단일 OR 튜플 자유 (부모에서 정규화).
+
+        반환은 ndarray 또는 float 상수 — Add/Neg/Sub처럼 도함수가 상수인
+        함수들이 float를 반환한다 (step34 버그 수정에서 타입 정직화).
 
         스칼라 출력 전용 — df(x) * upstream_grad 공식은 출력이 스칼라일 때만 성립.
         """

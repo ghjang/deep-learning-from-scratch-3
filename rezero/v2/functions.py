@@ -13,7 +13,7 @@ core.Function을 상속해 apply + derivative hook 구현.
     자동 처리) — 달라진 건 "흐르는 데이터의 타입"뿐.
 
     복잡도 순 (★ = v2에서 실제 수정 발생):
-    - Neg: lambda x: -1.0 * x                (단일, 단항. ★ np.float64 제거)
+    - Neg: lambda _: -1.0                    (단일, ★ step34 버그 수정 — 상수 도함수)
     - Add: (lambda _: 1, lambda _: 1)         (다변, 상수 — 그대로)
     - Sub: (lambda _: 1, lambda _: -1)        (다변, Add 변형 — 그대로)
     - Mul: (lambda _: x1, lambda _: x0)       (다변, ★ inputs에서 Variable 꺼내기)
@@ -76,7 +76,12 @@ class Mul(Function):
 
 
 class Neg(Function):
-    """단항 부호: x → -x. 미분: f'(x) = -1."""
+    """단항 부호: x → -x. 미분: f'(x) = -1 (상수).
+
+    ★ step34 버그 수정 (2026-08-24): v1부터 `lambda x: -1.0 * x`였는데 이는
+    도함수(-1)가 아니라 원 함수(-x) 반환 — y=-x의 미분이 -x가 되는 버그.
+    sin 고차 미분 3차부터 발동 (Neg.backward 첫 호출 시점)해 발견.
+    """
 
     @override
     def apply(self, x: np.ndarray) -> np.ndarray:  # type: ignore[override]
@@ -84,9 +89,8 @@ class Neg(Function):
 
     @override
     def derivative(self) -> DerivativeFn:
-        # ★ v2: np.float64 제거 — float * Variable도 __rmul__로 처리되고,
-        #   Variable 그래프가 유지됨 (np.float64가 좌변이면 NumPy가 개입 위험).
-        return lambda x: -1.0 * x
+        # 도함수는 상수 -1 (float) — backward에서 -1.0 * upstream → __rmul__.
+        return lambda _: -1.0
 
 
 class Sub(Function):
