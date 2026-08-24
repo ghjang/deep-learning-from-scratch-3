@@ -21,13 +21,14 @@ core.Function을 상속해 apply + derivative hook 구현.
     - Pow: lambda x: self.c * x**(self.c-1)   (단일, 그대로 — __pow__/__rmul__ 활용)
     - Sin: lambda x: cos(x)                   (★ np.cos → cos 함수 — Cos로 연결)
     - Cos: lambda x: -sin(x)                  (step32 신규 — sin의 고차 미분용)
+    - Tanh: 1 - tanh(x)**2 또는 1-y*y (Config.reuse_output)  (step35 — 자기 참조 + 2전략)
 """
 
 from typing import override
 
 import numpy as np
 
-from rezero.v2.core import DerivativeFn, Function, Variable
+from rezero.v2.core import Config, DerivativeFn, Function, Variable
 
 
 # ===== 구체 함수 클래스 =========================================================
@@ -181,6 +182,47 @@ class Cos(Function):
         return lambda x: -sin(x)
 
 
+class Tanh(Function):
+    """하이퍼볼릭 탄젠트: x → tanh(x). 미분: f'(x) = 1 - tanh(x)².
+
+    ★ step35 신규 — 도함수가 **자기 자신을 참조**하는 특이 구조.
+    4고지 신경망 활성함수 예습이기도 함.
+
+    ★ derivative 구현 전략 2종 (Config.reuse_output — 브로 제안, step18 철학 계승):
+    - False (기본): tanh(x) **재호출** — 도함수 식이 그래프에 self-contained로
+      명시 (1-tanh² 구조가 노드로 보임). Tanh 노드가 미분마다 추가되어 지수 폭증
+      (그래프 3형태 '폭증'의 교재 — 탐구 노트 32).
+    - True: forward **출력 y 재사용** (dezero 방식) — 계산 이득 (tanh 재계산 없음)
+      + Tanh 노드 1개 유지 (폭증 완화). 실증: 재호출 2→4→8 vs 재사용 1→1→1.
+    ★ 읽히는 시점 = 역전파 (derivative는 fill_grad 중 호출) — 순전파가 아니라
+      using_config 블록이 fill_grad를 감싸야 효과가 있다.
+    """
+
+    @override
+    def apply(self, x: np.ndarray) -> np.ndarray:  # type: ignore[override]
+        return np.tanh(x)
+
+    @override
+    def derivative(self) -> DerivativeFn:
+        if Config.reuse_output:
+            # forward 출력 재사용 — weakref 역참조를 클로저로 캡처 (브로 발견).
+            output_ref = self.output
+            assert output_ref is not None, "self.output must be set (__call__ should have run)"
+            y = output_ref()
+            assert y is not None, "output Variable이 이미 회수됨 — 역참조 불가"
+            return lambda _: 1 - y * y
+
+        # 재호출 — tanh(x)가 새 Tanh 노드를 만들며 그래프에 추가 (명시형).
+        # 1 - ...은 __rsub__, **2는 __pow__ — 전부 Variable 연산으로 2차 미분 연결.
+        return lambda x: 1 - tanh(x) ** 2
+
+    @override
+    def dot_label(self, show_param: bool = False) -> str:
+        if show_param and Config.reuse_output:
+            return 'Tanh(reuse)'
+        return 'Tanh'
+
+
 # ===== wrapper 함수 ============================================================
 # wrapper는 단순하게 (Function.__call__ 도입부의 as_variable이 변환 처리).
 def square(x: Variable) -> Variable:
@@ -263,4 +305,15 @@ def cos(x: Variable) -> Variable:
     """코사인 wrapper: cos(x). ★ step32 신규 — Sin 고차 미분용."""
     result = Cos()(x)
     assert isinstance(result, Variable), "Cos는 단일 출력이므로 Variable이어야 함"
+    return result
+
+
+def tanh(x: Variable) -> Variable:
+    """하이퍼볼릭 탄젠트 wrapper: tanh(x). ★ step35 신규 — 자기 참조 도함수.
+
+    derivative 전략은 Config.reuse_output (전역 스위치)로 선택 —
+    using_config('reuse_output', True) 블록이 fill_grad를 감싸면 효율형.
+    """
+    result = Tanh()(x)
+    assert isinstance(result, Variable), "Tanh는 단일 출력이므로 Variable이어야 함"
     return result

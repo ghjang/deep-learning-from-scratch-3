@@ -44,8 +44,14 @@ class Config:
 
     enable_backprop=True (기본) → 역전파 대비 그래프 구축.
     enable_backprop=False       → 순전파 값만 (추론용, 메모리 절약).
+    reuse_output=False (기본)   → derivative가 도함수를 입력으로 재계산 (명시형).
+    reuse_output=True           → derivative가 forward 출력을 재사용 (효율형,
+                                  step35 — tanh 등 출력형 도함수. 탐구 노트 32).
+                                  사용: with using_config('reuse_output', True):
+                                          fill_grad(...)   # 역전파 시점에 읽힘
     """
     enable_backprop: bool = True
+    reuse_output: bool = False
 
 
 @contextlib.contextmanager

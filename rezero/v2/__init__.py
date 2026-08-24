@@ -61,6 +61,7 @@ from rezero.v2.functions import (
     Sin,
     Square,
     Sub,
+    Tanh,
     add,
     cos,
     div,
@@ -72,6 +73,7 @@ from rezero.v2.functions import (
     sin,
     square,
     sub,
+    tanh,
 )
 from rezero.v2.utils import fold_dot_graph, numerical_diff, plot_dot_graph
 
@@ -98,6 +100,7 @@ __all__ = [
     "sin",
     "square",
     "sub",
+    "tanh",
     # functions (클래스 — 고급 사용자용)
     "Add",
     "Cos",
@@ -108,6 +111,7 @@ __all__ = [
     "Sin",
     "Square",
     "Sub",
+    "Tanh",
     # utils
     "fold_dot_graph",
     "numerical_diff",
