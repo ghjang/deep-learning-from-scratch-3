@@ -151,7 +151,7 @@ class Add(Function):
     """
 
     @override
-    def apply(self, x0: np.ndarray, x1: np.ndarray) -> np.ndarray:
+    def apply(self, x0: np.ndarray, x1: np.ndarray) -> np.ndarray:  # type: ignore[override]
         # ★ step12: 리스트 언팩 필요 없이 직접 위치 인수로 받음 (step11 대비 개선)
         y = x0 + x1
 
@@ -166,7 +166,7 @@ class Square(Function):
     """
 
     @override
-    def apply(self, x: np.ndarray) -> np.ndarray:
+    def apply(self, x: np.ndarray) -> np.ndarray:  # type: ignore[override]
         return x ** 2
 
 

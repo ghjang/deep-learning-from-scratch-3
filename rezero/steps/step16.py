@@ -230,7 +230,7 @@ class Square(Function):
     """제곱 함수: x → x². 미분: f'(x) = 2x."""
 
     @override
-    def apply(self, x: np.ndarray) -> np.ndarray:
+    def apply(self, x: np.ndarray) -> np.ndarray:  # type: ignore[override]
         return x ** 2
 
     @override
@@ -247,7 +247,7 @@ class Add(Function):
     """
 
     @override
-    def apply(self, x0: np.ndarray, x1: np.ndarray) -> np.ndarray:
+    def apply(self, x0: np.ndarray, x1: np.ndarray) -> np.ndarray:  # type: ignore[override]
         return x0 + x1
 
     @override

@@ -53,7 +53,7 @@ class Function:
 class Square(Function):
     """제곱 함수: x → x². Function을 상속해 forward만 정의."""
 
-    def forward(self, x):
+    def forward(self, x):  # type: ignore[override]
         return x ** 2
 
 
