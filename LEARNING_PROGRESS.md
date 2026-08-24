@@ -24,10 +24,10 @@
 
 ## 📈 전체 요약
 
-- **완료**: 33 / 60 (step01~33 ✅)
+- **완료**: 34 / 60 (step01~34 ✅)
 - **진행 중**: 0
 - **막힘**: 0
-- **마지막 업데이트**: 2026-08-24 — step33 완료 (뉴턴 자동 계산 — v2 첫 수확, gx2 손유도 소멸). 3고지 step33~36 (고차 미분 응용 4부작) 진입 — 34 sin / 35 tanh / 36 그래프 재사용
+- **마지막 업데이트**: 2026-08-24 — step34 완료 (sin 고차 미분 — ★ Neg 버그 발견/수정(v1~v2 공통), 테스트 222개). 3고지 step35(tanh 그래프 시각화 — 후보 8번 회수) / step36(그래프 재사용) 남음
 - ★ **step25/26 특이사항 (해결됨)**: step25 작업 시 step26 영역(Goldstein 그래프 출력)까지 선행 커버했었음 (정답지 배분 착각). 2026-08-19 브로 책 재확인으로 step26 본문에 코드 외 새 개념 없음 확인 → step26 공식 ✅ 처리 완료. 시각화 2부작 종결.
 
 ---
@@ -87,7 +87,7 @@
 | step31 | 고차 미분(이론 편) [No code] | ✅ | [#37](https://github.com/ghjang/deep-learning-from-scratch-3/issues/37) | 2026-08-20 | double backprop 이론 — grad를 Variable로, 역전파가 미분 계산 그래프 구성 → 재역전파. ★ 탐구 노트 30 (3단 논법 + 머리 꼬임 3지점 해부 + Define-by-Run 자기 참조). 구현은 step32, 수확(뉴턴 자동화)은 step33 |
 | step32 | 고차 미분(구현 편) | ✅ | [#38](https://github.com/ghjang/deep-learning-from-scratch-3/issues/38) | 2026-08-20 | ★ rezero v2 탄생 (v1 브랜칭) — grad의 Variable화 + fill_grad(create_graph) + derivative hook Variable 취급. 구조 생존 원칙 (apply/derivative/fill_grad 100% 유지, 타입만 진화). common 모듈 신설 (numerical_diff). Cos 신규. 테스트 219 (v1 105 + v2 114). dezero 대조 일치. 고차 미분 3부작 완결! |
 | step33 | 뉴턴 방법으로 푸는 최적화(자동 계산) | ✅ | [#39](https://github.com/ghjang/deep-learning-from-scratch-3/issues/39) | 2026-08-24 | step29의 gx2 손유도 함수가 완전히 사라짐 — `fill_grad(y, create_graph=True)` + `fill_grad(gx)`로 f'' 자동 (v2 첫 수확). 7 iters 기계 정밀도 2차 수렴 + dezero 완전 일치. ★ 후보 8번 등록 (2층 그래프 실제 모양 — step35 회수 예정) |
-| step34 | 벡터의 내적 / 행렬의 곱 | ⏳ | - | - | - |
+| step34 | sin 함수 고차 미분 | ✅ | [#40](https://github.com/ghjang/deep-learning-from-scratch-3/issues/40) | 2026-08-24 | 미분 순환 (sin→cos→−sin→−cos) 4곡선 시각화. ★ 벡터/루프 두 버전 대조 (브로 실험 설계) → 3자 대조 전부 True. ★★ 브로 실험이 v1 시절 Neg 버그 발견 (도함수가 아니라 원 함수 반환 — step22부터 은닉, dezero는 멀쩡 = rezero 고유) — v1/v2 수정 + 회귀 테스트 3개 + None 특성 전제 문서화. 큐 후보 8/9번 확장 (그래프 3형태, 용어 이중 구조, v0 아이디어) |
 | step35 | 행렬의 미분 구현 (MatMul) | ⏳ | - | - | - |
 | step36 | 고차 미분 이론 | ⏳ | - | - | - |
 
