@@ -1,7 +1,7 @@
-"""rezero.v1.utils — 유틸리티 함수.
+"""rezero.v2.utils — 유틸리티 함수.
 
-계산 그래프 시각화 (Graphviz DOT) — 그래프 순회 구조와 결합되어 v1 소유.
-numerical_diff는 버전 공통 순수 수학이라 rezero.common으로 이관됨 (step32).
+계산 그래프 시각화 (Graphviz DOT) — 그래프 순회 구조와 결합되어 v2 소유.
+numerical_diff는 버전 공통 순수 수학이라 rezero.common에 상주 (step32).
 """
 
 import math
@@ -10,8 +10,8 @@ import subprocess
 
 import numpy as np
 
-from rezero.common.utils import numerical_diff  # noqa: F401 — v1 API 하위 호환 re-export
-from rezero.v1.core import Function, Variable, iter_reverse_topo
+from rezero.common.utils import numerical_diff  # noqa: F401 — 공통 모듈 re-export
+from rezero.v2.core import Function, Variable, iter_reverse_topo
 
 __all__ = ["fold_dot_graph", "numerical_diff", "plot_dot_graph"]
 
