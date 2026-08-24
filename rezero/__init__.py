@@ -30,8 +30,8 @@ rezero — 『밑바닥부터 시작하는 딥러닝 3』 직접 구현 학습 �
   rezero/steps/ — 학습 흔적 전부 (step01~60). 과거 step은 수정 금지.
 
 진행 상황:
-  - 현재 단계: step33 대기 (뉴턴 방법 자동 계산 — v2 첫 수확: gx2 손유도가 사라진다)
-  - 완료한 step: step01 ~ step32 ✅ (+ 고차 미분(구현 편) — v2 탄생: Define-by-Run이 backward에도 적용)
+  - 현재 단계: step34 대기 (sin 함수의 고차 미분 — 미분 순환 sin→cos→−sin 시각화)
+  - 완료한 step: step01 ~ step33 ✅ (+ 뉴턴 자동 계산 — v2 첫 수확, f'' 손유도 소멸)
 """
 
-__version__ = "0.2.8"  # ★ step32 완료 (고차 미분(구현 편) — v2 브랜칭 + common. PATCH bump)
+__version__ = "0.2.9"  # ★ step33 완료 (뉴턴 자동 계산 — v2 첫 수확. PATCH bump)

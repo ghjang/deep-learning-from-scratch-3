@@ -2150,25 +2150,39 @@ step31 이론을 코드로 — ★ **rezero v2 탄생** (v1 브랜칭): grad의 
 
 ---
 
-## Step 33 — [3고지] 행렬의 미분 이론
+## Step 33 — [3고지] 뉴턴 방법으로 푸는 최적화(자동 계산)
 
-**Issue**: (링크)
-**완료일**: -
-**상태**: ⏳
+**Issue**: [#39](https://github.com/ghjang/deep-learning-from-scratch-3/issues/39)
+**완료일**: 2026-08-24
+**상태**: ✅
 
 ### 📖 요약 (한 줄)
 
+step29의 뉴턴 방법에서 손으로 유도하던 f''(gx2 함수)가 `create_graph=True` + 재역전파로 **자동 계산** — v2 탄생의 첫 수확.
+
+### 💡 통찰 / 배운 점 (★ 학습 시작 전 브로-AI 대화로 도출)
+
+- **step29와의 diff가 딱 2곳**: (1) `y.backward()` → `y.backward(create_graph=True)` (2) `gx2(x.data)` 수동 함수 → `gx.backward()` 자동 — 나머지는 동일한 f(x) = x⁴ − 2x², 같은 루프
+- **탐구 노트 29 복선 회수**: "수동 계산 = f'' 손유도 한계"가 step31 이론 → step32 구현(v2) → step33 수확으로 이어지는 3부작 완결
+- **브로 질문 — "여러 번 미분했을 때 최종 결과가 같은 변수 x를 참조?"**: ✅ 맞음. `Square.backward`의 `2 * x`에서 x는 `self.inputs[0]` = 1층 리프 x와 **같은 Variable 객체**. 1층/2층이 x를 공유하므로 "gx를 x로 미분"이 물리적으로 성립 — 재미분 가능의 구조적 비밀. → **RESEARCH_QUEUE 후보 8번**으로 등록 (step35에서 자연 회수 — 정답지가 바로 gx 그래프 시각화)
+- **수확의 서사**: 뉴턴 갱신 x ← x − f'/f''의 세 성분 중 이제 남은 건 f 하나 — 미분은 전부 프레임워크의 일
 
 ### ❓ 질문 / 막힌 점
 
-
-### 💡 통찰 / 배운 점
-
+- (내 실수 — 즉시 수정) 1차 코드에서 Pylance 10 errors (Optional 가드 6곳 누락 + dezero `**` type ignore) — 신설 원칙("pyright 전체 실행")대로 바로 잡음. 원칙의 첫 실전 작동
 
 ### 🔗 관련 링크
 
+- [Issue 39번 — step33 진행 추적](https://github.com/ghjang/deep-learning-from-scratch-3/issues/39)
+- [탐구 노트 29 — 뉴턴 방법](./notes/exploration_29_newton_method.md) — "수동 계산" 한계의 원점
+- [탐구 노트 30 — double backprop 이론](./notes/exploration_30_double_backprop.md) — 이 수확의 이론
+- `notes/RESEARCH_QUEUE.md` 후보 8번 — 2층 그래프 실제 모양 시각화 (step35 회수 예정)
 
 ### 📝 코드 / 수식 메모
+
+- 수렴 실증: x₀=2 → 1.4545 → 1.1510 → 1.0253 → 0.00091 → 1.2e-6 → 2.3e-12 → **1.0 (7 iters, 기계 정밀도)** — 오차 제곱(2차 수렴)이 눈에 보임
+- dezero 정답지와 최종값 완전 일치 (1.0 == 1.0)
+- 루프 패턴: `fill_grad(y, create_graph=True)` → `gx = x.grad` → `x.clear_grad()` → `fill_grad(gx)` → `gx2 = x.grad.data` → `x.data -= gx.data / gx2`
 
 
 ---
