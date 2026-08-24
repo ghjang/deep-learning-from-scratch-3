@@ -3,7 +3,7 @@ rezero.steps.step34 — [3고지] sin 함수 고차 미분
 =====================================================================
 
 ★ 책 공식 제목 "sin 함수 고차 미분". sin을 3번 미분해 y/y'/y''/y''' 곡선으로
-**미분 순환**(sin→cos→−sin→−cos)을 실증하는 능력 시연 스텝.
+**미분 순환**(sin→cos→-sin→-cos)을 실증하는 능력 시연 스텝.
 
 ★★★ 이 step의 실험 — 두 버전 대조 (브로 제안):
 
@@ -107,7 +107,7 @@ logs_b = run_loop_version()
 tb = time.perf_counter() - t0
 print(f"실행: {tb:.3f}s — 스칼라 Variable 200개 각각 3계 미분")
 
-# 수학적 기대값 (y=sin, y'=cos, y''=−sin, y'''=−cos)
+# 수학적 기대값 (y=sin, y'=cos, y''=-sin, y'''=-cos)
 xs = np.linspace(-7, 7, 200)
 expected = [np.sin(xs), np.cos(xs), -np.sin(xs), -np.cos(xs)]
 labels = ["y=sin(x)", "y'", "y''", "y'''"]
@@ -132,7 +132,7 @@ fig, ax = plt.subplots(figsize=(10, 6))
 for k in range(4):
     ax.plot(xs, logs_a[k], label=labels[k])
 
-ax.set_title('Higher-order derivatives of sin(x) — sin → cos → −sin → −cos (cycle)')
+ax.set_title('Higher-order derivatives of sin(x) — sin → cos → -sin → -cos (cycle)')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
 ax.legend(loc='lower right')

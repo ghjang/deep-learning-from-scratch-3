@@ -17,7 +17,7 @@ rezero.steps.step33 — [3고지] 뉴턴 방법으로 푸는 최적화(자동 �
   x.data -= gx.data / gx2                x.data -= gx.data / gx2
 
   사라진 건 단 하나 — 손으로 유도해 들고 다녀야 했던 gx2 함수.
-  f(x) = x⁴ − 2x²도 같고, 갱신식도 같고, 루프도 같다.
+  f(x) = x⁴ - 2x²도 같고, 갱신식도 같고, 루프도 같다.
 
 복선 회수 3부작 완결:
   step29 "수동 한계 발견" (탐구 노트 29)
@@ -26,10 +26,10 @@ rezero.steps.step33 — [3고지] 뉴턴 방법으로 푸는 최적화(자동 �
     → step33 수확 ← 지금 여기. v2의 첫 배당.
 
 수학:
-  f(x)  = x⁴ − 2x²
-  f'(x) = 4x³ − 4x          → f' = 0의 근: x = 0 (국소 최대 함정), x = ±1 (최소)
-  f''(x) = 12x² − 4
-  뉴턴 갱신: x ← x − f'/f'' — x₀ = 2에서 출발하면 1로 2차 수렴 (오차 제곱).
+  f(x)  = x⁴ - 2x²
+  f'(x) = 4x³ - 4x          → f' = 0의 근: x = 0 (국소 최대 함정), x = ±1 (최소)
+  f''(x) = 12x² - 4
+  뉴턴 갱신: x ← x - f'/f'' — x₀ = 2에서 출발하면 1로 2차 수렴 (오차 제곱).
 
 실행: uv run python rezero/steps/step33.py
 """
@@ -51,7 +51,7 @@ def f(x: Variable) -> Variable:
 
 
 # ===== 뉴턴 방법 — 자동 계산 (f''를 프레임워크가 알아서) =======================
-print("=== 뉴턴 방법 (자동 계산) — f(x) = x⁴ − 2x², x₀ = 2 ===")
+print("=== 뉴턴 방법 (자동 계산) — f(x) = x⁴ - 2x², x₀ = 2 ===")
 print("기대: 최소점 x = 1 로 2차 수렴 (오차 제곱 — 유효숫자 배가)\n")
 
 x = Variable(np.array(2.0))
@@ -64,12 +64,12 @@ for i in range(iters):
     x.clear_grad()
     fill_grad(y, create_graph=True)   # ★ ① 역전파가 그래프를 남기며 (2층 구축)
 
-    gx = x.grad                        # ★ ② f' — Variable (4x³−4x라는 "식")
+    gx = x.grad                        # ★ ② f' — Variable (4x³-4x라는 "식")
     assert gx is not None and gx.data is not None
     x.clear_grad()
     fill_grad(gx)                      # ★ ③ f'' 자동 — gx2 손유도 함수 대체!
     assert x.grad is not None and x.grad.data is not None
-    gx2 = x.grad.data                  # f'' = 12x² − 4
+    gx2 = x.grad.data                  # f'' = 12x² - 4
 
     assert x.data is not None          # Pylance Optional 가드 (data는 유지되지만 타입상 Optional)
     x.data -= gx.data / gx2            # 뉴턴 갱신 (step29와 동일 라인)
@@ -116,5 +116,5 @@ assert float(dx.data) == final
 print("→ 완전 일치 — rezero v2의 double backprop이 정답지와 같은 길을 걷는다.")
 
 print()
-print("★ step33 완료 — v2 첫 수확. 뉴턴 갱신 x ← x − f'/f''의 세 성분")
+print("★ step33 완료 — v2 첫 수확. 뉴턴 갱신 x ← x - f'/f''의 세 성분")
 print("  (f, f', f'') 중 이제 남은 건 f 하나. 미분은 전부 프레임워크의 일.")
