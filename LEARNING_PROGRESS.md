@@ -24,10 +24,10 @@
 
 ## 📈 전체 요약
 
-- **완료**: 31 / 60 (step01~31 ✅)
+- **완료**: 32 / 60 (step01~32 ✅)
 - **진행 중**: 0
 - **막힘**: 0
-- **마지막 업데이트**: 2026-08-20 — step31 완료 (고차 미분(이론 편) — double backprop. ★ step30+31 하루 완성, 고차 미분 3부작 마지막 문턱 step32 구현 편 남음)
+- **마지막 업데이트**: 2026-08-20 — step32 완료 (고차 미분(구현 편) — ★ v2 패키지 탄생 + common 모듈. ★ 하루 3 step 완료: 30/31/32! 고차 미분 3부작(준비/이론/구현) 완결)
 - ★ **step25/26 특이사항 (해결됨)**: step25 작업 시 step26 영역(Goldstein 그래프 출력)까지 선행 커버했었음 (정답지 배분 착각). 2026-08-19 브로 책 재확인으로 step26 본문에 코드 외 새 개념 없음 확인 → step26 공식 ✅ 처리 완료. 시각화 2부작 종결.
 
 ---
@@ -85,7 +85,7 @@
 | step29 | 뉴턴 방법으로 푸는 최적화(수동 계산) | ✅ | [#36](https://github.com/ghjang/deep-learning-from-scratch-3/issues/36) | 2026-08-19 | 뉴턴 갱신 x ← x - f'/f'' (접하는 포물선의 바닥으로 점프); 2차 수렴 실증 (7 iters 기계 정밀도); 국소 최대 함정 실험; 그림 2장 (연쇄 + 어긋난 바닥 클로즈업); ★ 탐구 노트 29 (접촉 3조건 → 곡률 정체 → 물리 평행 "원동력은 2차에 있다"); step30 고차 미분 복선 |
 | step30 | 고차 미분(준비 편) | ✅ | - (복습 장 — 별도 이슈 없음) | 2026-08-20 | [No code] 복습/조망 장 — Variable/Function/역전파 구조를 그림·다이어그램으로 재정리 (코드 0건, 브로 책 재독으로 완료). 고차 미분 3부작(31 이론/32 구현) 전 호흡 조절 |
 | step31 | 고차 미분(이론 편) [No code] | ✅ | [#37](https://github.com/ghjang/deep-learning-from-scratch-3/issues/37) | 2026-08-20 | double backprop 이론 — grad를 Variable로, 역전파가 미분 계산 그래프 구성 → 재역전파. ★ 탐구 노트 30 (3단 논법 + 머리 꼬임 3지점 해부 + Define-by-Run 자기 참조). 구현은 step32, 수확(뉴턴 자동화)은 step33 |
-| step32 | 다른 함수 최적화 (뉴턴 적용) | ⏳ | - | - | - |
+| step32 | 고차 미분(구현 편) | ✅ | [#38](https://github.com/ghjang/deep-learning-from-scratch-3/issues/38) | 2026-08-20 | ★ rezero v2 탄생 (v1 브랜칭) — grad의 Variable화 + fill_grad(create_graph) + derivative hook Variable 취급. 구조 생존 원칙 (apply/derivative/fill_grad 100% 유지, 타입만 진화). common 모듈 신설 (numerical_diff). Cos 신규. 테스트 219 (v1 105 + v2 114). dezero 대조 일치. 고차 미분 3부작 완결! |
 | step33 | 행렬의 미분 이론 | ⏳ | - | - | - |
 | step34 | 벡터의 내적 / 행렬의 곱 | ⏳ | - | - | - |
 | step35 | 행렬의 미분 구현 (MatMul) | ⏳ | - | - | - |

@@ -2106,25 +2106,46 @@ x.data -= x.grad / gx2(x.data)   # 크기까지 f''가 결정
 
 ---
 
-## Step 32 — [3고지] 다른 함수 최적화 (뉴턴 적용)
+## Step 32 — [3고지] 고차 미분(구현 편)
 
-**Issue**: (링크)
-**완료일**: -
-**상태**: ⏳
+**Issue**: [#38](https://github.com/ghjang/deep-learning-from-scratch-3/issues/38)
+**완료일**: 2026-08-20
+**상태**: ✅
 
 ### 📖 요약 (한 줄)
 
+step31 이론을 코드로 — ★ **rezero v2 탄생** (v1 브랜칭): grad의 Variable화 + `fill_grad(y, create_graph=True)` + derivative hook의 Variable 취급. `y = x²`의 f''(2)=2가 자동으로 나오는 순간.
+
+### 💡 통찰 / 배운 점 (★ 학습 시작 전 브로-AI 대화로 도출)
+
+- **브로 사전 파악 (책 재독)**: "그렇게 수정사항이 많은 것은 아니지만 어쨌든 코드 수정이 필요하게 되었군"
+- **정답지 분포 확인**: `steps/step32.py`는 `# No code` — 구현의 실체는 **`dezero/core.py`** (backward에 `create_graph`). `core_simple.py`엔 미반영 (학습용 단순 버전)
+- **책 변경 3가지**: (1) 시작 grad를 `Variable(np.ones_like)`로 — gy도 리프 (2) `f.backward` 호출을 `with using_config('enable_backprop', create_graph):`로 감싸기 — step18 Config 메커니즘의 재활용, 새 메커니즘 0 (3) 각 Function.backward가 Variable 연산으로
+- **★ 구조 생존 원칙 (브로 도출 — "apply/derivative 구조는 거의 다 살릴 수 있는 것 아닌가?")**: apply/derivative hook + fill_grad 전역 함수 + iter_reverse_topo 순회 100% 생존. 바뀐 건 "흐르는 데이터의 타입"(ndarray→Variable)뿐 — derivative 본문 `2 * x`는 그대로인데 `x.__rmul__` → `mul()`로 자동 전환 (연산자 오버로딩의 힘)
+- **★ Mul/Div의 `.data` 제거가 분기점**: `self.inputs[i].data` 꺼내면 ndarray 세계로 추락 (그래프 상실), Variable 그대로 꺼내면 gx가 그래프를 가짐 — "한 줄이 값과 식을 가른다"
+- **v2 브랜칭 결정 (브로 논리)**: A안(v1 진화)이어도 함수 클래스 전부 수정해야 하는 구조 → 스냅샷을 남기는 v2가 합리적. 책의 core_simple/core 이분법과 평행
+- **common 모듈 (브로 제안)**: numerical_diff는 grad 타입 무관한 진짜 공통 → `rezero/common/` 이관. 판별 기준 "grad/그래프 구조에 의존하는가?" — vX는 박제가 아닌 살아있는 코드라 공통은 한 곳에서 유지보수
+- **Cos 신규**: Sin derivative가 `np.cos(x)` → `cos(x)` (Variable 함수)가 되어야 2차 미분 그래프가 연결됨 — sin 고차 미분(step34)을 위한 파급
 
 ### ❓ 질문 / 막힌 점
 
-
-### 💡 통찰 / 배운 점
-
+- (시행착오 — 해결) v2 복사 시 core.py 매직메서드 **지연 import 10곳이 v1.functions 참조** → v2 Variable이 v1 연산 타서 77 failed. 복사 브랜칭 시 지연 import 전수 확인 필수
+- (시행착오 — 해결) 테스트 일괄 변환(sed)이 isclose/산술/중첩 allclose 패턴 놓침 — 전수 grep `.grad[^.]` 잔여 확인으로 방어
+- (브로 발견 — 해결) 커밋 전 브로가 VSCode에서 발견한 **Pylance 96 errors**: grad Optional 가드 누락 + numerical_diff **반공변** 오류. common 제네릭화(TypeVar+Protocol) + 가드 85곳 + 과거 steps 11곳 표식 → **0 errors**. ★ "패키지 구조 변경 시 pyright 전체 실행" 원칙 신설 (AGENTS.md) + 탐구 노트 31 파생
 
 ### 🔗 관련 링크
 
+- [Issue 38번 — step32 진행 추적](https://github.com/ghjang/deep-learning-from-scratch-3/issues/38)
+- [탐구 노트 30 — double backprop 이론](./notes/exploration_30_double_backprop.md) — 이 step이 구현한 이론의 전체 지도
+- [탐구 노트 31 — Python 제네릭](./notes/exploration_31_python_generics.md) — 96 errors 사건 파생 (TypeVar/Protocol/반공변)
+- `REZERO_CHANGES.md` 항목 038 — v2 브랜칭 + grad Variable화 + common 모듈 회계
+- `AGENTS.md` "버전 폴더 전략" — v1/v2 선택 가이드 갱신됨
 
 ### 📝 코드 / 수식 메모
+
+- 사용법 변화 (v1→v2): `fill_grad(y, create_graph=True)` → `gx = x.grad` (Variable) → `x.clear_grad()` → `fill_grad(gx)` → `x.grad.data`가 f''
+- 검증: y=x² → f''(2)=2 / y=x⁴ → f'''(2)=48 (3층 그래프 — n차가 "공짜") / sin → y''=-sin(1) / 기본 모드 gx.creator=None (lean)
+- 테스트: v1 105 + v2 114 (double backprop 9 신규) = 219 passed + dezero 대조 일치
 
 
 ---

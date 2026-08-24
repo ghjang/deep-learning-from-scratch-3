@@ -42,11 +42,11 @@
 |---|---|---|---|
 | **타입 힌트 / 정적 분석** | #001, #008 | 2 | ndarray 힌트 세트, Optional grad |
 | **네이밍 (의미 투명성)** | #002, #007, #015, #017, #019, #021, #022, #023, #025 | 9 | input_var, upstream_grad, fill_grad, worklist, output 단수, clear_grad, visited, schedule, 크로스참조 시도/철회 |
-| **구조 / 추상화 (Function 핵심 설계)** | #003, #004, #010, #011, #013, #014 | 6 | ABC, @override, derivative/apply hook 대칭, backward→fill_grad 전역 함수 |
+| **구조 / 추상화 (Function 핵심 설계)** | #003, #004, #010, #011, #013, #014, #037 | 7 | ABC, @override, derivative/apply hook 대칭, backward→fill_grad 전역 함수, iter_reverse_topo 순회 제너레이터 |
 | **검증 / 방어막** | #016, #029 | 2 | assert vs RuntimeError 구분, property/len None 가드 |
 | **메모리 관리** | #026, #027, #033 | 3 | weakref 순환 끊기, Config/no_grad 절약 모드, __array_priority__ 버림 |
 | **API 설계 (매개변수/표현/연산자)** | #028, #030, #031, #034, #035 | 5 | name 키워드 전용, Variable( 대문자 repr, 매직메서드 클래스 안 정의, __radd__/wrapper 정리, 3원칙 자동 적용 + Pow DRY + Neg 단순화 |
-| **패키지 구조** | #036 | 1 | 버전 폴더(v1/v2/v3) + 순환 참조 해결(지연 import) + 주석 정리 기준 |
+| **패키지 구조** | #036, #038 | 2 | 버전 폴더(v1/v2/v3) + 순환 참조 해결(지연 import), ★v2 브랜칭 + grad Variable화 + common 모듈 |
 | **유틸 / step 한정 / 문서 정비** | #005, #006, #009, #012, #018, #020, #024, #032 | 8 | name shadowing, numerical_diff docstring, backward docstring, set_creator 복선, pipe(FP), 주석 정비, fill_grad 통합, Mul derivative hook 재평가 |
 
 ### 회수 분류와의 관계 (step23 패키지화 시)
@@ -1649,6 +1649,66 @@ step25에서 `fold_dot_graph`(시각화)를 구현하다가, `fill_grad`(역전�
 - 이슈 33번 (fold 스냅샷 아이디어 — 본 제너레이터 위에서 자연스럽게 구현 가능)
 - 탐구 노트 20번 섹션 4/5/9 (설계 + 회수)
 - 탐구 노트 21번 (yield/제너레이터 심화)
+
+### #038 — ★★★ v2 브랜칭 + grad의 Variable화 + common 모듈 (step32 — 고차 미분(구현 편))
+
+**배경**:
+- step31 이론 (double backprop — 탐구 노트 30)의 구현 단계.
+- grad ndarray→Variable은 API 호환성이 깨지는 대개편 (`x.grad` → `x.grad.data`).
+- ★ 브로 논리로 결정: "A안(v1 안 수정)이어도 함수 클래스 전부 수정해야 하는 구조라면
+  스냅샷을 남기는 쪽이 합리적" → v2 브랜칭. 책의 core_simple/core 이분법과 평행
+  ("고차 미분 전(v1)/후(v2)" 나란히 보존).
+
+**내용**:
+
+1. `rezero/v2/` 신설 — v1 전체 복사 후 step32 구현:
+   - `Variable.grad`: `Optional[np.ndarray]` → `Optional["Variable"]`
+     (미분 결과가 "값"에서 "식"으로 — 재미분 가능 = 기억 상실 해소)
+   - `fill_grad(..., create_graph=False)` 파라미터 추가:
+     - 시작 grad를 `Variable(np.ones_like(...))`로 — 상수 1도 그래프의 리프
+     - backward 호출 + grad 누적을 `with using_config('enable_backprop', create_graph):`
+       로 래핑 — ★ 새 메커니즘 0, step18 Config 스위치의 재활용 (탐구 노트 30의
+       "기존 설계를 backward에도 일관 적용"이 코드로 증명된 지점)
+   - `derivative` hook 시그니처: `Callable[[ndarray], ndarray]` →
+     `type DerivativeFn = Callable[[Variable], Variable | float]`
+     (본문 코드는 거의 그대로 — 연산자 오버로딩이 ndarray→Variable 자동 전환.
+     `2 * x`가 `x.__rmul__` → `mul()` 호출)
+   - Mul/Div derivative: `self.inputs[i].data` → `self.inputs[i]` (Variable 그대로
+     꺼내기 — ★ gx가 그래프를 가지느냐의 분기점. ndarray 꺼내면 연결 상실)
+   - Neg: `np.float64(-1.0)` 제거 → `-1.0` (float * Variable → `__rmul__`)
+   - Sin derivative: `np.cos(x)` → `cos(x)` — ★ **Cos 클래스 + wrapper 신규**
+     (sin의 2차 미분 -sin 경로. np.cos이면 ndarray 세계로 추락)
+2. `rezero/common/` 신설 — numerical_diff 이관:
+   - ★ 판별 기준 (브로 합의): "grad 타입/그래프 구조에 의존하는가?"
+     — 무관 → common / 의존 → 각 vX 소유 (시각화는 vX 소유)
+   - `type(x)(...)` + `Protocol`(VariableLike)로 common이 특정 버전을
+     import하지 않음 — 진짜 공통 (v1/v2 어느 Variable에도 동작)
+   - v1/v2 utils는 common을 re-export (API 하위 호환 유지)
+3. ★ 구조 생존 원칙: apply/derivative hook + fill_grad 전역 함수 +
+   iter_reverse_topo 순회 **100% 생존** — 바뀐 건 "흐르는 데이터의 타입"뿐.
+   (v2는 rezero 정체성을 유지하며 고차 미분을 얻음)
+
+**검증**:
+- v1 105 + v2 114 = **219 passed** (v2 = 복제 105 + double backprop 신규 9)
+- 데모 5종 (steps/step32.py): y=x² → f''(2)=2 / y=x⁴ → f'''(2)=48 (3층) /
+  sin → y''=-sin(1) (Cos 경유) / 기본 lean (gx.creator=None) /
+  dezero 대조 (`variable(2.0)` = `Variable(2.0)`)
+- step27 스모크 → ★ 브로 요청으로 **step01~32 전수 실행 점검 OK**로 확대
+  (v1 수정 파급 전수 확인 — common 전환으로 기존 step 파일 전부 무사)
+
+**시행착오 (재발 방지)**:
+- v2 복사 시 core.py의 **매직메서드 지연 import 10곳이 v1.functions를 그대로
+  참조** → v2 Variable이 v1 연산을 타서 77 failed. ★ 복사 브랜칭 시 지연 import
+  전수 확인 필수 (grep "from rezero.v1").
+- 테스트 일괄 변환(sed)은 isclose/산술/`allclose(x.grad, y.grad)` 중첩 패턴을
+  놓치기 쉬움 — 변환 후 **전수 grep** `.grad[^.]`으로 잔여 확인 필수.
+
+**관련**:
+- 이슈 38번 (step32 진행 추적)
+- 탐구 노트 30 (double backprop 이론 — 2층 그래프/구조 생존/3개 좌표)
+- 항목 010/011 (apply/derivative hook — 시그니처 진화로 승계), 014 (fill_grad
+  전역 함수 — create_graph 파라미터 확장), 036 (버전 폴더 전략 — v2 실현)
+- 책 step32 + `dezero/core.py` backward(create_graph)
 
 ---
 

@@ -13,7 +13,7 @@
   v1은 "스칼라 Variable + 자동 역전파" 스코프. 다음 전제들이 성립할 때 사용 가능.
 
   1. 스칼라 출력 — Variable.data는 0차원 스칼라 ndarray.
-     Function은 출력 1개만 반환 (다출력 불가). 벡터/행렬/다출력은 v2(step34+)에서.
+     Function은 출력 1개만 반환 (다출력 불가). 벡터/행렬/다출력은 후속에서.
   2. Define-by-Run — 순전파 실행 시 계산 그래프가 자동 생성됨.
      같은 Variable로 두 번째 forward → 이전 grad 잔류 → 명시적 clear_grad() 필요.
   3. 그래프 구조 — 계산 그래프는 DAG (사이클 없음).
@@ -26,17 +26,20 @@
      no_grad() 블록: 역전파 그래프 구축 생략 (추론용).
      retain_grad=False (기본): 중간 Variable grad 버림.
   6. 역전파 — fill_grad(start_var) 전역 함수로 역전파 시작.
-     derivative hook: df(x) * upstream 공식 (스칼라만).
-     행렬 미분(야코비안)은 v2에서 backward 직접.
+     derivative hook: df(x) * upstream_grad 공식 (스칼라만).
+     행렬 미분(야코비안)은 후속에서 backward 직접 (v2도 아직 스칼라 스코프).
   7. 연산자 — +, -, *, /, **, 단항 - 지원.
      좌변이 scalar/ndarray여도 OK (__radd__/__rmul__).
      __array_priority__ 없이도 현대 NumPy에서 동작.
      Pow의 지수 c는 상수 (Variable 아님, 미분 대상 X).
-  8. 미지원 — 벡터/행렬/텐서 연산 (v2+), 복소수 미분,
-     cos/exp/log 등 수학 함수 (step28+에서 추가), 다출력 함수 (Split 등, step34+).
+  8. 미지원 — 고차 미분 (★ v2에서 — step32 브랜칭), 벡터/행렬/텐서 연산,
+     복소수 미분, cos 외 수학 함수, 다출력 함수 (Split 등).
 
   ★ 전제가 깨지면? — RuntimeError/TypeError로 방어. 상세는 core.py 각 가드 참조.
-  ★ v1→v2 진화 시점: step34 (행렬 미분). 항목 013(derivative hook) 붕괴 지점.
+  ★ v1→v2 브랜칭: 실제로는 **step32**에서 일어남 (고차 미분 — grad의 Variable화).
+    당초 예상과 달리 항목 013(derivative hook)은 붕괴 없이 시그니처만 진화
+    (DerivativeFn — 항목 038). v2 사용법은 rezero/v2/__init__.py 참조.
+  ★ numerical_diff는 rezero/common 소유를 re-export (step32 — 버전 공통).
 """
 
 from rezero.v1.core import (
