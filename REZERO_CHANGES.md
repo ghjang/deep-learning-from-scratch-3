@@ -1703,12 +1703,37 @@ step25에서 `fold_dot_graph`(시각화)를 구현하다가, `fill_grad`(역전�
 - 테스트 일괄 변환(sed)은 isclose/산술/`allclose(x.grad, y.grad)` 중첩 패턴을
   놓치기 쉬움 — 변환 후 **전수 grep** `.grad[^.]`으로 잔여 확인 필수.
 
+### #039 — ★★★ Tanh + Config.reuse_output — 도함수 구현 2전략 (step35 — 고차 미분 계산 그래프)
+
+**배경**:
+- step35에서 tanh' = 1−tanh² (자기 참조 도함수) 구현 — 미분 반복 시 그래프 지수 폭증
+  (Tanh 2→4→8→... / Function ≈3배) 실증. dezero는 backward에서 forward 출력 y를
+  재사용 (`self.outputs[0]()`)해 Tanh 1개 유지 — 구현 방식이 그래프 운명을 가름.
+
+**내용**:
+1. `Tanh` 신규 (v2) — 기본 전략은 **재호출형**: `lambda x: 1 - tanh(x) ** 2`.
+   도함수 식이 그래프에 self-contained로 명시 (교재적 가치).
+2. ★ 브로 발견 — "rezero에도 self.output이 있는데 왜 안 써?": 클로저 캡처로
+   재사용형 가능 (`y = self.output(); return lambda _: 1 - y * y`) —
+   실증: Tanh 1개 유지 (2→4→8 vs 1→1→1). 안 쓴 건 불가가 아니라 관습
+   (hook은 "입력의 순수 함수" 관습 + v1 도함수가 전부 입력형).
+3. ★ 설계 변천 (브로 주도): 인스턴스 옵션 `Tanh(reuse_output=...)` 제안 →
+   "wrapper 시그니처 오염, Config는?" 재제안 → **`Config.reuse_output` 전역 스위치**
+   채택 (step18 철학 "역전파 동작 전환은 Config 스위치"와 일관).
+4. ★ 시점 디테일: derivative는 **역전파 중 호출** — `using_config('reuse_output', True)`
+   블록이 **fill_grad를 감싸야** 효과 (순전파 시점 아님).
+5. 단독 사용성 차이: 재호출형만 `Tanh().derivative()`로 f'를 일급 객체로 획득
+   (항목 013의 완성형). 재사용형은 self.output 의존 — 순전파 없이 존재 불가.
+
+**검증**:
+- 227 passed (Tanh 5종: 순전파/gradient check/2차/전략 수치 동일/그래프 1개 유지)
+- pyright 0 errors / 그래프 10장 (재호출·재사용 각 1~5차)
+- 파일 크기 관찰: gx5 2740KB vs gx5_reuse 2330KB — 폭증의 주 범인은 Tanh보다
+  mul/sub 구조 복제 (Function ≈3배 > Tanh 2배)
+
 **관련**:
-- 이슈 38번 (step32 진행 추적)
-- 탐구 노트 30 (double backprop 이론 — 2층 그래프/구조 생존/3개 좌표)
-- 항목 010/011 (apply/derivative hook — 시그니처 진화로 승계), 014 (fill_grad
-  전역 함수 — create_graph 파라미터 확장), 036 (버전 폴더 전략 — v2 실현)
-- 책 step32 + `dezero/core.py` backward(create_graph)
+- 이슈 41번 / 탐구 노트 32 (미분식 해부 — 총정리) / 후보 8번 회수 (큐 첫 완주)
+- 항목 013 (derivative callable — 일급 도함수), 027 (Config 철학), 038 (v2 브랜칭)
 
 ---
 
