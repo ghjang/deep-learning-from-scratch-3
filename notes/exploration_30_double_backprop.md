@@ -284,6 +284,7 @@ step32의 설계 결정 사항. 정답지 `dezero/core_simple.py`와 `rezero/v1/
 - [탐구 노트 29 — 뉴턴 방법](./exploration_29_newton_method.md) — "수동 계산" 한계가 이 노트의 출발점
 - 탐구 노트 11 (autodiff modes), 탐구 노트 13 (미분 표기법) — dy/dx를 "함수"로 보는 관점의 토대
 - [RESEARCH_QUEUE 후보 7번](./RESEARCH_QUEUE.md) — Define-by-Run의 역사 (Chainer→PyTorch 계보 풀스토리)
+- [탐구 노트 34 — 야코비안은 흐르지 않는다](./exploration_34_jacobian_vjp.md) — §8 용어 3형제의 후속: 야코비안은 만들어지지 않고 gradient만 흐른다 (VJP 실체)
 - 정답지: `steps/step31.py` (`# No code`), `steps/step33.py` (create_graph 뉴턴 자동화 — 이론의 수확), `steps/step34.py` (sin 반복 미분 — 능력 시연)
 
 ## 키워드

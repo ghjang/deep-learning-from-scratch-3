@@ -328,6 +328,7 @@ PyTorch, DeZero가 채택한 패러다임:
 ### 🔗 관련 링크
 
 - [exploration_10](./exploration_10_what_is_derivative.md) §6 — "왜 역전파가 필요한가" (본 탐구의 모태)
+- [exploration_34](./exploration_34_jacobian_vjp.md) — ★ 쌍둥이와 재회: 본 탐구의 포워드/리버스 모드가 사실 JVP/VJP였다 (§4 "탐구 노트 11과의 재회" 표)
 - step04 노트 (수치 미분 구현)
 - step07+ (예정): 역전파 구현 — 본 탐구 §5·6의 실제 코드
 - [Colah's Blog: Calculus on Computational Graphs](https://colah.github.io/posts/2015-08-Backprop/) — 역전파/autodiff의 직관적 설명 (영어, 추천)

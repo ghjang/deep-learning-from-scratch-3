@@ -2220,11 +2220,12 @@ sin을 3번 미분해 y/y'/y''/y''' 곡선을 그려 **미분 순환**(sin→cos
   **dezero는 멀쩡** (`backward: return -gy` — core/core_simple 양쪽 코드+실행 실증) — rezero derivative hook 변형 고유의 버그.
   수정: v1/v2 `lambda _: -1.0` + 회귀 테스트 3개 봉인
 - ★ **상수 도함수의 재미분은 None** — y=-x의 2차 미분 시 x.grad가 0이 아니라 None (도함수가 상수가 되는 순간 x로 가는 간선 소멸). dezero 동일 특성 실증. v2 전제 2번에 문서화
-- 야코비안 개념 교정은 4고지 진입 시점에 재검토하기로 (브로 결정)
+- 야코비안 개념 교정은 4고지 진입 시점에 재검토하기로 (브로 결정) → **2026-08-24 회수 완료**: [탐구 노트 34 — 야코비안은 흐르지 않는다](./notes/exploration_34_jacobian_vjp.md)로 승격 (이슈 43 작업 1+2. 후보 10번 + 후보 8번 잔여 회수)
 
 ### 🔗 관련 링크
 
 - [Issue 40번 — step34 진행 추적](https://github.com/ghjang/deep-learning-from-scratch-3/issues/40)
+- [탐구 노트 34 — 야코비안은 흐르지 않는다](./notes/exploration_34_jacobian_vjp.md) — 위 "재검토" 약속의 회수처 (2026-08-24)
 - `notes/RESEARCH_QUEUE.md` 후보 8번 — 그래프 3형태(소멸/순환/폭증) + 용어 이중 구조 + Neg 버그 교훈까지 확장됨
 - 후보 9번 — rezero v0 (NumPy 배제 학습 실험실)
 
