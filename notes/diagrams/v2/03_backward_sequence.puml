@@ -5,60 +5,71 @@ skinparam shadowing false
 skinparam sequenceMessageAlign center
 
 actor "사용자 코드" as User
+participant "x : Variable 리프\n(입력 변수 — 사용자가 참조 유지)" as X
 participant "fill_grad" as FG
 participant "iter_reverse_topo\n(제너레이터)" as Topo
 participant "f : Function\n(예: Square)" as F
-participant "x : Variable\n(리프)" as X
 
-User -> FG : fill_grad(y, create_graph=?)\n예: y = x ** 2
+== 배경 — 순전파 시점 (02 참조) ==
+
+User -> X : x = Variable(np.array(2.0))\n(사용자가 입력 변수 생성 — 이 참조가\n그래프 리프를 살려두는 이유이기도 함)
+note over User, X : 이후 y = x ** 2 순전파로 그래프 구축 완료
+
+== 현재 — 역전파 호출 ==
+
+User -> FG : fill_grad(y, create_graph=?)\ny: 순전파의 최종 결과 Variable\n(역전파 시작점)\n예: y = x ** 2
 activate FG
 
 == 시작 guard + 시작 gradient ==
 
-FG -> FG : creator 없으면 RuntimeError\n(입력 변수에 호출 방지)
-FG -> FG : y.grad = Variable(ones_like(y.data))\n★ v2: 상수 1조차 리프 노드 (gy)
+FG -> FG : y.creator 없으면 RuntimeError\ncreator 없음 2가지:\n① 입력 리프 — 순전파를 거친 적 없는 값\n② no_grad 출력 — 순전파는 거쳤지만 연결 스킵\n(둘 다 역전파할 그래프가 없음)
+FG -> FG : y.grad = Variable(ones_like(y.data))\n씨앗: dy/dy = 1 — 곱셈 항등원\n(chain rule이 곱의 연쇄라 시작은 1)\n★ v2: 상수 1조차 리프 노드 (gy)
 
 == 역전파 메인 루프 ==
 
-loop f in iter_reverse_topo(y)\n(generation 내림차순 — 역위상)
-  FG -> Topo : next()
+loop f in iter_reverse_topo(y)\n— 계산 그래프를 순회 (출력→입력 방향)\nf: 그래프의 각 노드 = 연산 (Function 인스턴스)\n순회 방식: worklist + visited\n(f.generation 내림차순 = 역위상 — 순전파 시 설정된 값)\n다음 후보 탐색: f.inputs 각 변수의 creator를 따라감
+  FG -> Topo : next()\n(Topo 제너레이터에 다음 f 하나 요청)
   activate Topo
   Topo --> FG : yield f (worklist + visited로 중복 방지)
   deactivate Topo
 
-  FG -> F : output = f.output()\n(weakref 역참조)
+  FG -> F : f.output()\n(F 소유의 weakref 역참조 — f의 출력 변수 요청)
   activate F
-  FG -> F : upstream = output.grad
+  F --> FG : output (Variable 타입)\n(Function이 낳은 출력 변수)
+  FG -> FG : upstream = output.grad\n(방금 받은 output Variable의 속성 읽기)
 
   opt create_graph == True (v2 ★)
-    FG -> FG : using_config('enable_backprop', True)\n→ 이 블록의 Variable 연산이 그래프를 남김
+    FG -> FG : using_config('enable_backprop', True)\n목적: 다음 차수(2차) 미분 대비 — 이 블록의\n역전파 연산이 그래프를 남겨 gx가 식이 되게 함
   end
 
-  FG -> F : f.backward(upstream)\n(★ 국소 VJP — 노트 34 §11)
+  FG -> F : f.backward(upstream)\n(★ 국소(local) VJP — 노트 34 §11)
   activate F
   F -> F : derivative() → df\n예: lambda x: 2 * x
-  F -> F : local = df(x)\n★ Variable 연산 (v2)\n2 * x → x.__rmul__ → mul() 호출
+  F -> F : local = df(x)\n★ Variable 연산 (v2)\n2 * x → x.＿rmul＿ → mul() 호출
   F -> F : downstream = local * upstream\n(또 Variable 연산 — 2층 그래프 생성)
   deactivate F
   F --> FG : (downstream,)
 
-  FG -> X : x.grad가 None이면 대입\n아니면 x.grad + downstream (★누적)
+  FG -> X : x.grad가 None이면 대입\n아니면 x.grad + downstream (★누적)\n왜? 같은 변수가 여러 갈래로 쓰이면 기여도 합산\n(예: add(x,x)=2x → 1+1=2, step14)
   activate X
-  X --> FG : x.grad 갱신
+  X --> FG : x.grad 갱신됨
   deactivate X
 
   opt retain_grad == False (기본)
-    FG -> FG : output.grad = None\n(중간 grad 버리기 — 메모리 절약, step18)
+    FG -> FG : output.grad = None\n(output = 순회 중인 f의 출력 = 중간 변수.\n이 중간 grad를 버림 — 보통 리프(x) grad만 필요.\n메모리 절약, step18. True면 유지: 관찰/디버깅용)
   end
   deactivate F
 end
 
-FG --> User : 리턴 없음 (None)\nx.grad를 읽어 사용
+FG --> User : 리턴 없음 (None)
 deactivate FG
+User -> X : x.grad 읽기\n(역전파의 산물 — 기울기 사용: 갱신·로깅 등)
 
 note over User, X
-  <b>역전파 = 국소 VJP의 연쇄</b>
-  각 노드는 "자기 미분 공식 × upstream"만 계산 —
+  <b>역전파 = 국소(local) VJP의 연쇄</b>
+  국소 = 각 노드는 자기 미분 공식만 계산
+  (순회 중 그 시점의 함수 하나에 국한) —
+  전체 미분은 국소 계산들의 곱과 누적으로 완성.
   야코비안 행렬은 어디에도 없다 (노트 34).
   v2에서 이 연산 자체가 Variable 연산이라
   create_graph=True면 2층 그래프가 남는다.

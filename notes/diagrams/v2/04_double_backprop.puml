@@ -16,11 +16,11 @@ package "1층 — 원래 함수의 그래프 (y = x², 순전파)" #E3F2FD {
 ' ===== 2층 — 역전파가 '만든' 미분 계산 그래프 =====
 package "2층 — 미분 계산 그래프 (역전파가 생성, create_graph=True)" #FFEBEE {
   object "gy : Variable\ndata = 1.0\n★ 리프 (상수 1도 Variable!)" as gy
-  object "c2 : Variable\ndata = 2.0\n★ 리프 (상수 2도 Variable!)" as c2
+  object "c2 : Variable\ndata = 2.0\n★ 리프 — derivative의 2 * x에서\n리터럴 2가 as_variable(2)로\n래핑된 신생" as c2
   object "Mul(1)\ninputs: (x, c2)" as m1
   object "t1 : Variable\n= 2 · x  (식)" as t1
   object "Mul(2)\ninputs: (t1, gy)" as m2
-  object "gx = x.grad : Variable\n= (2·x) · 1  — ★ 값이 아니라 식" as gx
+  object "gx : Variable\n— 2층의 최종 출력\n(1층의 y 대응)" as gx
 }
 
 ' ===== 1층 데이터 흐름 =====
@@ -28,12 +28,12 @@ x -[#1E88E5]-> sq
 sq -[#1E88E5]-> y
 
 ' ===== 2층 데이터 흐름 (역전파 중 Variable 연산으로 생성됨) =====
-x -[#E53935]-> m1 : ★ 1층과 같은 x 객체!\n(두 그래프가 공유)
+x -[#E53935]-> m1 : ★ 1층과 같은 x 객체!\nSquare의 역전파가 mul(x, 2)를\n호출하며 x를 인자로 전달한 결과\n(1층→2층 직통이 아니라 부품 재취직)
 c2 -[#E53935]-> m1 : 2 * x의 2\n(derivative lambda x: 2*x)
 m1 -[#E53935]-> t1
 t1 -[#E53935]-> m2 : t1 * gy\n(부모 backward의 곱셈)
 gy -[#E53935]-> m2 : 시작 gradient
-m2 -[#E53935]-> gx : x.grad에 대입
+m2 -[#E53935]-> gx
 
 note right of x
   <b>x가 왜 두 그래프에 등장하나</b>
@@ -44,9 +44,30 @@ note right of x
   원본 x에 닿는다 — 이것이 "재미분 가능"
   의 구조적 비밀 (탐구 노트 34 §7,
   step35 그래프로 실증: x 노드 id 공유)
+  ====
+  <b>신생 vs 재참조</b>
+  2층에서 옛 객체 재등장은 x뿐 —
+  Mul들·c2·gy·t1·gx는 전부
+  이번 역전파에서 새로 태어난 객체.
+  무엇이 재등장하나는 미분식이 정한다
+  (입력형: x / 출력형: y도 / 형제: 형제들)
 end note
 
-note bottom of gx
+note right of gx
+  <b>gx의 이중 정체</b>
+  fill_grad의 배분 단계 (그래프 밖의 코드)가
+  x.grad 슬롯에 gx를 대입 — 그래프 입장에서
+  gx는 2층의 최종 출력 Variable
+  (식 내용: (2·x)·1 = 2x)
+  → 1차 역전파가 곧 2층의 순전파였던 것
+
+  <b>gx에 값이 저장된 곳은 data뿐</b> (data=4.0)
+  식 소유 = creator=Mul(2) 설정 —
+  사슬을 타고 내려가면 전체 2층이 복원됨.
+  grad는 비어있다가 2차 때 씨앗 슬롯으로 잠깐.
+  output은 gx의 필드가 아니라
+  Mul(2).output이 gx를 가리키는 참조.
+
   <b>이후 2차 미분 (step33 뉴턴)</b>
   1. gx = x.grad  (위의 식)
   2. x.clear_grad()
@@ -62,5 +83,7 @@ note top of gy
   Variable(np.ones_like)로 생성 —
   "상수 1조차 2층 그래프의 리프"
   (core.py fill_grad 주석)
+  사용자 참조 없음 — create_graph=True면
+  2층이 참조해 생존, False면 계산 후 GC
 end note
 @enduml

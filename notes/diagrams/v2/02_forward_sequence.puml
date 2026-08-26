@@ -6,12 +6,12 @@ skinparam sequenceMessageAlign center
 
 actor "사용자 코드" as User
 participant "x : Variable\n(리프)" as X
-participant "x.__pow__(2)" as PowOp
+participant "x.＿pow＿(2)" as PowOp
 participant "functions.pow" as Wrapper
 participant "Pow(c=2)\n인스턴스" as F
-participant "Function.__call__" as Call
+participant "Function.＿call＿" as Call
 
-User -> X : <b>x ** 2</b>\n(연산자 트리거)
+User -> X : <b>x ** 2</b>\n(연산자 오버로딩 트리거\n— Variable이 ＿pow＿ 정의)
 activate X
 X -> PowOp : Python이 호출\n(클래스 안 정의 — 지연 import)
 deactivate X
@@ -22,19 +22,20 @@ Wrapper -> F : Pow(2)(x) — 인스턴스 생성 후 호출
 deactivate Wrapper
 activate F
 
-F -> Call : __call__(x)
+F -> Call : ＿call＿(x)
 activate Call
 
 Call -> Call : <b>1. as_variable(x)</b>\n입력 정규화 (ndarray/scalar → Variable)
 Call -> Call : <b>2. data None 가드</b>\nxs = [x.data]
 Call -> F : <b>3. self.forward(xs)</b>
 activate F
-F -> F : forward → apply hook\nreturn x ** 2  (np 연산)
+F -> F : forward 뼈대 → apply hook\n(자기 호출 — 순수 수학 hook이 x ** 2 계산)
+F --> Call : return ys (순전파 결과)
 deactivate F
-Call -> Call : <b>4. 출력 Variable 생성</b>\noutput = Variable(x²결과)
+Call -> Call : <b>4. 순전파 결과를 출력 Variable에 저장</b>\noutput = Variable(x² 결과)
 
 alt Config.enable_backprop == True (기본)
-  Call -> Call : <b>5. 그래프 연결 ★</b>\n- generation = max(입력들)\n- output.set_creator(self)\n- self.inputs = (x,)\n- self.output = weakref(output)
+  Call -> Call : <b>5. 그래프 연결 ★</b>\n- generation = max(입력들)\n- output.set_creator(self)\n  (creator 기록 + generation 상속: self+1)\n- self.inputs = (x,)\n- self.output = weakref(output)
   note right of Call
     ★ 이 블록이 Define-by-Run의 핵심 —
     "실행"과 "그래프 구성"이 동시에
@@ -52,7 +53,11 @@ deactivate F
 note over User, Call
   <b>순전파의 부산물 = 계산 그래프</b>
   사용자는 수식 계산만 요청했지만,
-  x --Square--> y 연결이 자동 기록됨.
+  x → Square → y 연결이 자동 기록됨.
   역전파는 이 기록을 거슬러 간다.
+
+  ★ 부산물 생성 여부는 전역 옵션으로 결정 (Config.enable_backprop)
+  True (기본): 그래프 기록 O — 역전파 가능
+  False (no_grad): 기록 생략 — 추론 모드, 메모리 절약
 end note
 @enduml

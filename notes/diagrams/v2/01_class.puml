@@ -19,7 +19,8 @@ class Variable {
   __
   + shape / ndim / size / dtype  .. property (data 위임)
   + 산술 연산자 9종 (+ - * / **, 역순 r-계열, 단항 -)
-  + set_creator()
+  __
+  + set_creator()  .. creator 기록 + generation 상속 (func+1)
   + clear_grad()
 }
 
@@ -70,7 +71,7 @@ note left of Function
   <b>이 클래스를 상속하는 구체 함수 10종</b>
   Add · Sub · Neg · Square · Sin · Cos · Pow · Mul · Div · Tanh
   상세 (도함수 성분 유형별 지도) —
-  <b>05_concrete_functions.puml</b> 참조
+  <b>01-1_concrete_functions.puml</b> 참조
 end note
 
 note top of Config
