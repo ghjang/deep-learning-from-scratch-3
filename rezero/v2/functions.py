@@ -12,16 +12,22 @@ core.Function을 상속해 apply + derivative hook 구현.
     본문 코드는 v1과 거의 동일 (연산자 오버로딩이 ndarray → Variable 전환을
     자동 처리) — 달라진 건 "흐르는 데이터의 타입"뿐.
 
-    복잡도 순 (★ = v2에서 실제 수정 발생):
-    - Neg: lambda _: -1.0                    (단일, ★ step34 버그 수정 — 상수 도함수)
-    - Add: (lambda _: 1, lambda _: 1)         (다변, 상수 — 그대로)
-    - Sub: (lambda _: 1, lambda _: -1)        (다변, Add 변형 — 그대로)
-    - Mul: (lambda _: x1, lambda _: x0)       (다변, ★ inputs에서 Variable 꺼내기)
-    - Div: (lambda _: 1/x1, lambda _: -x0/x1**2)  (★ Variable 꺼내기)
-    - Pow: lambda x: self.c * x**(self.c-1)   (단일, 그대로 — __pow__/__rmul__ 활용)
-    - Sin: lambda x: cos(x)                   (★ np.cos → cos 함수 — Cos로 연결)
-    - Cos: lambda x: -sin(x)                  (step32 신규 — sin의 고차 미분용)
-    - Tanh: 1 - tanh(x)**2 또는 1-y*y (Config.reuse_output)  (step35 — 자기 참조 + 2전략)
+★ 도함수 성분 유형 지도 (작업 4 — 탐구 노트 32 §5 분류를 코드에 반영):
+    derivative hook이 "무엇에 의존하는가"로 유형화한 관습 지도.
+    4고지(출력형 활성함수 sigmoid/relu 등 대거 등장) 전의 좌표.
+
+    ① 상수형 (의존 없음)       — Add(1,1), Sub(1,-1), Neg(-1): 인자 무시 (lambda _:)
+    ② 입력형 (자기 입력 x)     — Square(2x), Sin(cos), Cos(-sin), Pow(c·x^(c-1)):
+                                "입력의 순수 함수" 관습 준수 — hook 인자만으로 계산
+    ③ 다른 입력형 (형제 입력)   — Mul(x1,x0), Div(1/x1, -x0/x1²): ★ 관습 위반 —
+                                self.inputs에서 형제를 클로저 캡처. 수학적 필연
+                                (곱셈 법칙 자체가 형제 값 요구). v2에선 형제도
+                                그래프에 있어 2차 미분 자동 연결 — 실해는 없음.
+    ④ 출력형 (forward 출력 y)   — Tanh: 미분식 1-y². 구현 2전략 (Config.reuse_output)
+                                — 재호출(1-tanh(x)², 관습 준수) / 재사용(1-y·y,
+                                self.output 참조). y가 weakref로 소멸 가능해 유일하게
+                                "전략 선택"이 필요한 유형.
+    ⑤ 입출력형 (x와 y 동시)     — 미등장 (4고지 예고 — SiLU 등)
 """
 
 from typing import override

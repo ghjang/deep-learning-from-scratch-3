@@ -7,14 +7,19 @@ core.Function을 상속해 apply + derivative hook 구현.
     부모 Function.backward가 chain rule fold step 일반화.
     자식은 apply(순수 수학) + derivative(도함수 hook)만 구현.
 
-    복잡도 순:
-    - Neg: lambda _: -1.0                    (단일, 상수 도함수 — step34 버그 수정)
-    - Add: (lambda _: 1, lambda _: 1)        (다변, 상수)
-    - Sub: (lambda _: 1, lambda _: -1)       (다변, Add 변형)
-    - Mul: (lambda _: x1, lambda _: x0)      (다변, 다른 입력값 의존)
-    - Div: (lambda _: 1/x1, lambda _: -x0/x1**2)  (가장 복잡, 제곱 항)
-    - Pow: lambda x: self.c * x**(self.c-1)  (단일, c 상수 참조)
-    - Sin: lambda x: np.cos(x)               (단일, np 수학 함수 — step27. 첫 수학 함수)
+★ 도함수 성분 유형 지도 (작업 4 — 탐구 노트 32 §5 분류를 코드에 반영):
+    derivative hook이 "무엇에 의존하는가"로 유형화한 관습 지도.
+    4고지(출력형 활성함수 대거 등장) 전의 좌표.
+
+    ① 상수형 (의존 없음)       — Add(1,1), Sub(1,-1), Neg(-1): 인자 무시 (lambda _:)
+    ② 입력형 (자기 입력 x)     — Square(2x), Sin(cos), Pow(c·x^(c-1)):
+                                "입력의 순수 함수" 관습 준수 — hook 인자만으로 계산
+    ③ 다른 입력형 (형제 입력)   — Mul(x1,x0), Div(1/x1, -x0/x1²): ★ 관습 위반 —
+                                self.inputs에서 형제를 클로저 캡처. 수학적 필연
+                                (곱셈 법칙 자체가 형제 값 요구). v1은 1차 미분
+                                스코프라 실해 없음 (v2는 형제를 Variable로 캡처).
+    ④ 출력형 (forward 출력 y)   — v1 미등장 (v2의 Tanh부터 — 재호출/재사용 전략)
+    ⑤ 입출력형 (x와 y 동시)     — 4고지 예고 (SiLU 등)
 """
 
 from collections.abc import Callable
