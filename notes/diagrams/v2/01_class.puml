@@ -1,0 +1,87 @@
+@startuml 01_class
+title rezero v2 — 클래스 구조 총람\n(제 3고지: step32 브랜칭 — grad가 Variable)
+
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam linetype ortho
+skinparam class {
+  BackgroundColor #FDFDFD
+  ArrowColor #444444
+}
+
+' ===== Variable 위 / Function 아래 (수직 관계) =====
+class Variable {
+  - data : Optional[ndarray]
+  - name : Optional[str]
+  - grad : Optional[Variable]  .. ★ v2: ndarray -> Variable
+  - creator : Optional[Function]
+  - generation : int
+  __
+  + shape / ndim / size / dtype  .. property (data 위임)
+  + 산술 연산자 9종 (+ - * / **, 역순 r-계열, 단항 -)
+  + set_creator()
+  + clear_grad()
+}
+
+abstract class Function {
+  - inputs : Optional[tuple[Variable, ...]]
+  - output : Optional[weakref.ref]
+  - generation : int
+  __
+  + __call__() : Variable             .. 정규화 + 그래프 연결
+  + forward()                         .. 순전파 뼈대
+  + backward()                        .. 역전파 (df(x)·up)
+  + dot_label()                       .. 시각화용
+  __
+  + {abstract} apply()                .. 수학 hook
+  + {abstract} derivative()           .. 도함수 hook
+}
+
+' ===== Function 좌측 — 모듈 함수 / 그 아래 — 설정 =====
+class fill_grad <<전역 함수>> {
+  역전파 (rezero 정체성)
+  Variable 메서드 아님
+  + fill_grad()  .. 인자: 시작점/.. / create_graph
+}
+
+class iter_reverse_topo <<제너레이터>>
+
+class Config <<전역 설정>> {
+  {static} enable_backprop : bool = True
+  {static} reuse_output : bool = False  .. step35 Tanh 전략
+}
+
+' ===== 관계 — 화살표 방향이 배치를 결정 (라벨 최소화, 상세는 노트로) =====
+Variable *-down-> Function : creator
+Function o-up-> Variable : inputs
+Function .up.> Variable : output
+
+fill_grad .[#1565C0]up.> Function : backward 호출
+fill_grad .down.> iter_reverse_topo : 순회 위임 (worklist+visited)
+Config -[hidden]right- Variable : Config 좌상단 고정 (Variable 왼쪽)
+
+' ===== Function 노트 — 참조 구조 + 구체 함수 안내 통합 =====
+note left of Function
+  <b>참조 구조 (Variable과의 선 3개)</b>
+  creator — 이 변수를 낳은 함수 (역방향 링크)
+  inputs — 순전파 입력 (강한 참조)
+  output — weakref (순환 참조 방지 + 메모리 절약, step17)
+
+  <b>이 클래스를 상속하는 구체 함수 10종</b>
+  Add · Sub · Neg · Square · Sin · Cos · Pow · Mul · Div · Tanh
+  상세 (도함수 성분 유형별 지도) —
+  <b>05_concrete_functions.puml</b> 참조
+end note
+
+note top of Config
+  Function.__call__과 backward가 읽는 전역 스위치
+  (using_config/no_grad 컨텍스트로 일시 변경)
+end note
+
+note top of Variable
+  ★ v2의 핵심 변화는 필드 하나:
+  grad가 Variable — 미분 결과가
+  "값"이 아니라 "식" (그래프 보유)
+  → fill_grad 재호출 = 2차 미분
+end note
+@enduml

@@ -1,0 +1,66 @@
+@startuml 04_double_backprop
+title double backprop — 2층 그래프의 실제 모습 (v2의 존재 이유)\ny = x² 에 fill_grad(y, create_graph=True)를 호출한 후의 객체 구조\n(층 = 안방 용어·탐구 노트 30 유래 — 국룰은 1계/2계 미분, double backprop. 4고지의 층=layer와는 다른 뜻)
+
+skinparam shadowing false
+skinparam object {
+  ArrowColor #444444
+}
+
+' ===== 1층 — 순전파가 만든 원래 그래프 =====
+package "1층 — 원래 함수의 그래프 (y = x², 순전파)" #E3F2FD {
+  object "x : Variable\ndata = 2.0\n(리프 — creator 없음)" as x
+  object "Square\napply: x²\nderivative: 2x" as sq
+  object "y : Variable\ndata = 4.0" as y
+}
+
+' ===== 2층 — 역전파가 '만든' 미분 계산 그래프 =====
+package "2층 — 미분 계산 그래프 (역전파가 생성, create_graph=True)" #FFEBEE {
+  object "gy : Variable\ndata = 1.0\n★ 리프 (상수 1도 Variable!)" as gy
+  object "c2 : Variable\ndata = 2.0\n★ 리프 (상수 2도 Variable!)" as c2
+  object "Mul(1)\ninputs: (x, c2)" as m1
+  object "t1 : Variable\n= 2 · x  (식)" as t1
+  object "Mul(2)\ninputs: (t1, gy)" as m2
+  object "gx = x.grad : Variable\n= (2·x) · 1  — ★ 값이 아니라 식" as gx
+}
+
+' ===== 1층 데이터 흐름 =====
+x -[#1E88E5]-> sq
+sq -[#1E88E5]-> y
+
+' ===== 2층 데이터 흐름 (역전파 중 Variable 연산으로 생성됨) =====
+x -[#E53935]-> m1 : ★ 1층과 같은 x 객체!\n(두 그래프가 공유)
+c2 -[#E53935]-> m1 : 2 * x의 2\n(derivative lambda x: 2*x)
+m1 -[#E53935]-> t1
+t1 -[#E53935]-> m2 : t1 * gy\n(부모 backward의 곱셈)
+gy -[#E53935]-> m2 : 시작 gradient
+m2 -[#E53935]-> gx : x.grad에 대입
+
+note right of x
+  <b>x가 왜 두 그래프에 등장하나</b>
+  Square.derivative의 2 * x에서
+  x는 self.inputs[0] — 1층 리프 x와
+  <b>같은 Variable 객체</b>.
+  gx 그래프를 끝까지 타고 내려가면
+  원본 x에 닿는다 — 이것이 "재미분 가능"
+  의 구조적 비밀 (탐구 노트 34 §7,
+  step35 그래프로 실증: x 노드 id 공유)
+end note
+
+note bottom of gx
+  <b>이후 2차 미분 (step33 뉴턴)</b>
+  1. gx = x.grad  (위의 식)
+  2. x.clear_grad()
+  3. fill_grad(gx)  ← gx도 Variable이니
+     2층 그래프를 역전파!
+  4. x.grad = 2.0  ← f''(2)
+  v1이었다면 grad가 ndarray(숫자 4.0)라
+  3단계가 불가능 — 이것이 v2 브랜칭 사유
+end note
+
+note top of gy
+  fill_grad 도입부에서
+  Variable(np.ones_like)로 생성 —
+  "상수 1조차 2층 그래프의 리프"
+  (core.py fill_grad 주석)
+end note
+@enduml

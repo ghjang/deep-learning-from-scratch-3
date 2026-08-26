@@ -1,0 +1,66 @@
+@startuml 03_backward_sequence
+title 역전파 시퀀스 — fill_grad의 메커니즘\n(worklist 순회 + derivative hook + grad 누적)
+
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+
+actor "사용자 코드" as User
+participant "fill_grad" as FG
+participant "iter_reverse_topo\n(제너레이터)" as Topo
+participant "f : Function\n(예: Square)" as F
+participant "x : Variable\n(리프)" as X
+
+User -> FG : fill_grad(y, create_graph=?)\n예: y = x ** 2
+activate FG
+
+== 시작 guard + 시작 gradient ==
+
+FG -> FG : creator 없으면 RuntimeError\n(입력 변수에 호출 방지)
+FG -> FG : y.grad = Variable(ones_like(y.data))\n★ v2: 상수 1조차 리프 노드 (gy)
+
+== 역전파 메인 루프 ==
+
+loop f in iter_reverse_topo(y)\n(generation 내림차순 — 역위상)
+  FG -> Topo : next()
+  activate Topo
+  Topo --> FG : yield f (worklist + visited로 중복 방지)
+  deactivate Topo
+
+  FG -> F : output = f.output()\n(weakref 역참조)
+  activate F
+  FG -> F : upstream = output.grad
+
+  opt create_graph == True (v2 ★)
+    FG -> FG : using_config('enable_backprop', True)\n→ 이 블록의 Variable 연산이 그래프를 남김
+  end
+
+  FG -> F : f.backward(upstream)\n(★ 국소 VJP — 노트 34 §11)
+  activate F
+  F -> F : derivative() → df\n예: lambda x: 2 * x
+  F -> F : local = df(x)\n★ Variable 연산 (v2)\n2 * x → x.__rmul__ → mul() 호출
+  F -> F : downstream = local * upstream\n(또 Variable 연산 — 2층 그래프 생성)
+  deactivate F
+  F --> FG : (downstream,)
+
+  FG -> X : x.grad가 None이면 대입\n아니면 x.grad + downstream (★누적)
+  activate X
+  X --> FG : x.grad 갱신
+  deactivate X
+
+  opt retain_grad == False (기본)
+    FG -> FG : output.grad = None\n(중간 grad 버리기 — 메모리 절약, step18)
+  end
+  deactivate F
+end
+
+FG --> User : 리턴 없음 (None)\nx.grad를 읽어 사용
+deactivate FG
+
+note over User, X
+  <b>역전파 = 국소 VJP의 연쇄</b>
+  각 노드는 "자기 미분 공식 × upstream"만 계산 —
+  야코비안 행렬은 어디에도 없다 (노트 34).
+  v2에서 이 연산 자체가 Variable 연산이라
+  create_graph=True면 2층 그래프가 남는다.
+end note
+@enduml

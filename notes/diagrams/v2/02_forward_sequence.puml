@@ -1,0 +1,58 @@
+@startuml 02_forward_sequence
+title 순전파 시퀀스 — Define-by-Run\n"코드 y = x ** 2 를 실행하는 순간 그래프가 생긴다"
+
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+
+actor "사용자 코드" as User
+participant "x : Variable\n(리프)" as X
+participant "x.__pow__(2)" as PowOp
+participant "functions.pow" as Wrapper
+participant "Pow(c=2)\n인스턴스" as F
+participant "Function.__call__" as Call
+
+User -> X : <b>x ** 2</b>\n(연산자 트리거)
+activate X
+X -> PowOp : Python이 호출\n(클래스 안 정의 — 지연 import)
+deactivate X
+
+PowOp -> Wrapper : pow(x, 2)
+activate Wrapper
+Wrapper -> F : Pow(2)(x) — 인스턴스 생성 후 호출
+deactivate Wrapper
+activate F
+
+F -> Call : __call__(x)
+activate Call
+
+Call -> Call : <b>1. as_variable(x)</b>\n입력 정규화 (ndarray/scalar → Variable)
+Call -> Call : <b>2. data None 가드</b>\nxs = [x.data]
+Call -> F : <b>3. self.forward(xs)</b>
+activate F
+F -> F : forward → apply hook\nreturn x ** 2  (np 연산)
+deactivate F
+Call -> Call : <b>4. 출력 Variable 생성</b>\noutput = Variable(x²결과)
+
+alt Config.enable_backprop == True (기본)
+  Call -> Call : <b>5. 그래프 연결 ★</b>\n- generation = max(입력들)\n- output.set_creator(self)\n- self.inputs = (x,)\n- self.output = weakref(output)
+  note right of Call
+    ★ 이 블록이 Define-by-Run의 핵심 —
+    "실행"과 "그래프 구성"이 동시에
+    (탐구 노트 33: 평가 시점)
+  end note
+else enable_backprop == False (no_grad)
+  Call -> Call : 5'. 그래프 연결 안 함\n(추론 모드 — 메모리 절약, step18)
+end
+
+Call --> F : return output
+deactivate Call
+F --> User : y (Variable — 그래프 소유)
+deactivate F
+
+note over User, Call
+  <b>순전파의 부산물 = 계산 그래프</b>
+  사용자는 수식 계산만 요청했지만,
+  x --Square--> y 연결이 자동 기록됨.
+  역전파는 이 기록을 거슬러 간다.
+end note
+@enduml
