@@ -242,7 +242,7 @@ class Function(ABC):
         if not isinstance(ys, tuple):
             ys = (ys,)
 
-        assert len(ys) == 1, f"v1은 출력 1개(스칼라) 가정. got {len(ys)} outputs"
+        assert len(ys) == 1, f"출력 1개(스칼라) 가정. got {len(ys)} outputs"
         output = Variable(as_array(ys[0]))
 
         if Config.enable_backprop:

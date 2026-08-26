@@ -3,9 +3,11 @@
 step20~22에서 검증한 핵심 케이스를 pytest 스타일로 정리.
 """
 
+from collections.abc import Callable
+
 import numpy as np
 
-from rezero.v1 import Variable, add, div, fill_grad, mul, neg, pow, rdiv, rsub, sub
+from rezero.v1 import Variable, add, div, fill_grad, mul, neg, numerical_diff, pow, rdiv, rsub, sub
 
 
 # ===== 교환법칙 O: +, * (step20) ===============================================
@@ -236,3 +238,63 @@ class TestCompoundExpressions:
         x = Variable(np.array(2.0))
         assert rsub(x, 3.0).data == np.array(1.0)   # 3.0 - 2.0
         assert rdiv(x, 6.0).data == np.array(3.0)   # 6.0 / 2.0
+
+
+# ===== gradient check — 전 연산자 도함수의 수치 검증 (작업 4) ====================
+class TestOperatorGradientCheck:
+    """★ 산술 연산자 도함수 gradient check — 해석(derivative hook) vs 수치 미분.
+
+    step34 Neg 버그(2026-08-24 발견, v1 step22부터 은닉)의 교훈: 순전파만 검사하면
+    도함수 버그가 은닉된다. 자명해 보이는 상수 도함수(1, -1)도 포함해 전 연산자를
+    numerical_diff로 검증 — Div(제곱 항 포함, 가장 복잡)이 최우선 대상이었다.
+
+    이변수 함수는 한쪽 입력을 고정한 클로저로 각 입력별 검증
+    (test_autodiff.TestMultivariableBackward 패턴 재사용).
+    """
+
+    def test_add_both_inputs(self):
+        """∂(x0+x1)/∂x0 = ∂(x0+x1)/∂x1 = 1 — 상수 도함수도 검증 대상."""
+        x1 = Variable(np.array(1.3))
+        x0_fixed = Variable(np.array(0.6))
+        for a in (0.7, 2.0, -1.5):
+            _assert_gradclose(lambda t: add(t, x1), a, f"add x0편 (a={a})")
+            _assert_gradclose(lambda t: add(x0_fixed, t), a, f"add x1편 (a={a})")
+
+    def test_mul_both_inputs(self):
+        """∂(x0·x1)/∂x0 = x1, ∂(x0·x1)/∂x1 = x0 — 다른 입력 의존 도함수."""
+        x1 = Variable(np.array(1.7))
+        x0 = Variable(np.array(0.5))
+        for a in (0.6, 2.0, -1.2):
+            _assert_gradclose(lambda t: mul(t, x1), a, f"mul x0편 (a={a})")
+            _assert_gradclose(lambda t: mul(x0, t), a, f"mul x1편 (a={a})")
+
+    def test_sub_both_inputs(self):
+        """∂(x0-x1)/∂x0 = 1, ∂(x0-x1)/∂x1 = -1 — 비교환, 부호까지 검증."""
+        x1 = Variable(np.array(2.0))
+        x0 = Variable(np.array(0.8))
+        for a in (0.5, 3.0, -1.0):
+            _assert_gradclose(lambda t: sub(t, x1), a, f"sub x0편 (a={a})")
+            _assert_gradclose(lambda t: sub(x0, t), a, f"sub x1편 (a={a})")
+
+    def test_div_both_inputs(self):
+        """∂(x0/x1)/∂x0 = 1/x1, ∂(x0/x1)/∂x1 = -x0/x1² — 제곱 항, ★ 최우선."""
+        x1 = Variable(np.array(1.7))
+        x0 = Variable(np.array(2.5))
+        for a in (0.6, 3.0, -1.2):
+            _assert_gradclose(lambda t: div(t, x1), a, f"div x0편 (a={a})")
+            _assert_gradclose(lambda t: div(x0, t), a, f"div x1편 (a={a})")
+
+    def test_pow_exponents(self):
+        """d(x^c)/dx = c·x^(c-1) — c=2, 3, 0.5 (0.5은 양수 점에서)."""
+        _assert_gradclose(lambda t: pow(t, 2), 1.5, "pow c=2")
+        _assert_gradclose(lambda t: pow(t, 3), -0.7, "pow c=3")
+        _assert_gradclose(lambda t: pow(t, 0.5), 2.0, "pow c=0.5")
+
+
+def _assert_gradclose(f: Callable[[Variable], Variable], x_val: float, label: str) -> None:
+    """f의 해석 grad(x_val) ≈ 수치 미분 대조 (gradient check 1점, v1판)."""
+    x = Variable(np.array(x_val))
+    fill_grad(f(x))
+    assert x.grad is not None
+    nd = numerical_diff(f, Variable(np.array(x_val)))
+    assert np.isclose(x.grad, nd), f"{label}: analytic={x.grad} vs numeric={nd}"

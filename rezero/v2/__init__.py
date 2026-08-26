@@ -31,7 +31,9 @@ v1 (제 1~2고지 스코프)을 step32에서 브랜칭 — 고차 미분(double 
   5. Define-by-Run — 순전파 실행 시 그래프 자동 생성. 재사용 시 clear_grad().
   6. 그래프 구조 — DAG. 같은 Variable 다중 입력 허용 (add(x,x)), visited set 방어.
   7. 메모리/GC — Function.output은 weakref, inputs는 강한 참조 (v1 계승).
-  8. 모드/설정 — Config.enable_backprop / no_grad() / retain_grad (v1 계승).
+  8. 모드/설정 — Config.enable_backprop / no_grad() / retain_grad (v1 계승) /
+     ★ Config.reuse_output (step35 — Tanh 등 출력형 도함수의 전략 스위치.
+     using_config('reuse_output', True)가 fill_grad를 감쌀 때 효과).
   9. 연산자 — +, -, *, /, **, 단항 - 지원 (v1 계승).
  10. 수학 함수 — sin, cos (★ step32: cos 신규 — sin 고차 미분용).
 
