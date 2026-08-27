@@ -28,7 +28,7 @@
 - **진행 중**: 0
 - **막힘**: 0
 - **마지막 업데이트**: 2026-08-24 — ★★★ step36 완료 = 제 3고지 (step25~36, 고차 미분 계산) 점령! 하루에 step33/34/35/36 4개 완료. / 같은 날 밤: 이슈 43 작업 1+2 완료 — 탐구 노트 34 "야코비안은 흐르지 않는다" 승격 (후보 10번+8번 잔여 회수, 수치 실증 포함)
-- ★ **다음 작업** (2026-08-26 밤 갱신): ① 노트 35(함수의 형태 분류학 — 초안) 브로 리뷰·음미 ② 노트 36(역전파 메모리 생태계 — 골격 작성됨, 리뷰·보강 후 완성) ③ 다이어그램 04 리뷰 마무리(05/06은 보강 완료 — 렌더 최종 확인만) ④ 이슈 43 작업 4-C 기록(REZERO_CHANGES C1/C2) ⑤ 후보 12(미분 그래프 실험 4종)·후보 11 — 작업 5(연습문제) 전후 자연 회수. 커밋 push 대기 중. [Issue 43](https://github.com/ghjang/deep-learning-from-scratch-3/issues/43) / [Issue 44 (포워드 모드)](https://github.com/ghjang/deep-learning-from-scratch-3/issues/44)
+- ★ **다음 작업** (2026-08-27 갱신): ① 노트 35(함수의 형태 분류학 — 초안) 브로 리뷰·음미 ② 노트 36(역전파 메모리 생태계 — 골격 작성됨, 리뷰·보강 후 완성) ③ 이슈 43 작업 4-C 기록(REZERO_CHANGES C1/C2) → 작업 4 종결 ④ [이슈 45 — 다층 그래프 시각화 도구](https://github.com/ghjang/deep-learning-from-scratch-3/issues/45) (공유 객체 id 병합 + 층 cluster, 후보 12의 선행 도구) ⑤ 후보 12(미분 그래프 실험 4종)·후보 11 ⑥ 작업 3(v0) or 5(연습문제) 선택. 커밋 push 대기 중. [Issue 43](https://github.com/ghjang/deep-learning-from-scratch-3/issues/43) / [Issue 44 (포워드 모드)](https://github.com/ghjang/deep-learning-from-scratch-3/issues/44)
 - ★ **step25/26 특이사항 (해결됨)**: step25 작업 시 step26 영역(Goldstein 그래프 출력)까지 선행 커버했었음 (정답지 배분 착각). 2026-08-19 브로 책 재확인으로 step26 본문에 코드 외 새 개념 없음 확인 → step26 공식 ✅ 처리 완료. 시각화 2부작 종결.
 
 ---
