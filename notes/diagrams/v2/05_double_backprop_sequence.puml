@@ -6,11 +6,11 @@ skinparam sequenceMessageAlign center
 
 actor "사용자 코드" as User
 participant "x : Variable 리프\n(★ 1층·2층 공유 — 끝까지 생존)" as X
-participant "gx : Variable\n(= x.grad — 2x라는 식\n2층 그래프의 출력)" as GX
+participant "out2 : Variable\n(= x.grad — 2x라는 식\n2층 그래프의 출력)" as GX
 participant "fill_grad" as FG
 participant "Square (1층)" as SQ
 participant "Mul(1) (2층)\ninputs: (x, c2=2)" as M1
-participant "Mul(2) (2층)\ninputs: (t1, gy=1)" as M2
+participant "Mul(2) (2층)\ninputs: (t1, up0=1)" as M2
 
 == 배경 — 순전파로 1층 구축 (상세는 02) ==
 
@@ -21,44 +21,44 @@ User -> SQ : y = square(x)\n(1층: x → Square → y 완성)
 
 User -> FG : fill_grad(y, create_graph=True)
 activate FG
-FG -> FG : gy = Variable(1) — 씨앗 (dy/dy = 1)
-FG -> SQ : backward(gy)\n[enable_backprop=True 컨텍스트 ★]
+FG -> FG : up0 = Variable(1) — 씨앗 (dy/dy = 1)
+FG -> SQ : backward(up0)\n[enable_backprop=True 컨텍스트 ★]
 activate SQ
 SQ -> SQ : derivative → lambda x: 2 * x
 SQ -> M1 : mul(x, c2)\n(c2 = 리터럴 2를 as_variable로 래핑한 신생)\n03과 같은 계산이지만 컨텍스트가 On\n→ ★2층 그래프가 생성됨★
 activate M1
 M1 --> SQ : t1 (= 2x의 식)
-SQ -> M2 : mul(t1, gy)
+SQ -> M2 : mul(t1, up0)
 activate M2
 M2 --> SQ : downstream (= (2x)·1)
 deactivate SQ
 deactivate M1
 deactivate M2
-FG -> X : x.grad = downstream\n→ gx = 2x라는 식 (그래프 소유)\n+ gx.data = 4.0 — eval까지 완료
+FG -> X : x.grad = downstream\n→ out2 = 2x라는 식 (그래프 소유)\n+ out2.data = 4.0 — eval까지 완료
 deactivate FG
 
 note over User, X
   ★ 핵심 — x가 1층과 2층을 잇는 공유 리프
-  gx를 끝까지 타고 내려가면 원본 x에 닿는다
+  out2를 끝까지 타고 내려가면 원본 x에 닿는다
   (재미분 가능의 구조적 비밀 — 노트 34 §7, 04 그림 참조)
   ★ 1차 역전파 = 2층의 순전파 —
-  gx는 x의 grad 슬롯에 저장된, 2층의 출력
+  out2는 x의 grad 슬롯에 저장된, 2층의 출력
   (이중 정체)
 end note
 
 == 2차 역전파 준비 ==
 
-User -> GX : gx = x.grad (식을 회수)
-User -> X : x.clear_grad()\n(gx가 그래프를 참조 중이라 그래프는 생존 —\nx.grad 슬롯만 비워 2차 결과를 받을 준비)
+User -> GX : out2 = x.grad (식을 회수)
+User -> X : x.clear_grad()\n(out2가 그래프를 참조 중이라 그래프는 생존 —\nx.grad 슬롯만 비워 2차 결과를 받을 준비)
 
 == 2차 역전파 — 2층 그래프를 순회 (1층이 아님!) ==
 
-User -> FG : fill_grad(gx)
+User -> FG : fill_grad(out2)
 activate FG
-FG -> FG : gx.creator 확인 → Mul(2)\n(2층 노드부터 순회 시작 —\n1층의 Square는 오지 않음)
-FG -> FG : 씨앗: d(gx)/d(gx) = 1
+FG -> FG : out2.creator 확인 → Mul(2)\n(2층 노드부터 순회 시작 —\n1층의 Square는 오지 않음)
+FG -> FG : 씨앗: d(out2)/d(out2) = 1
 
-FG -> M2 : backward(1)\nz = t1 · gy\n∂z/∂t1 = gy → t1.grad = 1 · 1 = 1\n∂z/∂gy = t1 (retain_grad=False로 버려짐)
+FG -> M2 : backward(1)\nz = t1 · up0\n∂z/∂t1 = up0 → t1.grad = 1 · 1 = 1\n∂z/∂up0 = t1 (retain_grad=False로 버려짐)
 activate M2
 M2 --> FG : t1.grad 전파
 deactivate M2
@@ -73,8 +73,8 @@ User -> X : x.grad 읽기 → 2.0
 
 note over User, X
   f''(2) = 2 ✓ — y = x²의 2차 미분 (상수)
-  대비: 1차 결과 gx = 2x "식" / 2차 결과 = 2.0 "값"
-  v1이었다면 gx가 ndarray(숫자 4.0)라
+  대비: 1차 결과 out2 = 2x "식" / 2차 결과 = 2.0 "값"
+  v1이었다면 out2가 ndarray(숫자 4.0)라
   여기서 두 번째 fill_grad가 불가능했을 것
 end note
 @enduml

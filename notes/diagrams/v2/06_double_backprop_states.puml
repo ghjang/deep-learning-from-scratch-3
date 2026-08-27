@@ -15,8 +15,8 @@ state "⑤ 2차 완료" as S5
 [*] --> S1 : y = square(x)
 
 S1 --> S2 : fill_grad(y,\ncreate_graph=True)
-S2 --> S3 : gx = x.grad\nx.clear_grad()
-S3 --> S4 : fill_grad(gx)
+S2 --> S3 : out2 = x.grad\nx.clear_grad()
+S3 --> S4 : fill_grad(out2)
 S4 --> S5 : 2층 순회 종료
 S5 --> [*] : x.grad = 2.0 읽기
 
@@ -34,17 +34,17 @@ note right of S2
   <b>그래프 (1층 + 2층 공존)</b>
   1층: x → Square → y (y.grad는 버려짐)
   2층: (x, c2) → Mul(1) → t1
-       (t1, gy) → Mul(2) → gx
+       (t1, up0) → Mul(2) → out2
   ====
-  gx.data = 4.0 — 1차 역전파가 eval까지 완료
+  out2.data = 4.0 — 1차 역전파가 eval까지 완료
   (1차 역전파 = 2층의 순전파였으므로 값도 계산됨)
-  x.grad에 gx 대입 — fill_grad 배분 (그래프 밖의 코드)
-  gx.creator = Mul(2) ← ★ 2층 소속
+  x.grad에 out2 대입 — fill_grad 배분 (그래프 밖의 코드)
+  out2.creator = Mul(2) ← ★ 2층 소속
   ====
   신생 vs 재참조 — 옛 객체 재등장은 x뿐
   (미분식 2x가 x를 참조. Square가 입력형이라)
   c2(2.0 — derivative 리터럴 2의 래핑)·
-  gy(씨앗 1)·Mul들·t1·gx 전부 신생.
+  up0(씨앗 1)·Mul들·t1·out2 전부 신생.
   일반화: 미분식이 참조하는 옛 변수만 재등장
   (입력형: x / 출력형: y / 형제 의존: 형제들)
   미분이 계산이어서, 계산이 그래프를 냄
@@ -53,8 +53,8 @@ end note
 note right of S3
   <b>그래프 불변 — 슬롯만 비움</b>
   clear_grad는 x.grad=None 대입일 뿐
-  gx가 2층 전체를 참조 중 → 그래프 생존
-  (gx를 손에서 놓으면 2층은 GC 대상)
+  out2가 2층 전체를 참조 중 → 그래프 생존
+  (out2를 손에서 놓으면 2층은 GC 대상)
   ====
   중간 변수 grad는 순회 중 자동 처분되지만
   (output.grad=None이 output에만 적용)
@@ -64,7 +64,7 @@ end note
 
 note left of S4
   <b>순회 대상 = 2층</b>
-  gx.creator = Mul(2)부터 시작
+  out2.creator = Mul(2)부터 시작
   1층의 Square는 오지 않음
   ====
   값 흐름: 씨앗 1 → t1.grad = 1·1
@@ -75,9 +75,9 @@ end note
 
 note left of S5
   <b>x.grad = 2.0 = f''(2)</b>
-  대비: 1차 결과 gx = 2x "식"
+  대비: 1차 결과 out2 = 2x "식"
         2차 결과 = 2.0 "값"
-  v1이었다면 gx가 ndarray 숫자(4.0)라
+  v1이었다면 out2가 ndarray 숫자(4.0)라
   2차 역전파 자체가 불가능했을 것
 end note
 @enduml
