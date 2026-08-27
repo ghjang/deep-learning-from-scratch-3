@@ -27,7 +27,9 @@ core.Function을 상속해 apply + derivative hook 구현.
                                 — 재호출(1-tanh(x)², 관습 준수) / 재사용(1-y·y,
                                 self.output 참조). y가 weakref로 소멸 가능해 유일하게
                                 "전략 선택"이 필요한 유형.
-    ⑤ 입출력형 (x와 y 동시)     — 미등장 (4고지 예고 — SiLU 등)
+    (+ 입출력형 = ②+④ 조합)    — 미등장 (4고지 예고 — SiLU 등, 유형 아닌 조합)
+    ★ ⑤ upstream형 (gy 자체)  — hook의 세계 밖: backward 직접 오버라이드
+                                 (4고지 MatMul: gx = gy·Wᵀ — 탐구 노트 35 §5)
 """
 
 from typing import override

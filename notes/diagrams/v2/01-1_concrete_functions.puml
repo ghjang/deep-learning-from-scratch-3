@@ -1,5 +1,5 @@
 @startuml 01-1_concrete_functions
-title 구체 함수 10종 — 도함수 성분 유형별 도감\n(유형색 = D1 지도 — functions.py 모듈 docstring 참조)\n\n<b>전부 core.Function 상속 — apply (수학) + derivative (도함수 hook)만 구현</b>\n곱셈 df(x)·upstream은 부모 Function.backward가 대행 · 탈출구: backward 직접 오버라이드\n(구조 총람: 01_class.puml)
+title 구체 함수 10종 — 도함수 성분 유형별 도감\n(유형색 = 도함수 성분 유형 지도 — functions.py 모듈 docstring 참조)\n\n<b>전부 core.Function 상속 — apply (수학) + derivative (도함수 hook)만 구현</b>\n곱셈 df(x)·upstream은 부모 Function.backward가 대행 · 탈출구: backward 직접 오버라이드\n(구조 총람: 01_class.puml)
 
 skinparam classAttributeIconSize 0
 skinparam shadowing false

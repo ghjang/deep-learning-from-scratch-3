@@ -4,7 +4,7 @@
 >
 > **시점**: 이슈 43 작업 4 (v2 UML 다이어그램 작성·리뷰) 중 파생 — 책이 다루지 않는 층위 (위상 선언: 밑시딥3 본문·정답지에 이 노트의 내용 대부분이 명시적으로 없음. 우리가 코드 추적과 실험으로 도출)
 > **모태**: 브로 혼란 시리즈 — gx의 이중 정체 / grad 슬롯 재활용 / 중간 grad 처분 / 리프 면책 / 신생 vs 재참조 / data·grad·output 구분
-> **선결**: [노트 30](./exploration_30_double_backprop.md) (이론), [노트 33](./exploration_33_evaluation_timing.md) (평가 시점·Variable 이중성), [노트 32](./exploration_32_derivative_anatomy.md) (D1 미분식 성분)
+> **선결**: [노트 30](./exploration_30_double_backprop.md) (이론), [노트 33](./exploration_33_evaluation_timing.md) (평가 시점·Variable 이중성), [노트 32](./exploration_32_derivative_anatomy.md) (미분식 성분 분류)
 
 ---
 
@@ -86,7 +86,7 @@
 
 - **함수 객체는 전부 신생** — `mul(x, 2)` 호출마다 `Mul()` 새 인스턴스.
 - y=x²의 2층 구성원: 옛 객체 재등장은 **x 하나**, 나머지(c2, gy, t1, gx, Mul들) 전부 이번 역전파에서 신생.
-- **어떤 옛 변수가 재등장하나는 D1 미분식 성분이 결정**:
+- **어떤 옛 변수가 재등장하나는 미분식 성분(노트 32 유형 지도)이 결정**:
 
 | 도함수 유형 | 재등장하는 옛 변수 |
 |---|---|
@@ -157,7 +157,7 @@ gx 하나를 놓고 보면 (답: **저장은 data뿐**):
 - [다이어그램 v2 7종](./diagrams/v2/) — 특히 04(2층 객체), 05(2차 시퀀스), 06(상태)
 - [탐구 노트 30](./exploration_30_double_backprop.md) — 이론 모태 (3단 논법)
 - [탐구 노트 33](./exploration_33_evaluation_timing.md) — Variable 이중성, 평가 시점
-- [탐구 노트 32](./exploration_32_derivative_anatomy.md) — D1 미분식 성분 (§4 명단 규칙의 근거)
+- [탐구 노트 32](./exploration_32_derivative_anatomy.md) — 미분식 성분 분류 (§4 명단 규칙의 근거)
 - [탐구 노트 34](./exploration_34_jacobian_vjp.md) §7 — x 공유 (step35 실증)
 - 큐 후보 12번 (미분 그래프 실험), 후보 11번 (그래프 3형태)
 

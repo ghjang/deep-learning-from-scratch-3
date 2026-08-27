@@ -19,7 +19,9 @@ core.Function을 상속해 apply + derivative hook 구현.
                                 (곱셈 법칙 자체가 형제 값 요구). v1은 1차 미분
                                 스코프라 실해 없음 (v2는 형제를 Variable로 캡처).
     ④ 출력형 (forward 출력 y)   — v1 미등장 (v2의 Tanh부터 — 재호출/재사용 전략)
-    ⑤ 입출력형 (x와 y 동시)     — 4고지 예고 (SiLU 등)
+    (+ 입출력형 = ②+④ 조합)    — 4고지 예고 (SiLU 등 — 유형 아닌 조합)
+    ★ ⑤ upstream형 (gy 자체)  — hook의 세계 밖: backward 직접 오버라이드
+                                 (4고지 MatMul: gx = gy·Wᵀ — 탐구 노트 35 §5)
 """
 
 from collections.abc import Callable
