@@ -47,7 +47,7 @@
 | **메모리 관리** | #026, #027, #033 | 3 | weakref 순환 끊기, Config/no_grad 절약 모드, __array_priority__ 버림 |
 | **API 설계 (매개변수/표현/연산자)** | #028, #030, #031, #034, #035 | 5 | name 키워드 전용, Variable( 대문자 repr, 매직메서드 클래스 안 정의, __radd__/wrapper 정리, 3원칙 자동 적용 + Pow DRY + Neg 단순화 |
 | **패키지 구조** | #036, #038 | 2 | 버전 폴더(v1/v2/v3) + 순환 참조 해결(지연 import), ★v2 브랜칭 + grad Variable화 + common 모듈 |
-| **유틸 / step 한정 / 문서 정비** | #005, #006, #009, #012, #018, #020, #024, #032 | 8 | name shadowing, numerical_diff docstring, backward docstring, set_creator 복선, pipe(FP), 주석 정비, fill_grad 통합, Mul derivative hook 재평가 |
+| **유틸 / step 한정 / 문서 정비** | #005, #006, #009, #012, #018, #020, #024, #032, #040 | 9 | name shadowing, numerical_diff docstring, backward docstring, set_creator 복선, pipe(FP), 주석 정비, fill_grad 통합, Mul derivative hook 재평가 |
 
 ### 회수 분류와의 관계 (step23 패키지화 시)
 
@@ -1734,6 +1734,39 @@ step25에서 `fold_dot_graph`(시각화)를 구현하다가, `fill_grad`(역전�
 **관련**:
 - 이슈 41번 / 탐구 노트 32 (미분식 해부 — 총정리) / 후보 8번 회수 (큐 첫 완주)
 - 항목 013 (derivative callable — 일급 도함수), 027 (Config 철학), 038 (v2 브랜칭)
+
+---
+
+### #040 — ★ v1/v2 리뷰 보류 항목 기록 — utils 복제(C1) + wrapper 반복(C2) (이슈 43 작업 4-C)
+
+> 2026-08-28 등록 (브로 승인 후). 이슈 43 작업 4 (v1/v2 리뷰)에서 **검토했으나 보류** 결정된
+> 2건의 기록 — 나중에 재검토할 수 있게 판정 이유를 남김. 코드 변경 없음.
+
+**C1 — v1/v2 `utils.py` 232줄 완전 복제**:
+
+- `diff` 결과: 차이는 import 경로 (`rezero.v1` ↔ `rezero.v2`)와 docstring 첫 줄뿐,
+  코드 본문 100% 동일 (시각화 파이프라인 전체)
+- 순수 부분(`_format_value`, 포맷 검증)만 common 이관 가능하나 이득 ~40줄
+- ★ 보류 사유: "그래프 구조 의존 시 vX 소유" 판별 기준과 충돌 — `_dot_var`/`_dot_func`/
+  `fold_dot_graph`는 Variable/iter_reverse_topo에 의존하므로 vX 소유가 맞음.
+  부분 이관은 파이프라인 분리로 복잡도 증가 > 40줄 절약.
+
+**C2 — wrapper 9종 동일 패턴 반복**:
+
+```python
+def square(x):
+    result = Square()(x)
+    assert isinstance(result, Variable), "..."
+    return result
+```
+
+- 팩토리/데코레이터로 압축 가능하나 **명시성 손해** — 각 wrapper가 6줄이지만
+  읽는 사람에게 "무슨 일을 하는지" 바로 보이는 것이 학습 프로젝트에서 우선.
+- dezero도 같은 패턴 (책 관례 유지).
+
+**관련**:
+- 이슈 43 작업 4 (v1/v2 리뷰 — A1~A3, B1, D1은 완료. C만 이 기록으로 종결)
+- [이슈 46](https://github.com/ghjang/deep-learning-from-scratch-3/issues/46) — Variable 던더 믹스인 분리 (같은 리뷰에서 파생된 후속 제안)
 
 ---
 
