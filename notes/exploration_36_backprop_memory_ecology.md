@@ -150,6 +150,26 @@ out2 하나를 놓고 보면 (답: **저장은 data뿐**):
 단계적 복잡도 4종으로 미분 그래프 내부 구조 실험 — 중간 출력 재등장, x 흐름(id 검증), 갈래 합산 관찰:
 ① sin(x²) ② x·sin(x) ③ x²+x³ ④ tanh (상세: 큐 후보 12번)
 
+### ★ 네이밍 성찰 — fill_grad라는 이름, 28스텝 만에 다시 보다 (브로 질문, 2026-08-28)
+
+> 브로: *"중간 노드에도 저장하면서 이동하는 구현이니 fill(채우다)이 의미가 있었을 듯하면서도, 이제 와서 보니 적절했는지?"*
+
+**fill이 맞는 이유** — 부수 효과를 정확히 기술: 리턴값 **None**, 각 Variable의 grad 필드를 변경하는 side effect가 본체. "fill"이 이를 정확히 암시 (채우고 끝, 리턴 없음). dezero의 `backward()`는 "계산하다" 뉘앙스, `fill_grad`는 "저장하다" 뉘앙스.
+
+**브로가 어색하다고 느낀 이유**: ① 누적도 하는데 fill인가 (첫 채우고 이후 더함) / ② 본질은 chain rule 아닌가 (fill은 결과지 과정이 아님) / ③ 중간 노드는 버리는데 (retain_grad=False면 채웠다가 버림).
+
+**대안 함수명 — chain rule 연쇄 관점 부각**:
+
+| 대안 | 강조점 | 근거 |
+|---|---|---|
+| `chain_grad` | chain rule 연쇄 | 국소 미분 × upstream을 연쇄 — 과정을 직접 지칭 |
+| `propagate_grad` | 전파 | gradient가 그래프를 타고 퍼져나감 — PyTorch docs도 "gradient propagation" 사용 |
+| `backprop` | 역방향 계산 | 업계 표준 — dezero의 backward와 같은 강조점, 전역 함수 버전 |
+| `fold_grad` | fold(접기) | right fold = 역전파의 본질 (step07 탐구) — FP 관점 |
+| `reduce_grad` | 수집 | 각 리프에 gradient를 수집·누적 — FP reduce |
+
+★ 판정: `fill_grad`가 나쁘지 않은 이유는 "리턴 없이 상태 변경"이라는 특이성을 이름에 담았기 때문. 대안들이 chain rule 본질을 더 잘 담지만, "fill"이 아니면 None 반환의 이유가 이름에서 사라짐. 네이밍 트레이드오프: **과정(chain rule) vs 결과(저장)** — 둘 중 하나만 이름에 담을 수 있고, step08에서 선택한 건 결과 쪽 (항목 015).
+
 ---
 
 ## 🔗 관련 링크
