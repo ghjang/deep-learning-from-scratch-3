@@ -39,14 +39,20 @@
 
 전부 정확. 수식 대응:
 
-| 단계 | 그래프 | 계산 | x.grad (객체) | x.grad.creator |
-|---|---|---|---|---|
-| 순전파 | **1층** (x → Square → y) | y = f(x) = x² | None | — |
-| 1차 역전파 (create_graph=True) | 1층 순회 + **2층 생성** | out2 = f'(x) = 2x | **Variable(4.0)** | Mul (그래프 보유 → 재미분 가능) |
-| 2차 역전파 (create_graph=False) | 2층 순회 | f''(x) = 2 | **Variable(2.0)** | **None** (lean — 재미분 불가) |
-| 2차 역전파 (create_graph=True) | 2층 순회 + **3층 생성** | f''(x) = 2 (같은 값!) | **Variable(2.0)** (값 동일) | Mul (3층 그래프 보유 → 3차 가능) |
+| 단계 | fill_grad에 넣는 것 | 순회 대상 | 계산 | x.grad | x.grad.creator | x의 역할 |
+|---|---|---|---|---|---|---|
+| 순전파 | (순방향 실행) | — | y = f(x) = x² | None | — | **입력 제공자** (1층 리프) |
+| 1차 역전파 (create_graph=True) | **y** (순전파의 최종 출력) | 1층 (y → x 방향) | f'(x) = 2x | Variable(4.0) — out2 = "2x라는 식"이 평가된 Variable | Mul | **grad 수령자** (out2를 받음) + **2층에도 리프로 참여** |
+| 2차 역전파 (create_graph=False) | **out2** (1차의 출력 = 2층의 y 역할) | 2층 (out2 → x 방향) | f''(x) = 2 | Variable(2.0) | None (lean) | **grad 수령자** (f''값을 받음) |
+| 2차 역전파 (create_graph=True) | **out2** (동일) | 2층 + **3층 생성** | f''(x) = 2 (같은 값!) | Variable(2.0) — 값 동일 | Mul (3층 보유) | 동일 + 3층에도 리프로 참여 |
 
-★ v2에서 x.grad는 **항상 Variable** (create_graph 무관 — 코드 실증: `type(x.grad)`가 양쪽 다 Variable) — 차이는 **creator의 유무**:
+★ 각 단계의 시작점이 곧 "이전 단계의 최종 출력" — 순전파의 출력(y)이 1차의 시작점, 1차의 출력(out2)이 2차의 시작점. **fill_grad에 넣는 Variable이 순회할 층을 결정한다** (§0 "fill_grad 하나가 차수를 결정"의 표 버전).
+
+★ out2의 값: `out2.data = 4.0` (= f'(2)) — 2x를 x=2에서 평가한 것. 그냥 4.0이 아니라 **"식이 평가된 Variable"** — data에 값 + creator에 계산 구조.
+
+★ x의 이동 경로: 순전파의 입력(리프) → 1차에서 grad 수령(out2 대입받음) + 2층의 리프로도 참여(미분식 2x가 x를 참조) → 2차에서 다시 grad 수령(f''값) → ... **모든 층에 등장하는 공유 리프**.
+
+★ v2에서 x.grad는 **항상 Variable** (create_graph 무관) — 차이는 **creator의 유무**:
 - creator 있음 = 그래프가 붙은 Variable("식") → 다음 차수 미분 가능
 - creator 없음 = lean한 Variable("값") → 재미분 불가 (f''=2는 상수이므로 더 미분해도 x로 가는 간선 없음)
 - ★ **2차 역전파의 결과값은 create_graph 여부와 무관하게 항상 2.0** — create_graph=True가 하는 일은 "그 결과 Variable에 3층 그래프를 붙여서 3차를 예약하는 것"뿐, 값 자체를 바꾸지 않음
