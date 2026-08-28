@@ -43,12 +43,13 @@
 |---|---|---|---|---|
 | 순전파 | **1층** (x → Square → y) | y = f(x) = x² | None | — |
 | 1차 역전파 (create_graph=True) | 1층 순회 + **2층 생성** | out2 = f'(x) = 2x | **Variable(4.0)** | Mul (그래프 보유 → 재미분 가능) |
-| 2차 역전파 (create_graph=False) | 2층 순회 — 계산은 함 | f''(x) | **Variable(2.0)** | **None** (lean — 재미분 불가) |
-| 2차 역전파 (create_graph=True) | 2층 순회 + **3층 생성** | out3 = f''' | **Variable(0.0)** | Mul (그래프 보유 → 3차 가능) |
+| 2차 역전파 (create_graph=False) | 2층 순회 | f''(x) = 2 | **Variable(2.0)** | **None** (lean — 재미분 불가) |
+| 2차 역전파 (create_graph=True) | 2층 순회 + **3층 생성** | f''(x) = 2 (같은 값!) | **Variable(2.0)** (값 동일) | Mul (3층 그래프 보유 → 3차 가능) |
 
 ★ v2에서 x.grad는 **항상 Variable** (create_graph 무관 — 코드 실증: `type(x.grad)`가 양쪽 다 Variable) — 차이는 **creator의 유무**:
 - creator 있음 = 그래프가 붙은 Variable("식") → 다음 차수 미분 가능
 - creator 없음 = lean한 Variable("값") → 재미분 불가 (f''=2는 상수이므로 더 미분해도 x로 가는 간선 없음)
+- ★ **2차 역전파의 결과값은 create_graph 여부와 무관하게 항상 2.0** — create_graph=True가 하는 일은 "그 결과 Variable에 3층 그래프를 붙여서 3차를 예약하는 것"뿐, 값 자체를 바꾸지 않음
 
 ★ x.grad 슬롯의 재활용 패턴: 매 차수마다 clear_grad로 비우고 다음 결과를 받음. 들어가는 건 항상 Variable이며, create_graph=True이면 그래프가 붙은 채로 들어감.
 
