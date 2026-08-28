@@ -37,20 +37,20 @@
 
 > 브로: *"최초 순전파가 만드는 그래프는 미분 이전의 원본 계산 그래프. 1차 역전파는 그 오리지널 그래프를 통해 1계 미분을 계산. 이때 create_graph=True로 진행하면 완료 시점에 '역전파 계산 자체의 그래프' = 1계 미분 계산 식이 존재. 여기서 2차 역전파를 때리면 1계 미분 식을 다시 1계 미분하는 것 — 결과적으로 원본에 대한 2계 미분."*
 
-전부 정확. 수식 대응 (**x = Variable(np.array(2.0))** — 모든 단계의 공통 출발점):
+전부 정확. 수식 대응 (**x = Variable(np.array(3.0))** — 모든 단계의 공통 출발점 (다이어그램 04~06은 x=2 사용 — 노트에서만 혼동 방지를 위해 3으로 변경: x=2일 때 y=4와 f'(2)=4가 같아져 순전파 값인지 미분 값인지 헷갈리기 때문)):
 
 | 단계 | 실행 코드 | 결과 (.data) | x.grad | x.grad.creator | x의 역할 |
 |---|---|---|---|---|---|
-| 순전파 | `y = square(x)` | **y.data = 4.0** (= 2²) | None | — | **입력 제공자**: x.data=2.0을 함수에 넣어줌 |
-| 1차 역전파 (create_graph=True) | `fill_grad(y, create_graph=True)` | **x.grad.data = 4.0** (= f'(2) = 2·2) | Variable(4.0) = out2 ("2x" 식) | Mul | **grad 수령자** + 2층에도 리프로 참여 |
-| 2차 역전파 (create_graph=False) | `out2 = x.grad; x.clear_grad(); fill_grad(out2)` | **x.grad.data = 2.0** (= f''(2)) | Variable(2.0) | None (lean) | **grad 수령자** (f''값 받음) |
+| 순전파 | `y = square(x)` | **y.data = 9.0** (= 3²) | None | — | **입력 제공자**: x.data=3.0을 함수에 넣어줌 |
+| 1차 역전파 (create_graph=True) | `fill_grad(y, create_graph=True)` | **x.grad.data = 6.0** (= f'(3) = 2·3) | Variable(6.0) = out2 ("2x" 식) | Mul | **grad 수령자** + 2층에도 리프로 참여 |
+| 2차 역전파 (create_graph=False) | `out2 = x.grad; x.clear_grad(); fill_grad(out2)` | **x.grad.data = 2.0** (= f''(3)) | Variable(2.0) | None (lean) | **grad 수령자** (f''값 받음) |
 | 2차 역전파 (create_graph=True) | `out2 = x.grad; x.clear_grad(); fill_grad(out2, create_graph=True)` | **x.grad.data = 2.0** (같은 값!) | Variable(2.0) — 값 동일 | Mul (3층 보유 → 3차 가능) | 동일 + 3층에도 리프 참여 |
 
 ★ 각 단계의 **시작점 = 이전 단계의 최종 출력** — 순전파의 y가 1차의 시작점, 1차의 out2가 2차의 시작점. **fill_grad에 넣는 Variable이 순회할 층을 결정** (§0의 표 버전).
 
-★ out2의 값: `out2.data = 4.0` — "2x라는 식"이 x=2에서 평가된 Variable. data에 4.0 + creator에 Mul (계산 구조 보존).
+★ out2의 값: `out2.data = 6.0` — "2x라는 식"이 x=3에서 평가된 Variable. data에 6.0 + creator에 Mul (계산 구조 보존).
 
-★ x의 이동 경로: 순전파의 입력(x.data=2.0 제공) → 1차에서 grad 수령(out2 대입) + 2층 리프로도 참여(미분식 2x가 x를 참조) → 2차에서 다시 grad 수령(f''값) → **모든 층에 등장하는 공유 리프**.
+★ x의 이동 경로: 순전파의 입력(x.data=3.0 제공) → 1차에서 grad 수령(out2 대입) + 2층 리프로도 참여(미분식 2x가 x를 참조) → 2차에서 다시 grad 수령(f''값) → **모든 층에 등장하는 공유 리프**.
 
 ★ v2에서 x.grad는 **항상 Variable** (create_graph 무관) — 차이는 **creator의 유무**:
 - creator 있음 = 그래프가 붙은 Variable("식") → 다음 차수 미분 가능
@@ -59,7 +59,7 @@
 
 ★ x.grad 슬롯의 재활용 패턴: 매 차수마다 clear_grad로 비우고 다음 결과를 받음. 들어가는 건 항상 Variable이며, create_graph=True이면 그래프가 붙은 채로 들어감.
 
-★ 핵심: **1차 역전파는 eval까지 완료하는 실행이었다** — 그래프만 만든 게 아니라 값(out2.data=4.0)까지 계산. 노트 33 "모든 실행은 그래프를 낳는다"의 반대 명제 — 그래프를 낳은 그 실행은 평가였다. (브로 발견)
+★ 핵심: **1차 역전파는 eval까지 완료하는 실행이었다** — 그래프만 만든 게 아니라 값(out2.data=6.0)까지 계산. 노트 33 "모든 실행은 그래프를 낳는다"의 반대 명제 — 그래프를 낳은 그 실행은 평가였다. (브로 발견)
 
 <a id="이중정체"></a>
 ## 2. out2의 이중 정체 (책 표기: gx)
@@ -129,7 +129,7 @@ out2 하나를 놓고 보면 (답: **저장은 data뿐**):
 
 | 필드 | out2에서의 상태 | 비고 |
 |---|---|---|
-| **data** | 4.0 | ★ 유일한 값 저장 — 1차 역전파가 계산 |
+| **data** | 6.0 | ★ 유일한 값 저장 — 1차 역전파가 계산 |
 | **grad** | None → 2차 때 씨앗 1 잠깐 → 버려짐 | out2도 누군가의 output이라 자동 처분 대상 |
 | **output** | out2의 필드가 **아님** | `Mul(2).output = weakref(out2)` — 남이 나를 참조하는 관계 |
 
