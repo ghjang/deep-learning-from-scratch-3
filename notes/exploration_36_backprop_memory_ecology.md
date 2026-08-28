@@ -39,14 +39,18 @@
 
 전부 정확. 수식 대응:
 
-| 단계 | 그래프 | 계산 | .data 값 | x.grad 슬롯 |
+| 단계 | 그래프 | 계산 | x.grad (객체) | x.grad.creator |
 |---|---|---|---|---|
-| 순전파 | **1층** (원본: x → Square → y) | y = f(x) = x² | y.data = 4.0 | None |
-| 1차 역전파 (create_graph=True) | 1층 순회 + **2층 생성** | out2 = f'(x) = 2x | out2.data = 4.0 (eval 완료) | **out2** (Variable 객체 대입) |
-| 2차 역전파 (create_graph=False 기본) | 2층 순회 — 3층 없음 | (f')' = f'' | — | **2.0** (상수 값 직접) |
-| 2차 역전파 (create_graph=True — 3차 예약) | 2층 순회 + **3층 생성** | out3 = f''' = 0 | out3.data = 0.0 | **out3** (Variable 객체) |
+| 순전파 | **1층** (x → Square → y) | y = f(x) = x² | None | — |
+| 1차 역전파 (create_graph=True) | 1층 순회 + **2층 생성** | out2 = f'(x) = 2x | **Variable(4.0)** | Mul (그래프 보유 → 재미분 가능) |
+| 2차 역전파 (create_graph=False) | 2층 순회 — 계산은 함 | f''(x) | **Variable(2.0)** | **None** (lean — 재미분 불가) |
+| 2차 역전파 (create_graph=True) | 2층 순회 + **3층 생성** | out3 = f''' | **Variable(0.0)** | Mul (그래프 보유 → 3차 가능) |
 
-★ x.grad 슬롯의 패턴: **create_graph=True면 Variable(식)이 들어가고, False면 상수 값이 직접 들어간다.** 그리고 매 차수마다 슬롯이 재활용됨 (clear_grad로 비우고 다음 결과를 받음).
+★ v2에서 x.grad는 **항상 Variable** (create_graph 무관 — 코드 실증: `type(x.grad)`가 양쪽 다 Variable) — 차이는 **creator의 유무**:
+- creator 있음 = 그래프가 붙은 Variable("식") → 다음 차수 미분 가능
+- creator 없음 = lean한 Variable("값") → 재미분 불가 (f''=2는 상수이므로 더 미분해도 x로 가는 간선 없음)
+
+★ x.grad 슬롯의 재활용 패턴: 매 차수마다 clear_grad로 비우고 다음 결과를 받음. 들어가는 건 항상 Variable이며, create_graph=True이면 그래프가 붙은 채로 들어감.
 
 ★ 핵심: **1차 역전파는 eval까지 완료하는 실행이었다** — 그래프만 만든 게 아니라 값(out2.data=4.0)까지 계산. 노트 33 "모든 실행은 그래프를 낳는다"의 반대 명제 — 그래프를 낳은 그 실행은 평가였다. (브로 발견)
 
