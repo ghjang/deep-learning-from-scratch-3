@@ -314,5 +314,6 @@ fill_grad(w.grad)   # w 행: x.grad=∂²L/∂w∂x, w.grad=∂²L/∂w²
 - [탐구 노트 32](./exploration_32_derivative_anatomy.md) — 미분식 성분 분류 (§4 명단 규칙의 근거)
 - [탐구 노트 34](./exploration_34_jacobian_vjp.md) §7 — x 공유 (step35 실증)
 - 큐 후보 12번 (미분 그래프 실험), 후보 11번 (그래프 3형태)
+- [Issue 48 — Hessian 구성 실험](https://github.com/ghjang/deep-learning-from-scratch-3/issues/48) — §8 다변수 위계의 실증 판
 
-**키워드**: `#역전파메모리생태계` `#v2심화` `#fill_grad차수결정` `#out2이중정체` `#1차역전파=2층순전파` `#grad슬롯생애` `#리프면책` `#신생vs재참조` `#data-grad-output` `#곱셈항등원씨앗` `#책이안다룬층위` `#다변수위계` `#Hessian` `#HVP` `#3차텐서` `#편미분지원` `#출력배제` `#역전파결과=입력변수에` `#fill_grad네이밍`
+**키워드**: `#역전파메모리생태계` `#v2심화` `#fill_grad차수결정` `#out2이중정체` `#1차역전파=2층순전파` `#grad슬롯생애` `#리프면책` `#신생vs재참조` `#data-grad-output` `#곱셈항등원씨앗` `#책이안다룬층위` `#다변수위계` `#Hessian` `#HVP` `#3차텐서` `#편미분지원` `#출력배제` `#역전파결과=입력변수에` `#fill_grad네이밍` `#순환참조` `#cleargrad부차효과` `#weakref=즉시회수` `#Variable재귀중첩` `#output-grad비대칭`
