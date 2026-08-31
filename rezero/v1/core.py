@@ -386,3 +386,26 @@ def fill_grad(
         # retain_grad=False면 중간 output grad 버리기 (메모리 절약)
         if not retain_grad:
             output.grad = None
+
+
+def backprop(
+    start_var: Variable,
+    upstream_grad: Optional[np.ndarray] = None,
+    *,
+    retain_grad: bool = False,
+) -> None:
+    """fill_grad의 업계 표준 이름 별칭 — 역전파 수행 (이슈 49, REZERO_CHANGES 항목 041).
+
+    fill_grad는 "grad를 채운다"(결과 관점) 이름이라 역전파 연산임이 코드에서
+    즉시 드러나지 않는다는 이유로, 명시적 이름의 진입점을 추가 (구현은 위임).
+    backprop이 표준(업계 관례·발견성 — 새 코드 기본) — fill_grad도 공존하는
+    정식 이름(FP적 fill/fold 관점, step07의 right-fold 통찰을 담은 이름).
+    관점을 강조하고 싶을 땐 fill_grad를 계속 써도 정당한 선택.
+
+    Args:
+        fill_grad와 동일 — start_var, upstream_grad, retain_grad.
+
+    See Also:
+        fill_grad — 실제 구현 (iter_reverse_topo + chain rule fold).
+    """
+    fill_grad(start_var, upstream_grad, retain_grad=retain_grad)

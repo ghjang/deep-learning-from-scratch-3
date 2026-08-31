@@ -1770,6 +1770,37 @@ def square(x):
 
 ---
 
+### #041 — ★ backprop 별칭 추가 — fill_grad의 업계 표준 이름 진입점 (이슈 49)
+
+> 2026-08-31 등록 (브로 제안+승인). 이슈 49 "fill_grad 함수명 재검토"의 결론 —
+> 전면 개명 대신 **별칭 전략**: `backprop`을 표준 이름으로 추가하고
+> fill_grad(항목 015)는 공존하는 정식 이름으로 유지. v1/v2 양쪽에 추가.
+
+**배경**:
+
+- 노트 36 §10 네이밍 성찰에서 후보 5종 재검토 → 브로 판단: "fold_grad 계열 이름이
+  틀린 건 아니나, 역전파 연산임이 코드에서 즉시 드러나지 않는다"
+- 전면 개명은 과거 step·v1/v2 코드·노트 전부를 깨는 과잉 (과거 step 수정 금지 원칙과
+  충돌) — 두 관점(FP적 fold vs 연산적 backprop)이 다 생존하는 별칭이 실용주의 최적해
+
+**변경**:
+
+- `rezero/v1/core.py`·`rezero/v2/core.py` — `backprop()` 포워딩 함수 추가
+  (구현은 fill_grad에 위임, 자기 docstring 보유 — v2는 create_graph 전달)
+- `v1/__init__.py`·`v2/__init__.py` — re-export + `__all__`
+- `v1/tests/test_backprop_alias.py`·`v2/tests/test_backprop_alias.py` —
+  동일 grad 생산 + upstream_grad 전달 + v2 create_graph(double backprop) 경로 검증
+
+**결과**: pytest v1+v2 **241 passed** / `uvx pyright rezero/` **0 errors**
+
+**이후 코드 규칙**: 새 코드는 `backprop` 권장(발견성) — 단 `fill_grad`는 폐기 대상이
+아니라 **공존하는 정식 이름** (FP적 fill/fold 관점을 강조할 땐 그대로 정당한 선택)
+
+**관련**: [이슈 49](https://github.com/ghjang/deep-learning-from-scratch-3/issues/49) /
+항목 015 (fill_grad 최초 채택, step08) / 노트 36 §10 (네이밍 성찰)
+
+---
+
 > 생각나는 대로 한 줄씩. 구체화되면 위 항목으로 승격.
 
 - (아직 없음 — 떠오르는 대로 추가)
