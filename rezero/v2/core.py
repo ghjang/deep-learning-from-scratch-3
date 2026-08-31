@@ -419,7 +419,9 @@ def fill_grad(
     elif start_var.grad is None:
         if start_var.data is None:
             raise RuntimeError(f"{start_var!r}의 data가 None입니다 — 역전파에 사용할 수 없습니다.")
-        start_var.grad = Variable(np.ones_like(start_var.data))  # ★ gy도 리프 노드
+        seed = Variable(np.ones_like(start_var.data))  # ★ gy도 리프 노드
+        seed.name = "seed"  # 시각화에서 씨앗 구분용 (이슈 45)
+        start_var.grad = seed
 
     # 역전파 메인 루프 — iter_reverse_topo가 순회를 담당 (worklist + visited 알고리즘 캡슐화)
     for f in iter_reverse_topo(start_var):

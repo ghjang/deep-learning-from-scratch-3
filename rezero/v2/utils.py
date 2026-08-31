@@ -188,14 +188,31 @@ def fold_dot_graph(
 #       ↓ DOT 조립
 
 
+def _is_seed(v: Variable) -> bool:
+    """역전파 씨앗 판별 — fill_grad가 name='seed'로 이름을 부여함.
+
+    값이 1이라고 전부 씨앗이 아님 (chain rule 상수 1과 구분).
+    """
+    return v.name == "seed"
+
+
 def _dot_var_node(
     v: Variable,
     verbose: bool = False,
     show_value: bool = False,
     value_format: "str | None" = None,
+    is_seed: bool = False,
 ) -> str:
-    """Variable을 DOT 노드 정의만으로 인코딩 (간선 제외, _dot_var의 노드 부분)."""
-    return _dot_var(v, verbose, show_value, value_format)
+    """Variable을 DOT 노드 정의만으로 인코딩 (간선 제외).
+    is_seed=True면 금색으로 구분 (역전파 시작 씨앗)."""
+    base = _dot_var(v, verbose, show_value, value_format)
+    if is_seed:
+        # 씨앗: gold 배경 + 별도 표시 — "이 1이 역전파를 시작했다"
+        base = base.replace(
+            'color=orange, style=filled',
+            'color=gold, style=filled, penwidth=2'
+        )
+    return base
 
 
 def _dot_func_node(f: Function, verbose: bool = False, show_value: bool = False) -> str:
@@ -276,7 +293,8 @@ def fold_multi_layer_dot_graph(
 
         for vid, p in var_primary.items():
             if p == layer_idx:
-                lines.append('  ' + _dot_var_node(vars_by_id[vid], verbose, show_value, value_format))
+                seed = layer_idx > 0 and _is_seed(vars_by_id[vid])
+                lines.append('  ' + _dot_var_node(vars_by_id[vid], verbose, show_value, value_format, is_seed=seed))
         for fid, p in func_primary.items():
             if p == layer_idx:
                 lines.append('  ' + _dot_func_node(funcs_by_id[fid], verbose, show_value))
