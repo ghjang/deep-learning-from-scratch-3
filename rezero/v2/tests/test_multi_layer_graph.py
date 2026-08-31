@@ -71,32 +71,47 @@ class TestMultiLayerGraphStructure:
         except AssertionError:
             pass  # 예상된 에러
 
+class TestLinearFunction:
+    """y = 2x의 미분 — 그래프가 x를 참조하지 않아 2계가 안 되는 경우.
 
-class TestGraphGrowthPattern:
-    """그래프 성장 패턴 실측 — 노트 36 §8의 근거.
-
-    x²의 값은 소멸 (4 → 4 → 2 → 0 → -0) 하지만
-    그래프는 선형 성장 (+2 Function/계).
+    노트 32 미분식 분류의 "입력 전용형" 실측: d(2x)/dx = 2는 상수라
+    미분식이 x를 참조하지 않음 → 1계 그래프에 x가 없음 → x.grad = None.
     """
 
-    def test_values_diminish(self):
-        """미분값: y=4, 1계=4, 2계=2, 3계=0."""
-        layers = _build_x2_derivatives(max_order=3)
-        expected = [4.0, 4.0, 2.0, 0.0]  # y, gx, gx2, gx3
-        for var, exp in zip(layers, expected):
-            assert var is not None and var.data is not None
-            assert float(var.data) == exp
+    def test_linear_1st_derivative_is_constant(self):
+        """y = 2x → y' = 2 (x=3에서)."""
+        x = Variable(np.array(3.0), name='x')
+        y = 2 * x
 
-    def test_graph_grows_linearly(self):
-        """Function 수: 1 → 3 → 5 → 7 → 9 (각 +2씩 선형 성장)."""
-        layers = _build_x2_derivatives(max_order=4)
-        counts = [_count_funcs(v) for v in layers]
-        expected = [1, 3, 5, 7, 9]
-        assert counts == expected
+        backprop(y, create_graph=True)
+        gx = x.grad
 
-    def test_growth_is_constant_increment(self):
-        """각 계층 간 성장량이 일정한지 (+2)."""
-        layers = _build_x2_derivatives(max_order=4)
-        counts = [_count_funcs(v) for v in layers]
-        increments = [counts[i + 1] - counts[i] for i in range(len(counts) - 1)]
-        assert all(d == 2 for d in increments), f'성장: {increments}'
+        assert gx is not None
+        assert gx.data is not None
+        assert float(gx.data) == 2.0
+
+    def test_linear_2nd_derivative_x_grad_is_none(self):
+        """y = 2x의 2계: gx의 그래프가 x를 참조하지 않아 x.grad = None."""
+        x = Variable(np.array(3.0), name='x')
+        y = 2 * x
+
+        backprop(y, create_graph=True)
+        gx = x.grad
+        assert gx is not None
+
+        x.clear_grad()
+        backprop(gx, create_graph=True)
+
+        assert x.grad is None
+
+    def test_linear_two_layer_graph_works(self):
+        """[y, gx] 2층 그래프는 정상 생성 (1계까지만 가능)."""
+        x = Variable(np.array(3.0), name='x')
+        y = 2 * x
+
+        backprop(y, create_graph=True)
+        gx = x.grad
+        assert gx is not None
+
+        dot = fold_multi_layer_dot_graph([y, gx], verbose=False)
+        assert dot.count('subgraph cluster_') == 2
