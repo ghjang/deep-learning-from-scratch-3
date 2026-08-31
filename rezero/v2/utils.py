@@ -13,7 +13,13 @@ import numpy as np
 from rezero.common.utils import numerical_diff  # noqa: F401 — 공통 모듈 re-export
 from rezero.v2.core import Function, Variable, iter_reverse_topo
 
-__all__ = ["fold_dot_graph", "numerical_diff", "plot_dot_graph"]
+__all__ = [
+    "fold_dot_graph",
+    "fold_multi_layer_dot_graph",
+    "numerical_diff",
+    "plot_dot_graph",
+    "plot_multi_layer_graph",
+]
 
 
 # ===== 계산 그래프 시각화 (Graphviz DOT) ========================================
@@ -160,6 +166,213 @@ def fold_dot_graph(
             txt += _dot_var(x, verbose, show_value, value_format)
 
     return f'digraph g {{\n{txt}}}'
+
+
+# ===== 다층 계산 그래프 시각화 (이슈 45) =========================================
+# 여러 시작 Variable의 그래프를 한 장에 병합 — 층별 cluster + 공유 노드 복제+점선.
+#
+# 핵심 착안: fold_dot_graph의 노드 id가 Python 객체 id이므로,
+# 여러 그래프에서 같은 객체가 나타나면 자동으로 같은 id → "공유"가 즉시 가시화됨.
+#
+# ★ 브로 원안 (2026-08-31): 공유 변수는 **원본을 원층 cluster 안에 두고**,
+# 다른 층에는 **복제 노드**를 배치한 뒤 원본을 **점선 화살표**로 가리키게 함.
+# 각 층이 그래프의 완결성을 유지하면서 변수 재사용이 명시적으로 보임.
+#
+# 파이프라인:
+#   [Variable, Variable, ...]     (예: [y, x.grad] — 1계 미분 + 2계 미분)
+#       ↓ 각 층별 역순회
+#   노드별 소속 층 기록           (id → {0, 1, ...})
+#       ↓ 분류
+#   소속 1개 → 해당 층 cluster 안
+#   소속 2개+ → 원본은 첫 층 cluster 안 / 복제는 이후 층 cluster 안 + 점선 → 원본
+#       ↓ DOT 조립
+
+
+def _dot_var_node(
+    v: Variable,
+    verbose: bool = False,
+    show_value: bool = False,
+    value_format: "str | None" = None,
+) -> str:
+    """Variable을 DOT 노드 정의만으로 인코딩 (간선 제외, _dot_var의 노드 부분)."""
+    return _dot_var(v, verbose, show_value, value_format)
+
+
+def _dot_var_dup(
+    v: Variable,
+    dup_id: str,
+    verbose: bool = False,
+    show_value: bool = False,
+    value_format: "str | None" = None,
+) -> str:
+    """공유 Variable의 복제 노드 — 원본과 같은 라벨, 점선 테두리로 구분."""
+    base = _dot_var_node(v, verbose, show_value, value_format)
+    # 노드 id 치환 (문자열 첫 등장 = 노드 정의의 id)
+    result = base.replace(str(id(v)), dup_id, 1)
+    # 복제 노드 시각: 흐린 배경(moccasin) + 점선 테두리 — "같은 변수의 참조"임을 표현
+    result = result.replace(
+        'color=orange, style=filled]',
+        'color=orange, fillcolor=moccasin, style="filled,dashed"]',
+    )
+    return result
+
+
+def _dot_func_node(f: Function, verbose: bool = False, show_value: bool = False) -> str:
+    """Function을 DOT 노드 정의만으로 인코딩 (간선 제외, _dot_func의 첫 줄)."""
+    show_param = verbose or show_value
+    return f'{id(f)} [label="{f.dot_label(show_param)}", color=lightblue, style=filled, shape=box]\n'
+
+
+def fold_multi_layer_dot_graph(
+    start_vars: "list[Variable]",
+    verbose: bool = True,
+    show_value: bool = False,
+    value_format: "str | None" = None,
+    layer_names: "list[str] | None" = None,
+) -> str:
+    """여러 시작 Variable의 계산 그래프를 층별 cluster로 병합한 DOT 생성.
+
+    공유 변수는 원본이 첫 소속 층 cluster 안에, 이후 층에는 복제 노드가
+    배치되고 원본을 점선 화살표로 가리킴 — 층별 완결성 + 재사용 명시.
+
+    Args:
+        start_vars: 각 층의 시작 Variable 목록 (예: [y, x.grad] — 1계/2계).
+        verbose: True면 Variable 노드에 shape/dtype 추가.
+        show_value: True면 Variable 노드에 값 추가.
+        value_format: 값 포맷 스펙 (None이면 적응형 기본).
+        layer_names: 각 층의 표시 이름 (None이면 "1층", "2층"...).
+
+    Returns:
+        완성된 DOT 텍스트 (cluster + 복제 + 점선 포함).
+    """
+    assert len(start_vars) >= 2, "다층 시각화는 시작점 2개 이상 필요"
+
+    # ① 각 층별 역순회 → 노드별 소속 층 + 객체 참조 + 간선(층 정보 포함)
+    var_layers: dict[int, set[int]] = {}
+    func_layers: dict[int, set[int]] = {}
+    vars_by_id: dict[int, Variable] = {}
+    funcs_by_id: dict[int, Function] = {}
+    edge_layers: dict[tuple[int, int], int] = {}  # (from, to) → first layer_idx
+
+    for layer_idx, start_var in enumerate(start_vars):
+        vid = id(start_var)
+        var_layers.setdefault(vid, set()).add(layer_idx)
+        vars_by_id[vid] = start_var
+
+        for func in iter_reverse_topo(start_var):
+            fid = id(func)
+            func_layers.setdefault(fid, set()).add(layer_idx)
+            funcs_by_id[fid] = func
+
+            output = func.output() if func.output else None
+            if output is not None:
+                oid = id(output)
+                var_layers.setdefault(oid, set()).add(layer_idx)
+                vars_by_id[oid] = output
+                edge_layers.setdefault((fid, oid), layer_idx)
+
+            if func.inputs:
+                for x in func.inputs:
+                    xid = id(x)
+                    var_layers.setdefault(xid, set()).add(layer_idx)
+                    vars_by_id[xid] = x
+                    edge_layers.setdefault((xid, fid), layer_idx)
+
+    # ② 공유 노드의 원본 층 = 소속 층 중 최솟값
+    shared_vars = {vid for vid, ls in var_layers.items() if len(ls) > 1}
+    primary_of: dict[int, int] = {vid: min(ls) for vid, ls in var_layers.items() if len(ls) > 1}
+
+    def effective_id(real_id: int, layer_idx: int) -> "int | str":
+        """해당 층에서 이 노드를 지칭할 id — 원본 층이면 실제 id, 아니면 복제 id."""
+        if real_id not in shared_vars or layer_idx == primary_of[real_id]:
+            return real_id
+        return f'ref{layer_idx}_{real_id}'
+
+    # ③ DOT 조립
+    lines: list[str] = []
+
+    # 각 층 cluster
+    for layer_idx in range(len(start_vars)):
+        lines.append(f'subgraph cluster_{layer_idx} {{\n')
+        if layer_names:
+            lines.append(f'  label = "{layer_names[layer_idx]}";\n')
+        lines.append('  style = rounded;\n')
+        lines.append('  color = lightgray;\n')
+
+        for vid, ls in var_layers.items():
+            if layer_idx not in ls:
+                continue
+            if vid in shared_vars and layer_idx != primary_of[vid]:
+                # 복제 노드 (점선 테두리 + 점선 참조는 간선 단계에서)
+                dup_id = f'ref{layer_idx}_{vid}'
+                lines.append('  ' + _dot_var_dup(vars_by_id[vid], dup_id, verbose, show_value, value_format))
+            else:
+                # 원본 또는 단일 소속 노드
+                lines.append('  ' + _dot_var_node(vars_by_id[vid], verbose, show_value, value_format))
+
+        for fid, ls in func_layers.items():
+            if layer_idx in ls:
+                lines.append('  ' + _dot_func_node(funcs_by_id[fid], verbose, show_value))
+
+        lines.append('}\n')
+
+    # 간선 — edge_layers의 층 정보로 유효 id 결정 (복제 노드가 있는 층이면 복제 id 사용)
+    for (from_id, to_id), layer_idx in sorted(edge_layers.items()):
+        eff_from = effective_id(from_id, layer_idx)
+        eff_to = effective_id(to_id, layer_idx)
+        lines.append(f'{eff_from} -> {eff_to}\n')
+
+    # 점선 참조 간선 — 복제 → 원본 ("공유" 라벨)
+    for vid in shared_vars:
+        for layer_idx in sorted(var_layers[vid]):
+            if layer_idx != primary_of[vid]:
+                dup_id = f'ref{layer_idx}_{vid}'
+                lines.append(f'{vid} -> {dup_id} [style=dashed, color=gray]\n')
+
+    return f'digraph g {{\n{"".join(lines)}}}'
+
+
+def plot_multi_layer_graph(
+    start_vars: "list[Variable]",
+    verbose: bool = True,
+    show_value: bool = False,
+    value_format: "str | None" = None,
+    layer_names: "list[str] | None" = None,
+    to_file: str = 'output/multi_layer.png',
+) -> str:
+    """다층 계산 그래프를 DOT로 인코딩하여 Graphviz로 렌더링, 파일로 저장.
+
+    Args:
+        start_vars: 각 층의 시작 Variable 목록.
+        verbose: True면 Variable 노드에 shape/dtype 추가.
+        show_value: True면 Variable 노드에 값 추가.
+        value_format: 값 포맷 스펙 (None이면 적응형 기본).
+        layer_names: 각 층의 표시 이름.
+        to_file: 출력 파일 경로 (확장자가 렌더링 포맷 결정).
+
+    Returns:
+        저장된 파일 경로.
+    """
+    extension = os.path.splitext(to_file)[1][1:]
+    if extension not in SUPPORTED_FORMATS:
+        raise ValueError(
+            f"지원하지 않는 포맷: '.{extension}'. "
+            f"지원 포맷: {sorted(SUPPORTED_FORMATS)}"
+        )
+
+    dot_graph = fold_multi_layer_dot_graph(
+        start_vars, verbose, show_value, value_format, layer_names
+    )
+
+    out_dir = os.path.dirname(to_file) or '.'
+    os.makedirs(out_dir, exist_ok=True)
+
+    dot_path = os.path.splitext(to_file)[0] + '.dot'
+    with open(dot_path, 'w') as f:
+        f.write(dot_graph)
+
+    subprocess.run(['dot', dot_path, '-T', extension, '-o', to_file], check=True)
+    return to_file
 
 
 # Graphviz dot이 지원하는 렌더링 포맷 (학습/디버깅 용도로 자주 쓰는 3종).
