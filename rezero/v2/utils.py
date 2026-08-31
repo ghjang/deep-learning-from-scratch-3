@@ -198,25 +198,6 @@ def _dot_var_node(
     return _dot_var(v, verbose, show_value, value_format)
 
 
-def _dot_var_dup(
-    v: Variable,
-    dup_id: str,
-    verbose: bool = False,
-    show_value: bool = False,
-    value_format: "str | None" = None,
-) -> str:
-    """공유 Variable의 복제 노드 — 원본과 같은 라벨, 점선 테두리로 구분."""
-    base = _dot_var_node(v, verbose, show_value, value_format)
-    # 노드 id 치환 (문자열 첫 등장 = 노드 정의의 id)
-    result = base.replace(str(id(v)), dup_id, 1)
-    # 복제 노드 시각: 흐린 배경(moccasin) + 점선 테두리 — "같은 변수의 참조"임을 표현
-    result = result.replace(
-        'color=orange, style=filled]',
-        'color=orange, fillcolor=moccasin, style="filled,dashed"]',
-    )
-    return result
-
-
 def _dot_func_node(f: Function, verbose: bool = False, show_value: bool = False) -> str:
     """Function을 DOT 노드 정의만으로 인코딩 (간선 제외, _dot_func의 첫 줄)."""
     show_param = verbose or show_value
@@ -232,27 +213,28 @@ def fold_multi_layer_dot_graph(
 ) -> str:
     """여러 시작 Variable의 계산 그래프를 층별 cluster로 병합한 DOT 생성.
 
-    공유 변수는 원본이 첫 소속 층 cluster 안에, 이후 층에는 복제 노드가
-    배치되고 원본을 점선 화살표로 가리킴 — 층별 완결성 + 재사용 명시.
+    ★ 무복제 원칙 (브로 방향 전환, 2026-08-31): 각 노드는 전체 그래프에
+    딱 1번만 등장 (primary cluster 안). 복제/점선 참조 없음.
+    공유 변수는 간선이 cluster 경계를 넘어 연결되는 것으로 시각화.
 
     Args:
         start_vars: 각 층의 시작 Variable 목록 (예: [y, x.grad] — 1계/2계).
         verbose: True면 Variable 노드에 shape/dtype 추가.
         show_value: True면 Variable 노드에 값 추가.
         value_format: 값 포맷 스펙 (None이면 적응형 기본).
-        layer_names: 각 층의 표시 이름 (None이면 "1층", "2층"...).
+        layer_names: 각 층의 표시 이름.
 
     Returns:
-        완성된 DOT 텍스트 (cluster + 복제 + 점선 포함).
+        완성된 DOT 텍스트.
     """
     assert len(start_vars) >= 2, "다층 시각화는 시작점 2개 이상 필요"
 
-    # ① 각 층별 역순회 → 노드별 소속 층 + 객체 참조 + 간선(층 정보 포함)
+    # ① 각 층별 역순회 → 노드별 소속 층 + 객체 참조 + 간선 수집
     var_layers: dict[int, set[int]] = {}
     func_layers: dict[int, set[int]] = {}
     vars_by_id: dict[int, Variable] = {}
     funcs_by_id: dict[int, Function] = {}
-    edge_layers: dict[tuple[int, int], int] = {}  # (from, to) → first layer_idx
+    edges: set[tuple[int, int]] = set()
 
     for layer_idx, start_var in enumerate(start_vars):
         vid = id(start_var)
@@ -269,71 +251,47 @@ def fold_multi_layer_dot_graph(
                 oid = id(output)
                 var_layers.setdefault(oid, set()).add(layer_idx)
                 vars_by_id[oid] = output
-                edge_layers.setdefault((fid, oid), layer_idx)
+                edges.add((fid, oid))
 
             if func.inputs:
                 for x in func.inputs:
                     xid = id(x)
                     var_layers.setdefault(xid, set()).add(layer_idx)
                     vars_by_id[xid] = x
-                    edge_layers.setdefault((xid, fid), layer_idx)
+                    edges.add((xid, fid))
 
-    # ② 공유(복제) 대상 = 순전파(층 0)에 소속 + 다른 층에도 등장하는 Variable
-    # 순전파의 변수(사용자 입력 x, 출력 y)만 복제 — 역전파에서 생성된
-    # 상수(1, 2, 0.5 등)나 씨앗은 자기 층에만 존재 (브로 지정, 2026-08-31)
-    primary_of: dict[int, int] = {vid: min(ls) for vid, ls in var_layers.items()}
-    shared_vars = {
-        vid for vid, ls in var_layers.items()
-        if len(ls) > 1 and primary_of[vid] == 0
-    }
+    # ② primary = 소속 층 중 최솟값 (노드가 처음 등장한 층)
+    var_primary = {vid: min(ls) for vid, ls in var_layers.items()}
+    func_primary = {fid: min(ls) for fid, ls in func_layers.items()}
 
-    def effective_id(real_id: int, layer_idx: int) -> "int | str":
-        """해당 층에서 이 노드를 지칭할 id — 원본 층이면 실제 id, 아니면 복제 id."""
-        if real_id not in shared_vars or layer_idx == primary_of[real_id]:
-            return real_id
-        return f'ref{layer_idx}_{real_id}'
-
-    # ③ DOT 조립
+    # ③ DOT 조립 — 각 노드는 primary cluster에 딱 1번
     lines: list[str] = []
 
-    # 각 층 cluster
     for layer_idx in range(len(start_vars)):
         lines.append(f'subgraph cluster_{layer_idx} {{\n')
-        if layer_names:
-            lines.append(f'  label = "{layer_names[layer_idx]}";\n')
         lines.append('  style = rounded;\n')
         lines.append('  color = lightgray;\n')
+        if layer_names:
+            lines.append(f'  label = "{layer_names[layer_idx]}";\n')
 
-        for vid, ls in var_layers.items():
-            if layer_idx not in ls:
-                continue
-            if vid in shared_vars and layer_idx != primary_of[vid]:
-                # 순전파 변수의 복제 (점선 테두리 — x/y 등이 하위 층에서 재사용됨)
-                dup_id = f'ref{layer_idx}_{vid}'
-                lines.append('  ' + _dot_var_dup(vars_by_id[vid], dup_id, verbose, show_value, value_format))
-            elif layer_idx == primary_of[vid]:
-                # 원본 — 리프 공유든 중간값이든, 처음 등장한 층에만 배치
+        for vid, p in var_primary.items():
+            if p == layer_idx:
                 lines.append('  ' + _dot_var_node(vars_by_id[vid], verbose, show_value, value_format))
-            # else: 중간값이 후속 층에도 등장하지만 primary 층에만 두고 간선으로 연결
-
-        for fid, ls in func_layers.items():
-            if layer_idx in ls:
+        for fid, p in func_primary.items():
+            if p == layer_idx:
                 lines.append('  ' + _dot_func_node(funcs_by_id[fid], verbose, show_value))
 
         lines.append('}\n')
 
-    # 간선 — 고유 (from, to) 조합을 실제 객체 id로 1회씩만 생성.
-    # 중간값은 primary cluster에만 있으므로 자연히 그 cluster 안/경계 간선이 됨.
-    # 공유 x의 간선은 원본(층 0)으로 직결 — 점선 참조 화살표가 재사용을 표현.
-    for (from_id, to_id) in sorted(edge_layers):
-        lines.append(f'{from_id} -> {to_id}\n')
-
-    # 점선 참조 간선 — 복제 → 원본 ("공유" 라벨)
-    for vid in shared_vars:
-        for layer_idx in sorted(var_layers[vid]):
-            if layer_idx != primary_of[vid]:
-                dup_id = f'ref{layer_idx}_{vid}'
-                lines.append(f'{vid} -> {dup_id} [style=dashed, color=gray]\n')
+    # 간선 — 실제 객체 id로 직결. 양끝이 다른 cluster면 점선 (층 간 참조 표시)
+    all_primary = {**var_primary, **func_primary}
+    for from_id, to_id in sorted(edges):
+        p_from = all_primary.get(from_id, 0)
+        p_to = all_primary.get(to_id, 0)
+        if p_from != p_to:
+            lines.append(f'{from_id} -> {to_id} [style=dashed, color=dimgray]\n')
+        else:
+            lines.append(f'{from_id} -> {to_id}\n')
 
     return f'digraph g {{\n{"".join(lines)}}}'
 

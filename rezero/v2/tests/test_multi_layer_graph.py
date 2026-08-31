@@ -51,15 +51,15 @@ class TestMultiLayerGraphStructure:
         dot = fold_multi_layer_dot_graph(layers, verbose=False)
         assert dot.count('subgraph cluster_') == 4 + 1  # 순전파 + 4계
 
-    def test_shared_variable_has_duplicate_and_dashed_reference(self):
-        """공유 변수 x: 원본(cluster 안) + 복제(점선 테두리) + 점선 참조 간선."""
-        layers = _build_x2_derivatives(max_order=1)
+    def test_no_duplication_each_node_appears_once(self):
+        """무복제 원칙: 각 노드는 전체 그래프에 딱 1번만 등장 (브로 방향 전환)."""
+        layers = _build_x2_derivatives(max_order=2)
         dot = fold_multi_layer_dot_graph(layers, verbose=False)
 
-        # 점선 참조 간선 존재 (원본 → 복제)
-        assert 'style=dashed' in dot
-        # 복제 노드 스타일 (fillcolor=moccasin + 점선 테두리)
-        assert 'fillcolor=moccasin' in dot
+        # 복제 노드(ref 접두사)가 없어야 함
+        assert 'ref' not in dot.replace('refresh', ''), '복제 노드가 존재하면 안 됨'
+        # 복제 스타일이 없어야 함 (점선 간선은 크로스 cluster용으로 허용)
+        assert 'moccasin' not in dot
 
     def test_minimum_two_vars_required(self):
         """시작점 1개면 AssertionError."""
