@@ -72,6 +72,45 @@ type Worklist = list["Function"]
 
 
 # ===== Variable — 순수 데이터 상자 =============================================
+# ===== VariableDataPropertyMixin — data에 위임하는 property (이슈 46 확장) ====
+class VariableDataPropertyMixin:
+    """data(ndarray)에 위임하는 property 4종 + __len__ — "순수 위임" 관심사.
+
+    Variable.data가 None이면 _ensure_data가 RuntimeError 방어 (Step10의
+    방어막 None 가드 원칙). Variable 본체는 "데이터 상자" 정의만 남음.
+    """
+
+    # 믹스인 계약 — 호스트(Variable)가 __init__에서 채울 속성 선언 (pyright용)
+    data: Optional[np.ndarray]
+
+    def _ensure_data(self) -> np.ndarray:
+        """data가 None이면 RuntimeError, 아니면 data 반환."""
+        if self.data is None:
+            raise RuntimeError(
+                f"{self!r}의 data가 None입니다 — data에 접근하는 연산(shape/len/dtype 등)을 수행할 수 없습니다."
+            )
+        return self.data
+
+    @property
+    def shape(self) -> tuple[int, ...]:
+        return self._ensure_data().shape
+
+    @property
+    def ndim(self) -> int:
+        return self._ensure_data().ndim
+
+    @property
+    def size(self) -> int:
+        return self._ensure_data().size
+
+    @property
+    def dtype(self) -> np.dtype:
+        return self._ensure_data().dtype
+
+    def __len__(self) -> int:
+        return len(self._ensure_data())
+
+
 # ===== VariableArithmeticMixin — 산술 연산자 (이슈 46, 믹스인 분리) ============
 class VariableArithmeticMixin:
     """Variable의 산술 연산자 9종 — 지연 import + functions 위임.
@@ -130,14 +169,15 @@ class VariableArithmeticMixin:
         return pow(cast("Variable", self), c)
 
 
-class Variable(VariableArithmeticMixin):
+class Variable(VariableDataPropertyMixin, VariableArithmeticMixin):
     """DeZero의 변수. 순수 데이터 상자.
 
     data + 미분값(grad) + 그래프 연결(creator + generation).
     역전파는 fill_grad 전역 함수가 담당 (rezero 정체성 — 관심사 분리).
 
-    name 속성 + data에 위임하는 property 4종(shape/ndim/size/dtype) +
-    __len__/__repr__ + 산술 연산자 9종은 VariableArithmeticMixin에서 상속.
+    name 속성 + __repr__.
+    data에 위임하는 property 4종 + __len__ → VariableDataPropertyMixin.
+    산술 연산자 9종 → VariableArithmeticMixin.
     """
 
     def __init__(self, data: Optional[np.ndarray], *, name: Optional[str] = None):
@@ -149,34 +189,6 @@ class Variable(VariableArithmeticMixin):
         self.grad: Optional[np.ndarray] = None
         self.creator: Optional["Function"] = None
         self.generation: int = 0
-
-    # ===== data에 위임하는 property 4종 + __len__ ==========================
-    def _ensure_data(self) -> np.ndarray:
-        """data가 None이면 RuntimeError, 아니면 data 반환."""
-        if self.data is None:
-            raise RuntimeError(
-                f"{self!r}의 data가 None입니다 — data에 접근하는 연산(shape/len/dtype 등)을 수행할 수 없습니다."
-            )
-        return self.data
-
-    @property
-    def shape(self) -> tuple[int, ...]:
-        return self._ensure_data().shape
-
-    @property
-    def ndim(self) -> int:
-        return self._ensure_data().ndim
-
-    @property
-    def size(self) -> int:
-        return self._ensure_data().size
-
-    @property
-    def dtype(self) -> np.dtype:
-        return self._ensure_data().dtype
-
-    def __len__(self) -> int:
-        return len(self._ensure_data())
 
     def __repr__(self) -> str:
         if self.data is None:
