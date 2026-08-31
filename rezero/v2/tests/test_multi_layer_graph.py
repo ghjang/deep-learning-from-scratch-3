@@ -42,19 +42,19 @@ class TestMultiLayerGraphStructure:
     def test_two_layers_produce_two_clusters(self):
         """[y, gx] 전달 → cluster 2개 생성."""
         layers = _build_x2_derivatives(max_order=1)
-        dot = fold_multi_layer_dot_graph(layers, verbose=False)
+        dot = fold_multi_layer_dot_graph(layers, verbose=False)  # type: ignore[arg-type]
         assert dot.count('subgraph cluster_') == 2
 
     def test_five_layers_produce_five_clusters(self):
         """[y, gx, gx2, gx3, gx4] 전달 → cluster 5개."""
         layers = _build_x2_derivatives(max_order=4)
-        dot = fold_multi_layer_dot_graph(layers, verbose=False)
+        dot = fold_multi_layer_dot_graph(layers, verbose=False)  # type: ignore[arg-type]
         assert dot.count('subgraph cluster_') == 4 + 1  # 순전파 + 4계
 
     def test_no_duplication_each_node_appears_once(self):
         """무복제 원칙: 각 노드는 전체 그래프에 딱 1번만 등장 (브로 방향 전환)."""
         layers = _build_x2_derivatives(max_order=2)
-        dot = fold_multi_layer_dot_graph(layers, verbose=False)
+        dot = fold_multi_layer_dot_graph(layers, verbose=False)  # type: ignore[arg-type]
 
         # 복제 노드(ref 접두사)가 없어야 함
         assert 'ref' not in dot.replace('refresh', ''), '복제 노드가 존재하면 안 됨'
@@ -70,6 +70,78 @@ class TestMultiLayerGraphStructure:
             assert False, 'Should have raised'
         except AssertionError:
             pass  # 예상된 에러
+
+
+class TestMultiVariableGradient:
+    """다변수 함수의 역전파 — 한 층에 여러 그래디언트 그래프 (브로 발견, 2026-08-31).
+
+    z = x·y의 backward는 x.grad와 y.grad 두 그래디언트 그래프를 만듦.
+    [z, [gx, gy]] 중첩 리스트로 전달하면 같은 층에 모두 포함되어야 함.
+    """
+
+    def test_multi_var_two_clusters(self):
+        """[z, [gx, gy]] → cluster 2개 (순전파 + 역전파 전체)."""
+        x = Variable(np.array(3.0), name='x')
+        y = Variable(np.array(5.0), name='y')
+        z = x * y
+
+        backprop(z, create_graph=True)
+        gx = x.grad
+        gy = y.grad
+
+        dot = fold_multi_layer_dot_graph([z, [gx, gy]], verbose=False)  # type: ignore[arg-type]
+        assert dot.count('subgraph cluster_') == 2
+
+    def test_multi_var_gradients_in_same_cluster(self):
+        """cluster_1에 gx와 gy의 그래프가 둘 다 있어야 함 (노드 수 > 단일 그래프)."""
+        x = Variable(np.array(3.0), name='x')
+        y = Variable(np.array(5.0), name='y')
+        z = x * y
+
+        backprop(z, create_graph=True)
+        gx = x.grad
+        gy = y.grad
+
+        # 다변수: [z, [gx, gy]] — cluster_1이 두 그래프를 모두 포함
+        dot_multi = fold_multi_layer_dot_graph([z, [gx, gy]], verbose=False)  # type: ignore[arg-type]
+
+        # 단일 변수 버전과 비교: cluster_1이 더 많은 노드를 가져야 함
+        import re
+        clusters_multi = re.findall(
+            r'subgraph cluster_1 \{(.*?)\}', dot_multi, re.DOTALL
+        )
+        nodes_multi = len(re.findall(r'^\s+\d+', clusters_multi[0], re.MULTILINE))
+
+        # gx 단독 그래프보다 노드가 많아야 함 (gy의 그래프도 포함되므로)
+        assert nodes_multi >= 3, f'cluster_1 노드 {nodes_multi}개 — 다변수 미포함?'
+
+    def test_multi_var_cross_cluster_edges(self):
+        """다변수 곱의 미분은 상대방을 참조 → 크로스 간선 존재."""
+        x = Variable(np.array(3.0), name='x')
+        y = Variable(np.array(5.0), name='y')
+        z = x * y
+
+        backprop(z, create_graph=True)
+        gx = x.grad
+        gy = y.grad
+
+        dot = fold_multi_layer_dot_graph([z, [gx, gy]], verbose=False)  # type: ignore[arg-type]
+
+        # d(xy)/dx = y (cluster_0의 y 참조), d(xy)/dy = x (cluster_0의 x 참조)
+        # → 크로스 간선 최소 2개 (x와 y 각각)
+        dashed_count = dot.count('style=dashed')
+        assert dashed_count >= 2, f'크로스 간선 {dashed_count}개 — 2개 이상 필요'
+
+    def test_single_var_still_works(self):
+        """기존 단변수 [y, gx] 방식도 여전히 작동 (호환성)."""
+        x = Variable(np.array(2.0))
+        y = x ** 2
+        backprop(y, create_graph=True)
+        gx = x.grad
+
+        dot = fold_multi_layer_dot_graph([y, gx], verbose=False)  # type: ignore[arg-type]
+        assert dot.count('subgraph cluster_') == 2
+
 
 class TestLinearFunction:
     """y = 2x의 미분 — 그래프가 x를 참조하지 않아 2계가 안 되는 경우.

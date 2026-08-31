@@ -222,7 +222,7 @@ def _dot_func_node(f: Function, verbose: bool = False, show_value: bool = False)
 
 
 def fold_multi_layer_dot_graph(
-    start_vars: "list[Variable]",
+    start_vars: "list[Variable | list[Variable]]",
     verbose: bool = True,
     show_value: bool = False,
     value_format: "str | None" = None,
@@ -230,12 +230,15 @@ def fold_multi_layer_dot_graph(
 ) -> str:
     """여러 시작 Variable의 계산 그래프를 층별 cluster로 병합한 DOT 생성.
 
-    ★ 무복제 원칙 (브로 방향 전환, 2026-08-31): 각 노드는 전체 그래프에
-    딱 1번만 등장 (primary cluster 안). 복제/점선 참조 없음.
-    공유 변수는 간선이 cluster 경계를 넘어 연결되는 것으로 시각화.
+    ★ 무복제 원칙: 각 노드는 전체 그래프에 딱 1번만 등장.
+    ★ 다변수 지원 (브로 발견, 2026-08-31): 한 층에 여러 Variable을 리스트로
+    전달 가능 — 다변수 함수의 역전파는 입력 변수 수만큼 그래디언트 그래프를
+    만들므로, 같은 층에 전부 포함해야 정확한 시각화.
 
     Args:
-        start_vars: 각 층의 시작 Variable 목록 (예: [y, x.grad] — 1계/2계).
+        start_vars: 각 층의 시작점. Variable 1개 또는 list[Variable].
+            단변수: [y, gx, gx2] (기존 방식 그대로)
+            다변수: [z, [gx, gy]] — 층 1에 x.grad와 y.grad를 모두 포함
         verbose: True면 Variable 노드에 shape/dtype 추가.
         show_value: True면 Variable 노드에 값 추가.
         value_format: 값 포맷 스펙 (None이면 적응형 기본).
@@ -246,6 +249,12 @@ def fold_multi_layer_dot_graph(
     """
     assert len(start_vars) >= 2, "다층 시각화는 시작점 2개 이상 필요"
 
+    # 정규화: 각 층을 list[Variable]로 통일
+    layers: list[list[Variable]] = [
+        [item] if isinstance(item, Variable) else list(item)
+        for item in start_vars
+    ]
+
     # ① 각 층별 역순회 → 노드별 소속 층 + 객체 참조 + 간선 수집
     var_layers: dict[int, set[int]] = {}
     func_layers: dict[int, set[int]] = {}
@@ -253,29 +262,30 @@ def fold_multi_layer_dot_graph(
     funcs_by_id: dict[int, Function] = {}
     edges: set[tuple[int, int]] = set()
 
-    for layer_idx, start_var in enumerate(start_vars):
-        vid = id(start_var)
-        var_layers.setdefault(vid, set()).add(layer_idx)
-        vars_by_id[vid] = start_var
+    for layer_idx, layer_starts in enumerate(layers):
+        for start_var in layer_starts:
+            vid = id(start_var)
+            var_layers.setdefault(vid, set()).add(layer_idx)
+            vars_by_id[vid] = start_var
 
-        for func in iter_reverse_topo(start_var):
-            fid = id(func)
-            func_layers.setdefault(fid, set()).add(layer_idx)
-            funcs_by_id[fid] = func
+            for func in iter_reverse_topo(start_var):
+                fid = id(func)
+                func_layers.setdefault(fid, set()).add(layer_idx)
+                funcs_by_id[fid] = func
 
-            output = func.output() if func.output else None
-            if output is not None:
-                oid = id(output)
-                var_layers.setdefault(oid, set()).add(layer_idx)
-                vars_by_id[oid] = output
-                edges.add((fid, oid))
+                output = func.output() if func.output else None
+                if output is not None:
+                    oid = id(output)
+                    var_layers.setdefault(oid, set()).add(layer_idx)
+                    vars_by_id[oid] = output
+                    edges.add((fid, oid))
 
-            if func.inputs:
-                for x in func.inputs:
-                    xid = id(x)
-                    var_layers.setdefault(xid, set()).add(layer_idx)
-                    vars_by_id[xid] = x
-                    edges.add((xid, fid))
+                if func.inputs:
+                    for x in func.inputs:
+                        xid = id(x)
+                        var_layers.setdefault(xid, set()).add(layer_idx)
+                        vars_by_id[xid] = x
+                        edges.add((xid, fid))
 
     # ② primary = 소속 층 중 최솟값 (노드가 처음 등장한 층)
     var_primary = {vid: min(ls) for vid, ls in var_layers.items()}
@@ -315,7 +325,7 @@ def fold_multi_layer_dot_graph(
 
 
 def plot_multi_layer_graph(
-    start_vars: "list[Variable]",
+    start_vars: "list[Variable | list[Variable]]",
     verbose: bool = True,
     show_value: bool = False,
     value_format: "str | None" = None,

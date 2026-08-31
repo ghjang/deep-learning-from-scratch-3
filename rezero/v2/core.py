@@ -456,6 +456,11 @@ def fill_grad(
                 else:
                     x.grad = x.grad + downstream_grad
 
+                # grad에 자동 이름 부여 — 시각화·디버깅에서 "이게 누구 미분값인지" 즉시 식별
+                # (브로 제안, 이슈 45 — x.name이 "x"면 x.grad.name = "x.grad")
+                if x.name and downstream_grad.name is None:
+                    downstream_grad.name = f"{x.name}.grad"
+
         # retain_grad=False면 중간 output grad 버리기 (메모리 절약).
         # None 할당일 뿐이라 컨텍스트 밖 — 그래프 만드는 연산만 with 안에.
         if not retain_grad:
