@@ -28,7 +28,51 @@
 - **진행 중**: 0
 - **막힘**: 0
 - **마지막 업데이트**: 2026-08-31 — 이슈 49·46 종결(backprop 별칭+믹스인), 이슈 45 다층 그래프 도구 구현+그래프 성장 발견, 노트 38~41 출산 — ★★★ step36 완료 = 제 3고지 (step25~36, 고차 미분 계산) 점령! 하루에 step33/34/35/36 4개 완료. / 같은 날 밤: 이슈 43 작업 1+2 완료 — 탐구 노트 34 "야코비안은 흐르지 않는다" 승격 (후보 10번+8번 잔여 회수, 수치 실증 포함)
-- ★ **다음 작업** (2026-08-31 저녁 갱신 — 새 세션용 인수인계): **① 노트 37(전치·다차원 어드레싱) 브로 정독 + 점검표 38문항 도전** — 작성 완료 + 대화 보강 완료(2026-08-28: concept image, 혼합 진법, 수학자의 전치 정의, 내적 보존 유도, 미분=선형 근사, std::vector·캐스팅=view/reshape, 어드레싱=내적·strides 자유도 / 2026-08-30 정독 중: axis 국어 사전·3D contraction·축 해석 프로토콜·reshape 해부·트리 뷰(브로 아이디어 — 당기기 규약·포함 관계·S₂/S₃ 원소 나열 포함)·두 클럽 정리·NCHW 재조직화·큐브 배치도, 문항 30→38), 브로가 읽고 답하는 단계. ② ✅ 완료(2026-08-31) [이슈 49 — fill_grad 이름 확정](https://github.com/ghjang/deep-learning-from-scratch-3/issues/49) — **backprop 별칭 전략** 채택 (REZERO_CHANGES 항목 041): fill_grad는 공존 정식 이름(FP 관점) 유지 + v1/v2에 `backprop` 포워딩 함수 추가, 이후 코드는 backprop 권장. 241 passed / pyright 0 errors. ③ 🔄 진행 중 [이슈 45](https://github.com/ghjang/deep-learning-from-scratch-3/issues/45) 다층 그래프 도구 — 구현 완료(plot_multi_layer_graph, 브로 원안 반영: 복제+점선 참조) + 노트 36 §8에 그래프 성장 발견 기록. 내일: 고아 노드 버그 확인, 씨앗 이름, cluster 색상, 항등함수+다양한 함수 테스트 → [이슈 48](https://github.com/ghjang/deep-learning-from-scratch-3/issues/48) Hessian → 후보 12. ④ ✅ 완료(2026-08-31) [이슈 46](https://github.com/ghjang/deep-learning-from-scratch-3/issues/46) — VariableArithmeticMixin 분리 (항목 042): 던더 9종 → 믹스인, cast 해법. 241 passed / 0 errors. ⑤ [이슈 47](https://github.com/ghjang/deep-learning-from-scratch-3/issues/47) MatMul 이중 구현 (step41 시점). ⑥ 작업 3(v0) or 5(연습문제) — 브로 선택. ⑦ [노트 39 — 고차원 전치 연습장](https://github.com/ghjang/deep-learning-from-scratch-3/blob/master/notes/exploration_39_highdim_transpose_gym.md) (2026-08-30 신설, 브로 요청 — 4D·5D 묶음 읽기 훈련, step38 직전이 최적 타이밍). ⑧ [노트 40 — 순열 행렬 실험실](https://github.com/ghjang/deep-learning-from-scratch-3/blob/master/notes/exploration_40_permutation_matrices.md) (2026-08-31 신설, 브로 흥미 — 생성법·생성원·케일리 표, 언제든 놀이터). ⑨ [노트 41 — 내적](https://github.com/ghjang/deep-learning-from-scratch-3/blob/master/notes/exploration_41_inner_product.md) (2026-08-31 신설, 브로 요청 — 두 얼굴·수반·행렬 판·코사인 유사도, 4고지 전 기초 화력). ★ 완료: 이슈 43 작업 1~4 전부 종결 (노트 34/35/36/37, UML 7종, gradient check, 유형 지도). [Issue 43](https://github.com/ghjang/deep-learning-from-scratch-3/issues/43) / [Issue 44](https://github.com/ghjang/deep-learning-from-scratch-3/issues/44)
+- ★ **다음 작업** (2026-08-31 심야 갱신 — 새 세션용 인수인계):
+  **이슈 45 다층 그래프 도구 — 계속 진행 (구현은 안정, 탐구·개선 단계)**
+
+  **오늘 완료** (전부 커밋·푸시됨, 252 passed / pyright 0 errors):
+  - 이슈 49 backprop 별칭 종결 / 이슈 46 믹스인 분리 종결
+  - 노트 37 §4 심화 완독 + 노트 38(FFT/음악)·39(연습장)·40(순열)·41(내적) 출산
+  - 노트 36 §8 "그래프는 항상 자란다" + "새 계산량은 미분식 복잡도를 따름" 발견
+  - 노트 32 §3 "미분식의 x 참조 여부가 고차 미분 가능성 결정" 발견
+  - plot_multi_layer_graph 구현 (무복제 + 크로스 cluster 점선 + 다변수 [z, [gx, gy]])
+  - seed 이름 부여 (gold 색상) + grad 자동 이름 (x.grad)
+  - 다변수 그래디언트 시각화 (z=x·y의 1계/2계 실험)
+
+  **내일 할 일** (우선순위 순):
+
+  1. **이슈 45 탐구 계속 — 다양한 함수의 계산 그래프 관찰** (브로 요청: 종류별로 여러 개)
+     - 노트 32 미분식 분류의 각 유형당 최소 1개씩 실험:
+       - 출력형: exp(x) — 재사용형 (그래프 거의 안 자람)
+       - 입력형: ReLU(x) — 부호 참조형 (그래프 자람?)
+       - 입출력형: sin(x) — 순환형 (4주기)
+       - 자기참조형: tanh(x) — 폭증형 (지수 성장)
+       - 다변수: x²+y² — 대각은 구해지고 비대각은 None (x·y의 반대!)
+       - 다변수 혼합: sin(x)·cos(y) — 대각+비대각 모두 구해지는 케이스?
+     - 각각 [z, gx, gx2, ...] 다층 그래프 생성 + 노드 수/크로스 간선/씨앗 수 관찰
+
+  2. **2계 미분 노드 이름 개선** (브로 지적: "y.grad"는 ∂²z/∂y∂x를 전달 못함)
+     - Unicode 수학 표기: ∂z/∂x, ∂²z/∂x∂y 등
+     - fill_grad의 자동 작명 로직 개선
+     - 또는 이미지 기반 (SymPy로 수식 렌더링 → PNG → DOT에 삽입?) — 과한가?
+
+  3. **이슈 45 close 조건**: 1~2 완료 후 종결
+
+  4. **이슈 48 Hessian 실험** — 오늘 발견한 "비대각만 구해진다"의 후속
+     - x·y vs x²+y² vs sin(x)·cos(y)의 Hessian 구조 비교
+     - "대각/비대각/전부" 패턴이 함수 유형과 어떻게 대응하는지
+
+  5. 이후: 이슈 47 MatMul (step41 시점) / 작업 3(v0) or 5(연습문제)
+
+  **브로 이해도 보강 포인트** (오늘 혼동했던 부분 — 내일 천천히 재방문 권장):
+  - 혼합 편미분 ∂²z/∂x∂y의 값: x·y에서 1이 나온 것은 "y를 y로 미분"이라서 (0이 아님)
+  - ∂x∂y 읽기: 분모는 오른쪽부터 (먼저 y, 나중 x) — Schwarz 정리로 값은 같지만 출처가 다름
+  - Hessian 구조: backprop(gx) = x행 전체 (대각+비대각)를 계산하려는 것이지만,
+    그래프 단절로 일부만 도달 가능한 경우 있음
+  - 이 부분 노트 36 §8에 보강 추가하면 좋음 (아직 미기록)
+
+  ⑦~⑨ 노트 39·40·41 놀이터 (그대로 유지)
 - ★ **step25/26 특이사항 (해결됨)**: step25 작업 시 step26 영역(Goldstein 그래프 출력)까지 선행 커버했었음 (정답지 배분 착각). 2026-08-19 브로 책 재확인으로 step26 본문에 코드 외 새 개념 없음 확인 → step26 공식 ✅ 처리 완료. 시각화 2부작 종결.
 
 ---
