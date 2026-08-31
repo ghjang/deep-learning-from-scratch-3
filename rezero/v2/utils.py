@@ -278,9 +278,14 @@ def fold_multi_layer_dot_graph(
                     vars_by_id[xid] = x
                     edge_layers.setdefault((xid, fid), layer_idx)
 
-    # ② 공유 노드의 원본 층 = 소속 층 중 최솟값
-    shared_vars = {vid for vid, ls in var_layers.items() if len(ls) > 1}
-    primary_of: dict[int, int] = {vid: min(ls) for vid, ls in var_layers.items() if len(ls) > 1}
+    # ② 공유(복제) 대상 = 순전파(층 0)에 소속 + 다른 층에도 등장하는 Variable
+    # 순전파의 변수(사용자 입력 x, 출력 y)만 복제 — 역전파에서 생성된
+    # 상수(1, 2, 0.5 등)나 씨앗은 자기 층에만 존재 (브로 지정, 2026-08-31)
+    primary_of: dict[int, int] = {vid: min(ls) for vid, ls in var_layers.items()}
+    shared_vars = {
+        vid for vid, ls in var_layers.items()
+        if len(ls) > 1 and primary_of[vid] == 0
+    }
 
     def effective_id(real_id: int, layer_idx: int) -> "int | str":
         """해당 층에서 이 노드를 지칭할 id — 원본 층이면 실제 id, 아니면 복제 id."""
@@ -303,12 +308,13 @@ def fold_multi_layer_dot_graph(
             if layer_idx not in ls:
                 continue
             if vid in shared_vars and layer_idx != primary_of[vid]:
-                # 복제 노드 (점선 테두리 + 점선 참조는 간선 단계에서)
+                # 순전파 변수의 복제 (점선 테두리 — x/y 등이 하위 층에서 재사용됨)
                 dup_id = f'ref{layer_idx}_{vid}'
                 lines.append('  ' + _dot_var_dup(vars_by_id[vid], dup_id, verbose, show_value, value_format))
-            else:
-                # 원본 또는 단일 소속 노드
+            elif layer_idx == primary_of[vid]:
+                # 원본 — 리프 공유든 중간값이든, 처음 등장한 층에만 배치
                 lines.append('  ' + _dot_var_node(vars_by_id[vid], verbose, show_value, value_format))
+            # else: 중간값이 후속 층에도 등장하지만 primary 층에만 두고 간선으로 연결
 
         for fid, ls in func_layers.items():
             if layer_idx in ls:
@@ -316,11 +322,11 @@ def fold_multi_layer_dot_graph(
 
         lines.append('}\n')
 
-    # 간선 — edge_layers의 층 정보로 유효 id 결정 (복제 노드가 있는 층이면 복제 id 사용)
-    for (from_id, to_id), layer_idx in sorted(edge_layers.items()):
-        eff_from = effective_id(from_id, layer_idx)
-        eff_to = effective_id(to_id, layer_idx)
-        lines.append(f'{eff_from} -> {eff_to}\n')
+    # 간선 — 고유 (from, to) 조합을 실제 객체 id로 1회씩만 생성.
+    # 중간값은 primary cluster에만 있으므로 자연히 그 cluster 안/경계 간선이 됨.
+    # 공유 x의 간선은 원본(층 0)으로 직결 — 점선 참조 화살표가 재사용을 표현.
+    for (from_id, to_id) in sorted(edge_layers):
+        lines.append(f'{from_id} -> {to_id}\n')
 
     # 점선 참조 간선 — 복제 → 원본 ("공유" 라벨)
     for vid in shared_vars:
