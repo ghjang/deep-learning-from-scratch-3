@@ -26,7 +26,7 @@ import contextlib
 import weakref
 from abc import ABC
 from collections.abc import Callable, Generator, Iterator
-from typing import Optional, override
+from typing import Optional, cast, override
 
 import numpy as np
 
@@ -95,7 +95,65 @@ type Worklist = list["Function"]
 
 
 # ===== Variable — 순수 데이터 상자 =============================================
-class Variable:
+# ===== VariableArithmeticMixin — 산술 연산자 (이슈 46, 믹스인 분리) ============
+class VariableArithmeticMixin:
+    """Variable의 산술 연산자 9종 — 지연 import + functions 위임.
+
+    ★ 지연 import (lazy import) — core.py ↔ functions.py **모듈 참조 순환** 회피.
+      core.py 로드 시점엔 functions.py를 안 부르고, 실제 연산 시점에 로드.
+      Python 모듈 캐싱으로 최초 1회만 실행 (성능 영향 없음).
+      cf. dezero는 setup_variable()로 클래스 밖 대입해서 해결 — 우린 클래스 안 정의 원칙 유지.
+
+    ★ 타입 어노테이션은 전부 문자열 ("Variable") — 믹스인이 Variable보다 먼저
+      정의되므로 클래스 정의 시점에 이름이 없어서 (정적 분석 순환 회피).
+    """
+
+    def __add__(self, other: "Variable | np.ndarray | float | int") -> "Variable":
+        from rezero.v2.functions import add
+        return add(cast("Variable", self), other)
+
+    def __mul__(self, other: "Variable | np.ndarray | float | int") -> "Variable":
+        from rezero.v2.functions import mul
+        return mul(cast("Variable", self), other)
+
+    def __radd__(self, other: "Variable | np.ndarray | float | int") -> "Variable":
+        from rezero.v2.functions import add
+        return add(cast("Variable", self), other)
+
+    def __rmul__(self, other: "Variable | np.ndarray | float | int") -> "Variable":
+        from rezero.v2.functions import mul
+        return mul(cast("Variable", self), other)
+
+    # 단항 -, 비교환 (-, /), 거듭제곱
+    def __neg__(self) -> "Variable":
+        from rezero.v2.functions import neg
+        return neg(cast("Variable", self))
+
+    def __sub__(self, other: "Variable | np.ndarray | float | int") -> "Variable":
+        from rezero.v2.functions import sub
+        return sub(cast("Variable", self), other)
+
+    def __rsub__(self, other: "Variable | np.ndarray | float | int") -> "Variable":
+        """역순 뺄셈: other - x. 비교환 → rsub가 순서 뒤집기 처리."""
+        from rezero.v2.functions import rsub
+        return rsub(cast("Variable", self), other)
+
+    def __truediv__(self, other: "Variable | np.ndarray | float | int") -> "Variable":
+        from rezero.v2.functions import div
+        return div(cast("Variable", self), other)
+
+    def __rtruediv__(self, other: "Variable | np.ndarray | float | int") -> "Variable":
+        """역순 나눗셈: other / x. 비교환 → rdiv가 순서 뒤집기 처리."""
+        from rezero.v2.functions import rdiv
+        return rdiv(cast("Variable", self), other)
+
+    def __pow__(self, c: "int | float") -> "Variable":
+        """거듭제곱: x ** c. c는 상수 (Variable 아님, 미분 대상 아님)."""
+        from rezero.v2.functions import pow
+        return pow(cast("Variable", self), c)
+
+
+class Variable(VariableArithmeticMixin):
     """DeZero의 변수. 순수 데이터 상자.
 
     data + 미분값(grad) + 그래프 연결(creator + generation).
@@ -105,7 +163,7 @@ class Variable:
     가진다 ("값"이 아니라 "식"). 값 접근은 x.grad.data.
 
     name 속성 + data에 위임하는 property 4종(shape/ndim/size/dtype) +
-    __len__/__repr__ + 산술 연산자 7종(+, -, *, /, **, 단항 -) 지원.
+    __len__/__repr__ + 산술 연산자 9종은 VariableArithmeticMixin에서 상속.
     """
 
     def __init__(self, data: Optional[np.ndarray], *, name: Optional[str] = None):
@@ -152,58 +210,13 @@ class Variable:
         p = str(self.data).replace('\n', '\n' + ' ' * 9)
         return 'Variable(' + p + ')'
 
-    # ===== 산술 연산자 (전부 클래스 안에 정의) ==============================
-    # ★ 지연 import (lazy import) — core.py ↔ functions.py 순환 참조 회피.
-    #   core.py 로드 시점엔 functions.py를 안 부르고, 실제 연산 시점에 로드.
-    #   Python 모듈 캐싱으로 최초 1회만 실행 (성능 영향 없음).
-    #   cf. dezero는 setup_variable()로 클래스 밖 대입해서 해결 — 우린 클래스 안 정의 원칙 유지.
-    def __add__(self, other: "Variable | np.ndarray | float | int") -> "Variable":
-        from rezero.v2.functions import add
-        return add(self, other)
-
-    def __mul__(self, other: "Variable | np.ndarray | float | int") -> "Variable":
-        from rezero.v2.functions import mul
-        return mul(self, other)
-
-    def __radd__(self, other: "Variable | np.ndarray | float | int") -> "Variable":
-        from rezero.v2.functions import add
-        return add(self, other)
-
-    def __rmul__(self, other: "Variable | np.ndarray | float | int") -> "Variable":
-        from rezero.v2.functions import mul
-        return mul(self, other)
-
-    # 단항 -, 비교환 (-, /), 거듭제곱
-    def __neg__(self) -> "Variable":
-        from rezero.v2.functions import neg
-        return neg(self)
-
-    def __sub__(self, other: "Variable | np.ndarray | float | int") -> "Variable":
-        from rezero.v2.functions import sub
-        return sub(self, other)
-
-    def __rsub__(self, other: "Variable | np.ndarray | float | int") -> "Variable":
-        """역순 뺄셈: other - x. 비교환 → rsub가 순서 뒤집기 처리."""
-        from rezero.v2.functions import rsub
-        return rsub(self, other)
-
-    def __truediv__(self, other: "Variable | np.ndarray | float | int") -> "Variable":
-        from rezero.v2.functions import div
-        return div(self, other)
-
-    def __rtruediv__(self, other: "Variable | np.ndarray | float | int") -> "Variable":
-        """역순 나눗셈: other / x. 비교환 → rdiv가 순서 뒤집기 처리."""
-        from rezero.v2.functions import rdiv
-        return rdiv(self, other)
-
-    def __pow__(self, c: "int | float") -> "Variable":
-        """거듭제곱: x ** c. c는 상수 (Variable 아님, 미분 대상 아님)."""
-        from rezero.v2.functions import pow
-        return pow(self, c)
-
-    # ===== 그래프 연결 =====================================================
     def set_creator(self, func: "Function") -> None:
-        """이 Variable을 만든 Function을 기록 + generation 상속."""
+        """이 Variable을 만든 Function을 기록 + generation 상속.
+
+        Define-by-Run의 핵심 — 순전파가 실행되는 순간 이 메서드가 불려
+        계산 그래프가 동적으로 자란다. creator가 채워져야 fill_grad가
+        역방향으로 순회할 수 있음 (creator 없는 Variable = 그래프의 리프).
+        """
         self.creator = func
         self.generation = func.generation + 1
 

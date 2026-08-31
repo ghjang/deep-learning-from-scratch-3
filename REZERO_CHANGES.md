@@ -1801,6 +1801,40 @@ def square(x):
 
 ---
 
+### #042 — ★★ Variable 던더 9종 → VariableArithmeticMixin 분리 (이슈 46)
+
+> 2026-08-31 등록 (브로 승인). 노트 35 리뷰 중 브로 제안 — *"Variable 클래스 내에
+> 던더 메서드들이 너무 왕창 들어가 있는데 모양이 너무 마음에 안 든다"* →
+> 산술 연산자 9종을 믹스인으로 분리, Variable 본체는 "순수 데이터 상자" 정의와 코드 모양이 일치.
+
+**변경**:
+- `rezero/v1/core.py`·`v2/core.py` — `VariableArithmeticMixin` 신설 (Variable 앞에 정의),
+  산술 연산자 9종(\_\_add\_\_ 등)을 Variable 본체에서 믹스인으로 이동.
+  `class Variable(VariableArithmeticMixin):` 상속
+- 지연 import + 문자열 어노테이션 구조 그대로 (모듈 참조 순환 회피 유지)
+- **cast("Variable", self)** — 믹스인의 self를 wrapper 함수의 Variable 파라미터에
+  맞추는 표준 해법 (Self@Mixin → Variable 타입 불일치 해결. 노트 31 제네릭의 실전 응용)
+
+**pyright 3단계 진화** (믹스인 + 정적 분석의 고전 문제):
+1. plain self → Self@Mixin이 Variable에 안 들어감 (20 errors)
+2. TypeVar bound=Mixin → 여전히 Variable엔 못 들어감 (20 errors — bound가 믹스인이라)
+3. cast("Variable", self) → **통과** (0 errors) — "믹스인은 Variable에만 혼입됨"을 정적 분석에 명시
+
+**이슈의 "순환" 용어 정확화 (브로 지정)**: 이슈 46의 "순환"은 **모듈 참조 순환**
+(core ↔ functions 임포트 순환)이지 객체 참조 순환이 아님. 던더 메서드 내부에
+"참조를 유지하는" 코드는 없음 — 지연 import가 "호출 시점에 functions 모듈을
+로드한다"는 뜻일 뿐. (별도로 타입 어노테이션 순환도 있음 — 믹스인이 Variable보다
+먼저 정의되므로 문자열 어노테이션으로 해결)
+
+**결과**: pytest v1+v2 **241 passed** / `uvx pyright rezero/` **0 errors**
+MRO: Variable → VariableArithmeticMixin → object (동작 동일성 확인)
+
+**관련**: [이슈 46](https://github.com/ghjang/deep-learning-from-scratch-3/issues/46) /
+항목 031 (매직메서드 클래스 안 정의 — 믹스인 안 정의도 같은 원칙) /
+[노트 31](../blob/master/notes/exploration_31_python_generics.md) (TypeVar/Protocol — cast 해법의 배경)
+
+---
+
 > 생각나는 대로 한 줄씩. 구체화되면 위 항목으로 승격.
 
 - (아직 없음 — 떠오르는 대로 추가)
