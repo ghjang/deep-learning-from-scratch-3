@@ -18,7 +18,10 @@ core.Function을 상속해 apply + derivative hook 구현.
 
     ① 상수형 (의존 없음)       — Add(1,1), Sub(1,-1), Neg(-1): 인자 무시 (lambda _:)
     ② 입력형 (자기 입력 x)     — Square(2x), Sin(cos), Cos(-sin), Pow(c·x^(c-1)):
-                                "입력의 순수 함수" 관습 준수 — hook 인자만으로 계산
+                                "입력의 순수 함수" 관습 준수 — hook 인자만으로 계산.
+                                ★ 변주 — Abs(np.sign(x.data)): 부호 참조형이되
+                                **값 참조** (ndarray 반환, 그래프 무연결). dezero
+                                ReLU 관례 — 2계 미분이 이 갈래에서 소멸 (이슈 45).
     ③ 다른 입력형 (형제 입력)   — Mul(x1,x0), Div(1/x1, -x0/x1²): ★ 관습 위반 —
                                 self.inputs에서 형제를 클로저 캡처. 수학적 필연
                                 (곱셈 법칙 자체가 형제 값 요구). v2에선 형제도
@@ -231,6 +234,34 @@ class Tanh(Function):
         return 'Tanh'
 
 
+class Abs(Function):
+    """절댓값: x → |x|. 미분: f'(x) = sign(x).
+
+    ★ 부호 참조형 (노트 32 '입력형'의 순수 표본, 이슈 45 투어용) —
+    도함수가 출력 z가 아니라 **입력 x의 부호**를 본다.
+
+    ★ 값 참조 방식 (dezero ReLU 관례, 지도 ②의 변주): np.sign(x.data)를
+    ndarray로 반환 — x의 그래프와 **무연결**인 상수 ±1. 따라서 2계 백프롭
+    시 이 경로는 그래프를 남기지 않는다 (소멸 관찰 대상).
+    심볼릭 버전 (gy * (x / |x|) — 그래프 유지) 과의 비교는 투어에서.
+    """
+
+    @override
+    def apply(self, x: np.ndarray) -> np.ndarray:  # type: ignore[override]
+        return np.abs(x)
+
+    @override
+    def derivative(self) -> DerivativeFn:
+        assert self.inputs is not None, "self.inputs must be set (__call__ should have run)"
+
+        data = self.inputs[0].data
+        assert data is not None, "inputs[0].data must be set (apply should have run)"
+
+        # np.sign(data) — ndarray 값 (그래프 없음). backward가 upstream과 곱하면
+        # 리프 Variable(±1)로 참여 → 2계 미분은 이 갈래에서 상수 취급.
+        return lambda _: np.sign(data)
+
+
 # ===== wrapper 함수 ============================================================
 # wrapper는 단순하게 (Function.__call__ 도입부의 as_variable이 변환 처리).
 def square(x: Variable) -> Variable:
@@ -323,5 +354,15 @@ def tanh(x: Variable) -> Variable:
     using_config('reuse_output', True) 블록이 fill_grad를 감싸면 효율형.
     """
     result = Tanh()(x)
-    assert isinstance(result, Variable), "Tanh는 단일 출력이므로 Variable이어야 함"
+    assert isinstance(result, Variable), "Tanh은 단일 출력이므로 Variable이어야 함"
+    return result
+
+
+def abs(x: Variable) -> Variable:
+    """절댓값 wrapper: |x|. ★ 이슈 45 투어용 — 부호 참조형 (미분 = sign(x)).
+
+    Python 내장 abs()와 1:1 — Variable의 __abs__ 던더가 이 wrapper를 호출.
+    """
+    result = Abs()(x)
+    assert isinstance(result, Variable), "Abs는 단일 출력이므로 Variable이어야 함"
     return result

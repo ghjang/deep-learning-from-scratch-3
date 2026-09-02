@@ -7,6 +7,7 @@
 import numpy as np
 
 from rezero.v2 import Variable, fill_grad, numerical_diff, sin, tanh
+from rezero.v2.functions import abs as rz_abs  # 내장 abs() 덮어쓰기 방지 — 별칭
 
 
 class TestSinForward:
@@ -153,3 +154,66 @@ class TestTanh:
         d = fold_dot_graph(final, verbose=False)
         # show_param=False면 라벨은 'Tanh' — 재사용형은 3번 재미분해도 단 1개
         assert d.count('label="Tanh"') == 1
+
+
+class TestAbs:
+    """절댓값 — 부호 참조형 (이슈 45 투어 준비, 2026-09-02).
+
+    미분 = sign(x), 값 참조 방식 (dezero ReLU 관례) — sign이 ndarray 값으로
+    반환되어 x의 그래프와 무연결. 고차 미분에서의 운명이 관찰 포인트.
+    """
+
+    def test_forward(self):
+        """|2| = 2, |-3| = 3."""
+        y = rz_abs(Variable(np.array(2.0)))
+        assert y.data is not None
+        assert float(y.data) == 2.0
+
+        y2 = rz_abs(Variable(np.array(-3.0)))
+        assert y2.data is not None
+        assert float(y2.data) == 3.0
+
+    def test_dunder_abs(self):
+        """Python 내장 abs()와 1:1 — __abs__ 던더 경유."""
+        y = abs(Variable(np.array(-1.5)))  # 내장 abs → Variable.__abs__
+        assert y.data is not None
+        assert float(y.data) == 1.5
+
+    def test_gradient_sign(self):
+        """부호 참조: x>0이면 +1, x<0이면 -1 (출력이 아니라 입력의 부호를 봄)."""
+        x = Variable(np.array(2.0))
+        fill_grad(rz_abs(x))
+        gx = x.grad
+        assert gx is not None and gx.data is not None
+        assert float(gx.data) == 1.0
+
+        x2 = Variable(np.array(-2.0))
+        fill_grad(rz_abs(x2))
+        gx2 = x2.grad
+        assert gx2 is not None and gx2.data is not None
+        assert float(gx2.data) == -1.0
+
+    def test_gradient_check(self):
+        """numerical_diff와 일치 (x=1.5 — 특이점 0에서 충분히 먼 지점)."""
+        x = Variable(np.array(1.5))
+        fill_grad(rz_abs(x))
+        gx = x.grad
+        assert gx is not None and gx.data is not None
+        approx = numerical_diff(rz_abs, x)
+        assert abs(float(gx.data) - approx) < 1e-6
+
+    def test_second_derivative_disconnected(self):
+        """2계: 값 참조라 x가 gx 그래프에 없음 → x.grad = None (그래프 단절).
+
+        노트 32 §3 'x 참조 여부가 고차 미분 가능성을 결정'의 부호 참조형 실증 —
+        sign이 상수 복사(±1)라 2계 백프롭이 x에 도달하지 못한다.
+        """
+        x = Variable(np.array(2.0))
+        fill_grad(rz_abs(x), create_graph=True)
+        gx = x.grad
+        assert gx is not None
+
+        x.clear_grad()
+        fill_grad(gx, create_graph=True)
+
+        assert x.grad is None

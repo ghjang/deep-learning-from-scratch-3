@@ -35,7 +35,9 @@ import numpy as np
 # 도함수 hook의 시그니처. 입력은 Variable (v1: ndarray).
 # 반환은 Variable 또는 float 상수 — backward 뼈대에서 upstream과 곱해질 때
 # Variable로 정규화됨 (float * Variable → __rmul__ → Variable).
-type DerivativeFn = Callable[["Variable"], "Variable | float"]
+# ndarray도 허용 (이슈 45 — Abs 등 '값 참조' 변주, dezero ReLU 관례):
+# 그래프와 무연결인 상수 값으로, 곱해지면 리프 Variable이 된다.
+type DerivativeFn = Callable[["Variable"], "Variable | float | np.ndarray"]
 
 
 # ===== Config — 전역 설정 (역전파 on/off) ======================================
@@ -190,6 +192,11 @@ class VariableArithmeticMixin:
         """거듭제곱: x ** c. c는 상수 (Variable 아님, 미분 대상 아님)."""
         from rezero.v2.functions import pow
         return pow(cast("Variable", self), c)
+
+    def __abs__(self) -> "Variable":
+        """절댓값: |x| — Python 내장 abs(x)와 1:1. 부호 참조형 (미분 = sign(x))."""
+        from rezero.v2.functions import abs as abs_fn
+        return abs_fn(cast("Variable", self))
 
 
 class Variable(VariableDataPropertyMixin, VariableArithmeticMixin):

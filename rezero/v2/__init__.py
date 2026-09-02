@@ -55,6 +55,7 @@ from rezero.v2.core import (
     using_config,
 )
 from rezero.v2.functions import (
+    Abs,
     Add,
     Cos,
     Div,
@@ -65,6 +66,7 @@ from rezero.v2.functions import (
     Square,
     Sub,
     Tanh,
+    abs,
     add,
     cos,
     div,
@@ -93,6 +95,7 @@ __all__ = [
     "no_grad",
     "using_config",
     # functions (wrapper)
+    "abs",
     "add",
     "cos",
     "div",
@@ -106,6 +109,7 @@ __all__ = [
     "sub",
     "tanh",
     # functions (클래스 — 고급 사용자용)
+    "Abs",
     "Add",
     "Cos",
     "Div",
