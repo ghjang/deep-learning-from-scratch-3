@@ -6,7 +6,7 @@
 
 import numpy as np
 
-from rezero.v2 import Variable, fill_grad, numerical_diff, sin, tanh
+from rezero.v2 import Variable, fill_grad, identity, numerical_diff, sin, tanh
 from rezero.v2.functions import abs as rz_abs  # 내장 abs() 덮어쓰기 방지 — 별칭
 
 
@@ -210,6 +210,42 @@ class TestAbs:
         """
         x = Variable(np.array(2.0))
         fill_grad(rz_abs(x), create_graph=True)
+        gx = x.grad
+        assert gx is not None
+
+        x.clear_grad()
+        fill_grad(gx, create_graph=True)
+
+        assert x.grad is None
+
+
+class TestIdentity:
+    """항등함수 — 상수형 도함수 (이슈 45 투어 Stop 1.5, 2026-09-02).
+
+    미분 = 1 (모든 지점) — abs와 그래프 패턴은 같으나 상수가 x에 무관.
+    노트 36 §8 조사 리스트 4번 회수.
+    """
+
+    def test_forward(self):
+        """identity는 값 그대로 — 3영역 전부."""
+        for v in (3.0, -3.0, 0.0):
+            y = identity(Variable(np.array(v)))
+            assert y.data is not None
+            assert float(y.data) == v
+
+    def test_gradient_always_one(self):
+        """모든 지점에서 gx = 1 — abs(sign)과 달리 0에서도 1 (상수형)."""
+        for v in (3.0, -3.0, 0.0):
+            x = Variable(np.array(v))
+            fill_grad(identity(x))
+            gx = x.grad
+            assert gx is not None and gx.data is not None
+            assert float(gx.data) == 1.0
+
+    def test_second_derivative_disconnected(self):
+        """2계: 상수 1도 그래프 무연결 → x.grad = None (abs와 동일 패턴)."""
+        x = Variable(np.array(2.0))
+        fill_grad(identity(x), create_graph=True)
         gx = x.grad
         assert gx is not None
 

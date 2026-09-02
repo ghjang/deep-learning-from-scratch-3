@@ -262,6 +262,27 @@ class Abs(Function):
         return lambda _: np.sign(data)
 
 
+class Identity(Function):
+    """항등함수: x → x. 미분: f'(x) = 1 (모든 지점).
+
+    ★ 상수형 도함수의 순수 표본 (지도 ①) — derivative가 입력/출력 무관 상수 1.
+    abs(부호 참조)와 한 쌍: 그래프 구조는 동일 패턴(리프 상수 + Mul)이나
+    상수의 값이 x에 의존하지 않음 — 3영역(x>0/x<0/x=0) 전부 gx = 1.
+
+    ★ 실전 선례 torch.nn.Identity — ResNet 스킵 연결의 자리표시자.
+    노트 36 §8 조사 리스트 4번 회수 (2026-08-31 브로 작성).
+    """
+
+    @override
+    def apply(self, x: np.ndarray) -> np.ndarray:  # type: ignore[override]
+        return x
+
+    @override
+    def derivative(self) -> DerivativeFn:
+        # 상수 1 (float) — backward에서 1 * upstream → __rmul__ → 리프 1과 Mul.
+        return lambda _: 1
+
+
 # ===== wrapper 함수 ============================================================
 # wrapper는 단순하게 (Function.__call__ 도입부의 as_variable이 변환 처리).
 def square(x: Variable) -> Variable:
@@ -365,4 +386,14 @@ def abs(x: Variable) -> Variable:
     """
     result = Abs()(x)
     assert isinstance(result, Variable), "Abs는 단일 출력이므로 Variable이어야 함"
+    return result
+
+
+def identity(x: Variable) -> Variable:
+    """항등함수 wrapper: x → x. ★ 이슈 45 투어용 — 상수형 도함수 (미분 = 1).
+
+    출력이 곧 입력 — 그래프에 '아무 일도 안 하는' 노드를 남길 때 사용.
+    """
+    result = Identity()(x)
+    assert isinstance(result, Variable), "Identity는 단일 출력이므로 Variable이어야 함"
     return result
