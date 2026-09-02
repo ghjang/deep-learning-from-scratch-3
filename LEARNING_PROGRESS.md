@@ -41,6 +41,8 @@
 
   **내일 할 일** (우선순위 순):
 
+  0. **이슈 52 — plot_derivatives 도우미 구현** (Stop 3 전): y에서 order계 미분 + 그래프 원샃
+     (mode='all' 다층 / 'last' 마지막 그래프만) — tanh 실험의 스크립트 중복 해소
   1. **투어 Stop 3 tanh — 예측부터** (브로 예측 3개 대기 중):
      - ① 재호출 모드(기본)에서 층별 새 Function 수 양상 — sin은 4개 고정이었는데 tanh는?
      - ② reuse_output=True 모드와의 비교 (Tanh 노드 재사용 — 성장 억제?)
