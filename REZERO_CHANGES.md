@@ -46,7 +46,7 @@
 | **검증 / 방어막** | #016, #029 | 2 | assert vs RuntimeError 구분, property/len None 가드 |
 | **메모리 관리** | #026, #027, #033 | 3 | weakref 순환 끊기, Config/no_grad 절약 모드, __array_priority__ 버림 |
 | **API 설계 (매개변수/표현/연산자)** | #028, #030, #031, #034, #035 | 5 | name 키워드 전용, Variable( 대문자 repr, 매직메서드 클래스 안 정의, __radd__/wrapper 정리, 3원칙 자동 적용 + Pow DRY + Neg 단순화 |
-| **패키지 구조** | #036, #038 | 2 | 버전 폴더(v1/v2/v3) + 순환 참조 해결(지연 import), ★v2 브랜칭 + grad Variable화 + common 모듈 |
+| **패키지 구조** | #036, #038, #043 | 3 | 버전 폴더(v1/v2/v3) + 순환 참조 해결(지연 import), ★v2 브랜칭 + grad Variable화 + common 모듈, v3 함수 3분류(펀더멘털/활성/계층) |
 | **유틸 / step 한정 / 문서 정비** | #005, #006, #009, #012, #018, #020, #024, #032, #040 | 9 | name shadowing, numerical_diff docstring, backward docstring, set_creator 복선, pipe(FP), 주석 정비, fill_grad 통합, Mul derivative hook 재평가 |
 
 ### 회수 분류와의 관계 (step23 패키지화 시)
@@ -57,12 +57,13 @@
 
 step23 회수 시: 각 항목마다 "주제별 그룹 + 회수 분류" 둘 다 보고 승격 결정.
 
-### 상태 분포 (2026-08-10 기준)
+### 상태 분포 (2026-09-02 기준)
 
 | 상태 | 항목 수 | 비고 |
 |---|---|---|
-| ✅ 반영 | 34 | 대부분 (#028~#030 step19, #031~#032 step20, #033~#034 step21, #035 step22, #036 step23 신규 추가, #020 step23 회수 완료) |
-| 🔄 보류 | 1 | #018 (pipe, step23 재도입 검토 → step24+로 연기) |
+| ✅ 반영 | 39 | #037 (step25), #038 (step32), #039 (step35), #041 (이슈 49), #042 (이슈 46) 추가 반영 |
+| 🔄 보류 | 2 | #018 (pipe, step23 재도입 검토 → step24+로 연기), #040 (v1/v2 리뷰 보류 기록) |
+| 💡 아이디어 | 1 | #043 (v3 함수 3분류 — step37 창설 시 회수) |
 | ⏭ 철회 | 1 | #025 (크로스참조 네이밍 시도/철회, 교훈은 영구 보존) |
 
 ---
@@ -1832,6 +1833,51 @@ MRO: Variable → VariableArithmeticMixin → object (동작 동일성 확인)
 **관련**: [이슈 46](https://github.com/ghjang/deep-learning-from-scratch-3/issues/46) /
 항목 031 (매직메서드 클래스 안 정의 — 믹스인 안 정의도 같은 원칙) /
 [노트 31](../blob/master/notes/exploration_31_python_generics.md) (TypeVar/Protocol — cast 해법의 배경)
+
+### #043 — 💡 v3 모듈 구조 — 함수 3분류 (펀더멘털/활성/계층) + tanh 이중 소속 재엑스포트 (step37 창설 후보)
+
+> 2026-09-02 등록 (브로 제안). 3고지 종결 직후 브로 질문에서 출발 — *"sin 같은 함수는
+> 자동미분 설명용이지 딥러닝 계층으로 단독 사용되는 경우는 없지 않냐"* → 함수의
+> **역할별 모듈 패키징**을 v3 창설(step37) 때 반영하자는 아이디어. 아직 미결정.
+
+**배경 — 브로 직감 = 실제 프레임워크 설계와 통함**:
+
+Chainer(dezero의 조상)은 `chainer.functions`(파라미터 없는 순수 연산) vs
+`chainer.links`(파라미터 갖는 계층)의 이분법을 쓰고, PyTorch도 `torch.nn.functional`
+vs `torch.nn`으로 평행. dezero 역시 4고지에서 `functions.py` vs `layers.py`/`models.py`로
+물려받음 — 즉 책의 내용 전개가 이미 이 구조를 향해 있음.
+
+**분류표** (두 축: 단독 계층? / 학습 파라미터?):
+
+| 분류 | 함수들 | 단독 계층 | 파라미터 | 모듈 |
+|---|---|---|---|---|
+| 산술/수학 부품 | add, mul, pow, exp, log, matmul, sum | ❌ | ❌ | `v3/functions.py` |
+| 활성함수 | relu, sigmoid, tanh, softmax | ✅ | ❌ | `v3/activations.py` |
+| 계층 | Linear, Conv2d, BatchNorm | ✅ | ✅ | `v3/layers.py` |
+| 설명용 장난감 | sin, cos, square | ❌ | ❌ | `steps/`에만 (승격 ❌) |
+
+- 장난감(sin, square)은 `steps/` 소속 유지 — 기존 원칙("장난감은 학습 흔적,
+  펀더멘털은 API")의 모듈 버전
+
+**tanh 이중 소속 — 기본 구현은 functions, activations에서 재노출**:
+
+- 브로 아이디어: tanh는 펀더멘털(쌍곡선 함수)이면서 활성함수 — functions에 기본
+  소속시키고 activations에서 재엑스포트하는 건 괴상한가? → **괴상하지 않고 정석**
+  (단일 소유권 + 역할별 진입점)
+- 선례 1: PyTorch — `torch.sigmoid`와 `torch.nn.functional.sigmoid`가 한 구현의
+  복수 노출
+- 선례 2: rezero 자신 — `common/utils.py`(소유)를 v1/v2 `utils.py`가 re-export
+  (항목 038 패턴)
+- 수학적으로 tanh는 exp의 합성((e^x - e^-x)/(e^x + e^-x))이지만, 미분식 1 - tanh²이
+  자기 참조형(폭증형, 노트 32 분류)이라 구현을 직접 갖는 게 합리적 — functions 시민권 OK
+- 정적 분석 협력: ★ rezero 기존 관례 따름 — `# noqa: F401` 주석(의도 명시) +
+  `__all__` 포함 (step32 확립, `v1/utils.py`·`v2/utils.py`의 numerical_diff 재노출 방식).
+  대안: `from ..functions import tanh as tanh` (PEP 484 재내보내기 관례)
+
+**회수 시점**: step37 v3 폴더 창설 시. 이슈 47 (MatMul, step41 언저리)과 자연 연결.
+
+**관련**: 항목 036 (버전 폴더 전략) / 항목 038 (common 소유 + re-export 패턴) /
+[노트 32](../blob/master/notes/exploration_32_derivative_anatomy.md) (미분식 분류 — tanh 자기참조형)
 
 ---
 
