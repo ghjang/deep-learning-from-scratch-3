@@ -1875,6 +1875,7 @@ vs `torch.nn`으로 평행. dezero 역시 4고지에서 `functions.py` vs `layer
   대안: `from ..functions import tanh as tanh` (PEP 484 재내보내기 관례)
 
 **회수 시점**: step37 v3 폴더 창설 시. 이슈 47 (MatMul, step41 언저리)과 자연 연결.
+★ 2026-09-02 GitHub 이슈로 승격 — [Issue 50](https://github.com/ghjang/deep-learning-from-scratch-3/issues/50) (브로 요청).
 
 **관련**: 항목 036 (버전 폴더 전략) / 항목 038 (common 소유 + re-export 패턴) /
 [노트 32](../blob/master/notes/exploration_32_derivative_anatomy.md) (미분식 분류 — tanh 자기참조형)
