@@ -11,7 +11,7 @@ import numpy as np
 from rezero.v2 import Variable, backprop
 from rezero.v2.core import iter_reverse_topo
 from rezero.v2.functions import cos, sin
-from rezero.v2.utils import fold_multi_layer_dot_graph
+from rezero.v2.utils import _format_data, fold_multi_layer_dot_graph
 
 
 def _count_funcs(var: Variable) -> int:
@@ -206,6 +206,42 @@ def _subgroup_spans(dot: str) -> list[tuple[int, int]]:
                 break
 
     return spans
+
+
+class TestFormatData:
+    """show_value의 배열 대응 (책 관례 정렬 + rezero 옵션 계약 이행, 2026-09-02).
+
+    스칼라는 값 그대로, 배열은 앞 4개 요약 + shape — 책은 배열 값을
+    표시하지 않지만 show_value 옵션의 "값을 보여준다" 계약은 배열도 이행.
+    """
+
+    def test_scalar_unchanged(self):
+        """스칼라(ndim=0)는 기존 _format_value 동작 그대로."""
+        assert _format_data(np.array(5.0)) == '5'
+        assert _format_data(np.array(0.0)) == '0'
+
+    def test_short_vector_all_shown(self):
+        """4개 이하 벡터는 전부 표시 + shape, 생략 없음."""
+        assert _format_data(np.array([1.0, 2.0])) == '[1, 2] (2,)'
+
+    def test_long_vector_summarized(self):
+        """5개 이상 벡터는 앞 4개 + '...' + shape."""
+        result = _format_data(np.arange(10.0))
+        assert result == '[0, 1, 2, 3, ...] (10,)'
+
+    def test_matrix_flattened_with_shape(self):
+        """2D 배열도 ravel 요약 + 원 shape 표시."""
+        result = _format_data(np.ones((2, 3)))
+        assert result == '[1, 1, 1, 1, ...] (2, 3)'
+
+    def test_shape_only_mode(self):
+        """show_array=False — 배열은 값 없이 shape만 (책 관례 절제 모드)."""
+        result = _format_data(np.arange(10.0), show_array=False)
+        assert result == '(10,)'
+
+    def test_shape_only_keeps_scalar_value(self):
+        """show_array=False여도 스칼라 값은 유지 (절제는 배열에만 적용)."""
+        assert _format_data(np.array(7.0), show_array=False) == '7'
 
 
 class TestSubgroupLayout:

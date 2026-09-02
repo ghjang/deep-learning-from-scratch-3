@@ -61,11 +61,37 @@ def _format_value(v: float, fmt: "str | None" = None) -> str:
     return f'{v:.2e}'
 
 
+def _format_data(
+    data: np.ndarray,
+    fmt: "str | None" = None,
+    max_items: int = 4,
+    show_array: bool = True,
+) -> str:
+    """노드 라벨용 데이터 포맷팅 — 스칼라는 값 그대로, 배열은 show_array에 따라.
+
+    책 관례(dezero)는 배열 값을 표시하지 않고 shape/dtype만(verbose) 보이지만,
+    rezero의 show_value 옵션은 "값을 보여준다"는 계약이므로 배열도 성실히 이행 —
+    show_array=True(기본): 앞 max_items개 원소 (적응형 포맷 재사용) + shape.
+    show_array=False: 배열은 값 없이 shape만 (책 관례에 가까운 절제 모드).
+    """
+    if data.ndim == 0:
+        return _format_value(float(data), fmt)
+
+    if not show_array:
+        return f'{data.shape}'
+
+    flat = data.ravel()
+    shown = [_format_value(float(u), fmt) for u in flat[:max_items]]
+    suffix = ', ...' if flat.size > max_items else ''
+    return f'[{", ".join(shown)}{suffix}] {data.shape}'
+
+
 def _dot_var(
     v: Variable,
     verbose: bool = False,
     show_value: bool = False,
     value_format: "str | None" = None,
+    array_show_value: bool = True,
 ) -> str:
     """Variable을 DOT 노드 문자열로 인코딩 (주황색 원).
 
@@ -76,7 +102,10 @@ def _dot_var(
         v: 시각화할 Variable.
         verbose: True면 라벨에 shape/dtype 추가 (정적 정보, v2 텐서에서 빛을 발).
         show_value: True면 라벨에 값 추가 (동적 정보, 디버깅용).
+            스칼라는 값 그대로, 배열은 array_show_value에 따라 요약/shape.
             verbose와 독립 — 정적 구조 정보와 동적 상태 정보는 관심사 분리.
+        array_show_value: show_value=True일 때 배열 값을 표시할지.
+            True(기본) — 앞 4개 요약 + shape / False — shape만 (책 관례 절제 모드).
         value_format: 값 포맷 스펙 (None이면 적응형 기본). 상세는 _format_value.
     """
     parts: list[str] = []
@@ -92,7 +121,7 @@ def _dot_var(
 
     # 값 (동적 정보) — 변수명(또는 info) 뒤면 " = "로 연결
     if show_value and v.data is not None:
-        value = _format_value(float(v.data), value_format)
+        value = _format_data(v.data, value_format, show_array=array_show_value)
         parts.append(f' = {value}' if len(parts) > 0 else value)
 
     # HTML-like label: '<...>' 로 감싸면 Graphviz가 HTML 해석.
@@ -133,6 +162,7 @@ def fold_dot_graph(
     verbose: bool = True,
     show_value: bool = False,
     value_format: "str | None" = None,
+    array_show_value: bool = True,
 ) -> str:
     """output에서 역방향으로 그래프를 순회하며 DOT 텍스트를 합성(fold).
 
@@ -144,12 +174,13 @@ def fold_dot_graph(
         verbose: True면 Variable 노드에 shape/dtype 추가 (정적 정보).
         show_value: True면 Variable 노드에 값 추가 (동적 정보, 디버깅용).
         value_format: 값 포맷 스펙 (None이면 적응형 기본). 상세는 _format_value.
+        array_show_value: show_value=True일 때 배열 값 표시 (True=요약 / False=shape만).
 
     Returns:
         완성된 DOT 텍스트 ("digraph g { ... }").
     """
     # output 노드는 순회 시작 전 먼저 찍기 (iter_reverse_topo가 yield하는 건 Function뿐)
-    txt = _dot_var(output, verbose, show_value, value_format)
+    txt = _dot_var(output, verbose, show_value, value_format, array_show_value)
 
     # 역방향 순회하며 각 Function + inputs를 DOT 텍스트로 누적
     for func in iter_reverse_topo(output):
@@ -157,7 +188,7 @@ def fold_dot_graph(
         assert func.output is not None, "func.output must be set"
         txt += _dot_func(func, verbose, show_value)
         for x in func.inputs:
-            txt += _dot_var(x, verbose, show_value, value_format)
+            txt += _dot_var(x, verbose, show_value, value_format, array_show_value)
 
     return f'digraph g {{\n{txt}}}'
 
@@ -174,6 +205,7 @@ def plot_dot_graph(
     show_value: bool = False,
     value_format: "str | None" = None,
     to_file: str = 'output/graph.png',
+    array_show_value: bool = True,
 ) -> str:
     """계산 그래프를 DOT로 인코딩하여 Graphviz로 렌더링, 파일로 저장.
 
@@ -194,6 +226,7 @@ def plot_dot_graph(
         to_file: 출력 파일 경로. **확장자가 렌더링 포맷 결정**.
             지원 포맷: png (범용/문서), svg (벡터/VSCode에서 텍스트로도 까볼 수 있음),
             pdf (인쇄/발표). 그 외 확장자는 ValueError.
+        array_show_value: show_value=True일 때 배열 값 표시 (True=요약 / False=shape만).
 
     Returns:
         저장된 파일 경로 (to_file 그대로).
@@ -212,7 +245,7 @@ def plot_dot_graph(
             f"지원 포맷: {sorted(SUPPORTED_FORMATS)} (png/svg/pdf)"
         )
 
-    dot_graph = fold_dot_graph(output, verbose, show_value, value_format)
+    dot_graph = fold_dot_graph(output, verbose, show_value, value_format, array_show_value)
 
     # 산출물 디렉터리 보장 — to_file이 'output/foo.png'면 같은 폴더에 DOT도 저장
     out_dir = os.path.dirname(to_file) or '.'
