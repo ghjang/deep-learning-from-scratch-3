@@ -7,6 +7,7 @@ numerical_diff는 버전 공통 순수 수학이라 rezero.common에 상주 (ste
 import math
 import os
 import subprocess
+from typing import cast
 
 import numpy as np
 
@@ -221,24 +222,62 @@ def _dot_func_node(f: Function, verbose: bool = False, show_value: bool = False)
     return f'{id(f)} [label="{f.dot_label(show_param)}", color=lightblue, style=filled, shape=box]\n'
 
 
+def _normalize_layers(
+    start_vars: "list[Variable | list[Variable] | list[list[Variable]]]",
+) -> list[list[list[Variable]]]:
+    """각 층을 서브그룹 목록 list[list[Variable]]로 정규화.
+
+    층 표현 3종 (서브그룹핑 — 브로 아이디어, 이슈 45):
+      Variable             → 서브그룹 1개 (하위 박스는 생략 — 1개뿐이니 그릴 필요 없음)
+      list[Variable]       → 각 Variable이 서브그룹 1개씩 (자동 서브그룹핑 —
+                             "층에 넘긴 리스트의 각 Variable = 서브그룹 1개" 규칙)
+      list[list[Variable]] → 각 내부 리스트가 서브그룹 (2계 Hessian 행별 묶음 —
+                             [[hxx, hyx], [hxy, hyy]] → x행 박스 + y행 박스)
+    """
+    assert len(start_vars) >= 2, "다층 시각화는 시작점 2개 이상 필요"
+
+    layers: list[list[list[Variable]]] = []
+    for item in start_vars:
+        if isinstance(item, Variable):
+            layers.append([[item]])
+        elif all(isinstance(v, Variable) for v in item):
+            assert item, "빈 층(list)은 전달할 수 없음"
+            # all(isinstance)는 타입 가드가 아니므로 cast로 정적 분석과 화해
+            flat = cast("list[Variable]", item)
+            layers.append([[v] for v in flat])
+        else:
+            groups = [list(cast("list[Variable]", g)) for g in item]
+            assert groups and all(
+                g and all(isinstance(v, Variable) for v in g) for g in groups
+            ), "list[list[Variable]] 형태여야 함 (각 내부 리스트는 비지 않은 Variable 목록)"
+            layers.append(groups)
+
+    return layers
+
+
 def fold_multi_layer_dot_graph(
-    start_vars: "list[Variable | list[Variable]]",
+    start_vars: "list[Variable | list[Variable] | list[list[Variable]]]",
     verbose: bool = True,
     show_value: bool = False,
     value_format: "str | None" = None,
     layer_names: "list[str] | None" = None,
 ) -> str:
-    """여러 시작 Variable의 계산 그래프를 층별 cluster로 병합한 DOT 생성.
+    """여러 시작 Variable의 계산 그래프를 층별 cluster + 층 내 서브그룹으로 병합.
 
     ★ 무복제 원칙: 각 노드는 전체 그래프에 딱 1번만 등장.
     ★ 다변수 지원 (브로 발견, 2026-08-31): 한 층에 여러 Variable을 리스트로
-    전달 가능 — 다변수 함수의 역전파는 입력 변수 수만큼 그래디언트 그래프를
-    만들므로, 같은 층에 전부 포함해야 정확한 시각화.
+      전달 가능 — 다변수 함수의 역전파는 입력 변수 수만큼 그래디언트 그래프를
+      만들므로, 같은 층에 전부 포함해야 정확한 시각화.
+    ★ 층 내 서브그룹핑 (브로 아이디어, 2026-09-02): 다변수 층의 그래프는
+      그래디언트 성분별(1계)·Hessian 행별(2계)로 여러 덩어리가 섞여 보임 →
+      Graphviz 중첩 cluster로 구분. 서브그룹 2개 이상에 소속된 노드
+      (seed 등 공통 재료)는 서브그룹 밖 층 최상위에 배치해 '공유'임을 시각화.
 
     Args:
-        start_vars: 각 층의 시작점. Variable 1개 또는 list[Variable].
-            단변수: [y, gx, gx2] (기존 방식 그대로)
-            다변수: [z, [gx, gy]] — 층 1에 x.grad와 y.grad를 모두 포함
+        start_vars: 각 층의 시작점. 3종 (상세는 _normalize_layers).
+            단변수: [y, gx, gx2] (기존 방식 그대로 — 하위 박스 없음)
+            다변수 자동: [z, [gx, gy]] — cluster_1 안에 gx박스 + gy박스
+            Hessian 행별: [z, [gx, gy], [[hxx, hyx], [hxy, hyy]]]
         verbose: True면 Variable 노드에 shape/dtype 추가.
         show_value: True면 Variable 노드에 값 추가.
         value_format: 값 포맷 스펙 (None이면 적응형 기본).
@@ -247,76 +286,109 @@ def fold_multi_layer_dot_graph(
     Returns:
         완성된 DOT 텍스트.
     """
-    assert len(start_vars) >= 2, "다층 시각화는 시작점 2개 이상 필요"
+    layers = _normalize_layers(start_vars)
 
-    # 정규화: 각 층을 list[Variable]로 통일
-    layers: list[list[Variable]] = [
-        [item] if isinstance(item, Variable) else list(item)
-        for item in start_vars
-    ]
-
-    # ① 각 층별 역순회 → 노드별 소속 층 + 객체 참조 + 간선 수집
-    var_layers: dict[int, set[int]] = {}
-    func_layers: dict[int, set[int]] = {}
+    # ① 층별·서브그룹별 역순회 → 노드별 소속 (층 × 서브그룹) + 객체 + 간선 수집
+    var_groups: dict[int, dict[int, set[int]]] = {}   # vid → {층 idx: {서브그룹 idx}}
+    func_groups: dict[int, dict[int, set[int]]] = {}  # fid → {층 idx: {서브그룹 idx}}
     vars_by_id: dict[int, Variable] = {}
     funcs_by_id: dict[int, Function] = {}
     edges: set[tuple[int, int]] = set()
 
-    for layer_idx, layer_starts in enumerate(layers):
-        for start_var in layer_starts:
-            vid = id(start_var)
-            var_layers.setdefault(vid, set()).add(layer_idx)
-            vars_by_id[vid] = start_var
+    def register_var(v: Variable, layer_idx: int, group_idx: int) -> None:
+        vid = id(v)
+        var_groups.setdefault(vid, {}).setdefault(layer_idx, set()).add(group_idx)
+        vars_by_id[vid] = v
 
-            for func in iter_reverse_topo(start_var):
-                fid = id(func)
-                func_layers.setdefault(fid, set()).add(layer_idx)
-                funcs_by_id[fid] = func
+    for layer_idx, groups in enumerate(layers):
+        for group_idx, group in enumerate(groups):
+            for start_var in group:
+                register_var(start_var, layer_idx, group_idx)
 
-                output = func.output() if func.output else None
-                if output is not None:
-                    oid = id(output)
-                    var_layers.setdefault(oid, set()).add(layer_idx)
-                    vars_by_id[oid] = output
-                    edges.add((fid, oid))
+                for func in iter_reverse_topo(start_var):
+                    fid = id(func)
+                    func_groups.setdefault(fid, {}).setdefault(layer_idx, set()).add(group_idx)
+                    funcs_by_id[fid] = func
 
-                if func.inputs:
-                    for x in func.inputs:
-                        xid = id(x)
-                        var_layers.setdefault(xid, set()).add(layer_idx)
-                        vars_by_id[xid] = x
-                        edges.add((xid, fid))
+                    output = func.output() if func.output else None
+                    if output is not None:
+                        register_var(output, layer_idx, group_idx)
+                        edges.add((fid, id(output)))
 
-    # ② primary = 소속 층 중 최솟값 (노드가 처음 등장한 층)
-    var_primary = {vid: min(ls) for vid, ls in var_layers.items()}
-    func_primary = {fid: min(ls) for fid, ls in func_layers.items()}
+                    if func.inputs:
+                        for x in func.inputs:
+                            register_var(x, layer_idx, group_idx)
+                            edges.add((id(x), fid))
 
-    # ③ DOT 조립 — 각 노드는 primary cluster에 딱 1번
+    # ② 배치 결정 — primary = 처음 등장한 층. 그 층에서의 소속 서브그룹이
+    #    정확히 1개면 그 서브그룹 박스로, 2개 이상이면(공유 재료) 층 최상위로.
+    var_cell: dict[int, tuple[int, int | None]] = {}   # vid → (층, 서브그룹 or None)
+    func_cell: dict[int, tuple[int, int | None]] = {}
+
+    for vid, groups_by_layer in var_groups.items():
+        primary = min(groups_by_layer)
+        members = groups_by_layer[primary]
+        var_cell[vid] = (primary, next(iter(members)) if len(members) == 1 else None)
+
+    for fid, groups_by_layer in func_groups.items():
+        primary = min(groups_by_layer)
+        members = groups_by_layer[primary]
+        func_cell[fid] = (primary, next(iter(members)) if len(members) == 1 else None)
+
+    # ③ DOT 조립 — 각 노드는 자기 배치에 딱 1번 (무복제)
     lines: list[str] = []
 
-    for layer_idx in range(len(start_vars)):
+    for layer_idx in range(len(layers)):
+        draw_subgroups = len(layers[layer_idx]) > 1
+
         lines.append(f'subgraph cluster_{layer_idx} {{\n')
         lines.append('  style = rounded;\n')
         lines.append('  color = lightgray;\n')
         if layer_names:
             lines.append(f'  label = "{layer_names[layer_idx]}";\n')
 
-        for vid, p in var_primary.items():
-            if p == layer_idx:
+        # (a) 층 최상위 — 공유 재료(서브그룹 2개 이상 소속) + 서브그룹 없는 층 전체
+        for vid, (l, g) in var_cell.items():
+            if l == layer_idx and (g is None or not draw_subgroups):
                 seed = layer_idx > 0 and _is_seed(vars_by_id[vid])
                 lines.append('  ' + _dot_var_node(vars_by_id[vid], verbose, show_value, value_format, is_seed=seed))
-        for fid, p in func_primary.items():
-            if p == layer_idx:
+
+        for fid, (l, g) in func_cell.items():
+            if l == layer_idx and (g is None or not draw_subgroups):
                 lines.append('  ' + _dot_func_node(funcs_by_id[fid], verbose, show_value))
+
+        # (b) 서브그룹 박스 — 각 그래디언트 성분/Hessian 행을 중첩 cluster로 구분.
+        #     라벨은 없음 — 박스 안 노드들이 이미 무엇인지 보여주므로 (브로 취향).
+        if draw_subgroups:
+            for group_idx in range(len(layers[layer_idx])):
+                lines.append(f'  subgraph cluster_{layer_idx}_{group_idx} {{\n')
+                lines.append('    style = rounded;\n')
+                lines.append('    color = gray62;\n')
+
+                for vid, (l, g) in var_cell.items():
+                    if l == layer_idx and g == group_idx:
+                        seed = layer_idx > 0 and _is_seed(vars_by_id[vid])
+                        lines.append('    ' + _dot_var_node(vars_by_id[vid], verbose, show_value, value_format, is_seed=seed))
+
+                for fid, (l, g) in func_cell.items():
+                    if l == layer_idx and g == group_idx:
+                        lines.append('    ' + _dot_func_node(funcs_by_id[fid], verbose, show_value))
+
+                lines.append('  }\n')
 
         lines.append('}\n')
 
-    # 간선 — 실제 객체 id로 직결. 양끝이 다른 cluster면 점선 (층 간 참조 표시)
-    all_primary = {**var_primary, **func_primary}
+    # 간선 — 실제 객체 id로 직결. 배치가 다른 박스(층 or 서브그룹)에 걸치면 점선.
+    # (공유 노드 ↔ 서브그룹 연결은 같은 층 안이면 실선 — "공유 재료에서 흐름" 표현)
+    cell = {**var_cell, **func_cell}
     for from_id, to_id in sorted(edges):
-        p_from = all_primary.get(from_id, 0)
-        p_to = all_primary.get(to_id, 0)
-        if p_from != p_to:
+        l_from, g_from = cell[from_id]
+        l_to, g_to = cell[to_id]
+        crosses_boundary = (l_from != l_to) or (
+            g_from is not None and g_to is not None and g_from != g_to
+        )
+
+        if crosses_boundary:
             lines.append(f'{from_id} -> {to_id} [style=dashed, color=dimgray]\n')
         else:
             lines.append(f'{from_id} -> {to_id}\n')
@@ -325,7 +397,7 @@ def fold_multi_layer_dot_graph(
 
 
 def plot_multi_layer_graph(
-    start_vars: "list[Variable | list[Variable]]",
+    start_vars: "list[Variable | list[Variable] | list[list[Variable]]]",
     verbose: bool = True,
     show_value: bool = False,
     value_format: "str | None" = None,
@@ -335,7 +407,9 @@ def plot_multi_layer_graph(
     """다층 계산 그래프를 DOT로 인코딩하여 Graphviz로 렌더링, 파일로 저장.
 
     Args:
-        start_vars: 각 층의 시작 Variable 목록.
+        start_vars: 각 층의 시작점. 3종 (상세는 fold_multi_layer_dot_graph).
+            단변수: [y, gx, gx2] / 다변수 자동: [z, [gx, gy]] /
+            Hessian 행별: [z, [gx, gy], [[hxx, hyx], [hxy, hyy]]]
         verbose: True면 Variable 노드에 shape/dtype 추가.
         show_value: True면 Variable 노드에 값 추가.
         value_format: 값 포맷 스펙 (None이면 적응형 기본).

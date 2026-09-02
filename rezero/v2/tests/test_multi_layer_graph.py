@@ -10,6 +10,7 @@ import numpy as np
 
 from rezero.v2 import Variable, backprop
 from rezero.v2.core import iter_reverse_topo
+from rezero.v2.functions import cos, sin
 from rezero.v2.utils import fold_multi_layer_dot_graph
 
 
@@ -77,53 +78,44 @@ class TestMultiVariableGradient:
 
     z = x·y의 backward는 x.grad와 y.grad 두 그래디언트 그래프를 만듦.
     [z, [gx, gy]] 중첩 리스트로 전달하면 같은 층에 모두 포함되어야 함.
+    2026-09-02 서브그룹핑: 각 Variable이 서브그룹 박스(cluster_1_0/1_1)로 구분됨.
     """
 
-    def test_multi_var_two_clusters(self):
-        """[z, [gx, gy]] → cluster 2개 (순전파 + 역전파 전체)."""
+    def _build_xy(self):
         x = Variable(np.array(3.0), name='x')
         y = Variable(np.array(5.0), name='y')
         z = x * y
-
         backprop(z, create_graph=True)
-        gx = x.grad
-        gy = y.grad
+        return x, y, z, x.grad, y.grad
+
+    def test_multi_var_two_clusters(self):
+        """[z, [gx, gy]] → 층 cluster 2개 + 서브그룹 박스 2개 = subgraph 4개."""
+        _, _, z, gx, gy = self._build_xy()
 
         dot = fold_multi_layer_dot_graph([z, [gx, gy]], verbose=False)  # type: ignore[arg-type]
-        assert dot.count('subgraph cluster_') == 2
+        assert dot.count('subgraph cluster_') == 2 + 2  # 층 2 + 서브그룹 2
 
     def test_multi_var_gradients_in_same_cluster(self):
-        """cluster_1에 gx와 gy의 그래프가 둘 다 있어야 함 (노드 수 > 단일 그래프)."""
-        x = Variable(np.array(3.0), name='x')
-        y = Variable(np.array(5.0), name='y')
-        z = x * y
+        """cluster_1 안에 gx박스(cluster_1_0) + gy박스(cluster_1_1)가 둘 다 있어야 함."""
+        _, _, z, gx, gy = self._build_xy()
 
-        backprop(z, create_graph=True)
-        gx = x.grad
-        gy = y.grad
+        dot = fold_multi_layer_dot_graph([z, [gx, gy]], verbose=False)  # type: ignore[arg-type]
+        assert 'cluster_1_0' in dot, 'gx 서브그룹 박스 없음'
+        assert 'cluster_1_1' in dot, 'gy 서브그룹 박스 없음'
 
-        # 다변수: [z, [gx, gy]] — cluster_1이 두 그래프를 모두 포함
-        dot_multi = fold_multi_layer_dot_graph([z, [gx, gy]], verbose=False)  # type: ignore[arg-type]
-
-        # 단일 변수 버전과 비교: cluster_1이 더 많은 노드를 가져야 함
+        # 각 서브그룹 박스 안에 노드가 최소 1개씩 있어야 함
         import re
-        clusters_multi = re.findall(
-            r'subgraph cluster_1 \{(.*?)\}', dot_multi, re.DOTALL
-        )
-        nodes_multi = len(re.findall(r'^\s+\d+', clusters_multi[0], re.MULTILINE))
-
-        # gx 단독 그래프보다 노드가 많아야 함 (gy의 그래프도 포함되므로)
-        assert nodes_multi >= 3, f'cluster_1 노드 {nodes_multi}개 — 다변수 미포함?'
+        for sub in ('cluster_1_0', 'cluster_1_1'):
+            block = re.search(
+                rf'subgraph {sub} \{{(.*?)\}}\n', dot, re.DOTALL
+            )
+            assert block is not None, f'{sub} 블록 파싱 실패'
+            nodes = len(re.findall(r'^\s+\d+ \[', block.group(1), re.MULTILINE))
+            assert nodes >= 1, f'{sub}에 노드 {nodes}개 — 그래프 미포함?'
 
     def test_multi_var_cross_cluster_edges(self):
         """다변수 곱의 미분은 상대방을 참조 → 크로스 간선 존재."""
-        x = Variable(np.array(3.0), name='x')
-        y = Variable(np.array(5.0), name='y')
-        z = x * y
-
-        backprop(z, create_graph=True)
-        gx = x.grad
-        gy = y.grad
+        _, _, z, gx, gy = self._build_xy()
 
         dot = fold_multi_layer_dot_graph([z, [gx, gy]], verbose=False)  # type: ignore[arg-type]
 
@@ -187,3 +179,118 @@ class TestLinearFunction:
 
         dot = fold_multi_layer_dot_graph([y, gx], verbose=False)
         assert dot.count('subgraph cluster_') == 2
+
+
+def _subgroup_spans(dot: str) -> list[tuple[int, int]]:
+    """cluster_{layer}_{group} 서브그룹 블록의 (시작, 끝) 라인 범위 목록.
+
+    층 cluster_{n} (밑줄 1개)와 구분하기 위해 이름 성분 수로 판별.
+    """
+    spans = []
+    lines = dot.splitlines()
+
+    for i, line in enumerate(lines):
+        s = line.strip()
+        if not s.startswith('subgraph cluster_'):
+            continue
+
+        name = s[len('subgraph '):].rstrip(' {').strip()
+        if len(name.split('_')) != 3:  # cluster, layer, group
+            continue
+
+        depth = 0
+        for j in range(i, len(lines)):
+            depth += lines[j].count('{') - lines[j].count('}')
+            if depth == 0:
+                spans.append((i, j))
+                break
+
+    return spans
+
+
+class TestSubgroupLayout:
+    """층 내 서브그룹핑 (브로 아이디어, 2026-09-02 — 이슈 45).
+
+    다변수 층의 그래프는 성분별(1계)·Hessian 행별(2계) 덩어리가 섞여 보임 →
+    중첩 cluster로 구분. 공유 노드(seed 등)는 서브그룹 밖 층 최상위에 배치.
+    """
+
+    def _build_xy(self):
+        x = Variable(np.array(3.0), name='x')
+        y = Variable(np.array(5.0), name='y')
+        z = x * y
+        backprop(z, create_graph=True)
+        return x, y, z, x.grad, y.grad
+
+    def test_shared_seed_outside_subgroups(self):
+        """seed는 gx·gy 양쪽의 공통 재료 → 서브그룹 밖(cluster_1 최상위)에 배치."""
+        _, _, z, gx, gy = self._build_xy()
+
+        dot = fold_multi_layer_dot_graph([z, [gx, gy]], verbose=False)  # type: ignore[arg-type]
+        lines = dot.splitlines()
+
+        seed_lines = [i for i, line in enumerate(lines) if 'seed' in line]
+        assert seed_lines, 'seed 노드가 그래프에 없음'
+
+        for start, end in _subgroup_spans(dot):
+            for sl in seed_lines:
+                assert not (start <= sl <= end), (
+                    f'seed(라인 {sl})가 서브그룹 블록 ({start}~{end}) 안에 있음 — '
+                    '공유 재료는 층 최상위여야 함'
+                )
+
+    def test_single_group_layer_omits_subgroup_box(self):
+        """서브그룹 1개뿐인 층은 하위 박스를 그리지 않음 (불필요한 중첩 방지)."""
+        x = Variable(np.array(2.0), name='x')
+        y = x ** 2
+        backprop(y, create_graph=True)
+        gx = x.grad
+        assert gx is not None
+
+        dot = fold_multi_layer_dot_graph([y, gx], verbose=False)
+        assert 'cluster_0_' not in dot, '서브그룹 1개 층에 하위 박스가 그려짐'
+        assert 'cluster_1_' not in dot
+
+    def test_hessian_row_grouping(self):
+        """sin(x)·cos(y) 2계 — 중첩 리스트로 Hessian 행별 서브그룹.
+
+        [z, [gx, gy], [[hxx, hyx], [hxy, hyy]]] → cluster_2 안에
+        x행 박스(cluster_2_0) + y행 박스(cluster_2_1).
+        """
+        x = Variable(np.array(1.0), name='x')
+        y = Variable(np.array(2.0), name='y')
+        z = sin(x) * cos(y)
+
+        backprop(z, create_graph=True)
+        gx, gy = x.grad, y.grad
+        assert gx is not None and gy is not None
+
+        # x행: backprop(gx) → x.grad = ∂²z/∂x², y.grad = ∂²z/∂y∂x
+        x.clear_grad(); y.clear_grad()
+        backprop(gx, create_graph=True)
+        hxx, hyx = x.grad, y.grad
+
+        # y행: backprop(gy) → x.grad = ∂²z/∂x∂y, y.grad = ∂²z/∂y²
+        x.clear_grad(); y.clear_grad()
+        backprop(gy, create_graph=True)
+        hxy, hyy = x.grad, y.grad
+
+        # 4성분 전부 계산되는지 — sin·cos는 미분식이 x·y 둘 다 참조하므로 기대
+        assert hxx is not None and hyx is not None
+        assert hxy is not None and hyy is not None
+
+        layers = [z, [[gx], [gy]], [[hxx, hyx], [hxy, hyy]]]
+        dot = fold_multi_layer_dot_graph(layers, verbose=False)  # type: ignore[arg-type]
+
+        assert 'cluster_1_0' in dot and 'cluster_1_1' in dot  # 1계: gx박스 + gy박스
+        assert 'cluster_2_0' in dot and 'cluster_2_1' in dot  # 2계: x행 + y행
+        assert dot.count('subgraph cluster_') == 3 + 4  # 층 3 + 서브그룹 2+2
+
+    def test_flat_list_equals_auto_subgroups(self):
+        """[z, [gx, gy]] (자동)와 [z, [[gx], [gy]]] (명시)는 같은 구조 생성."""
+        _, _, z, gx, gy = self._build_xy()
+
+        dot_auto = fold_multi_layer_dot_graph([z, [gx, gy]], verbose=False)  # type: ignore[arg-type]
+        dot_explicit = fold_multi_layer_dot_graph([z, [[gx], [gy]]], verbose=False)  # type: ignore[arg-type]
+
+        assert dot_auto == dot_explicit
