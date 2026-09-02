@@ -244,6 +244,38 @@ class TestFormatData:
         assert _format_data(np.array(7.0), show_array=False) == '7'
 
 
+    def test_auto_layer_labels_default(self):
+        """show_labels 기본 True — [forward]/[1st backward] 자동 (verbose와 독립, 중앙 상단)."""
+        x = Variable(np.array(2.0), name='x')
+        y = x ** 2
+        backprop(y, create_graph=True)
+        gx = x.grad
+        assert gx is not None
+
+        dot = fold_multi_layer_dot_graph([y, gx], verbose=False)
+        assert 'labeljust = c' in dot
+        assert 'label = "< forward >"' in dot
+        assert 'label = "< 1st backward >"' in dot
+
+    def test_auto_layer_labels_ordinal(self):
+        """2계까지 — < 2nd backward > 서수 표기."""
+        layers = _build_x2_derivatives(max_order=2)
+        dot = fold_multi_layer_dot_graph(layers, verbose=False)  # type: ignore[arg-type]
+        assert 'label = "< 2nd backward >"' in dot
+
+    def test_show_labels_false(self):
+        """show_labels=False → 층 라벨 없음."""
+        x = Variable(np.array(2.0), name='x')
+        y = x ** 2
+        backprop(y, create_graph=True)
+        gx = x.grad
+        assert gx is not None
+
+        dot = fold_multi_layer_dot_graph([y, gx], verbose=False, show_labels=False)
+        assert 'forward' not in dot
+        assert 'backward' not in dot
+
+
 class TestSubgroupLayout:
     """층 내 서브그룹핑 (브로 아이디어, 2026-09-02 — 이슈 45).
 

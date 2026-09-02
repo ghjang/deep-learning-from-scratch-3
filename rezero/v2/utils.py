@@ -287,6 +287,15 @@ def _normalize_layers(
     return layers
 
 
+def _ordinal(n: int) -> str:
+    """서수 접미사 — 1st/2nd/3rd/4th... (11~13은 th). 층 라벨용."""
+    if 11 <= n % 100 <= 13:
+        suffix = 'th'
+    else:
+        suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')
+    return f'{n}{suffix}'
+
+
 def fold_multi_layer_dot_graph(
     start_vars: "list[Variable | list[Variable] | list[list[Variable]]]",
     verbose: bool = True,
@@ -294,6 +303,7 @@ def fold_multi_layer_dot_graph(
     value_format: "str | None" = None,
     layer_names: "list[str] | None" = None,
     array_show_value: bool = True,
+    show_labels: bool = True,
 ) -> str:
     """여러 시작 Variable의 계산 그래프를 층별 cluster + 층 내 서브그룹으로 병합.
 
@@ -311,11 +321,13 @@ def fold_multi_layer_dot_graph(
             단변수: [y, gx, gx2] (기존 방식 그대로 — 하위 박스 없음)
             다변수 자동: [z, [gx, gy]] — cluster_1 안에 gx박스 + gy박스
             Hessian 행별: [z, [gx, gy], [[hxx, hyx], [hxy, hyy]]]
-        verbose: True면 Variable 노드에 shape/dtype 추가.
+        verbose: True면 Variable 노드에 shape/dtype 추가 (노드 정적 정보 — 책 관례).
         show_value: True면 Variable 노드에 값 추가.
         value_format: 값 포맷 스펙 (None이면 적응형 기본).
-        layer_names: 각 층의 표시 이름.
+        layer_names: 각 층의 표시 이름 (주면 자동 라벨 대신 사용).
         array_show_value: show_value=True일 때 배열 값 표시 (True=요약 / False=shape만).
+        show_labels: True(기본)면 층 라벨 표시 — verbose와 독립인 별도 축.
+            layer_names 우선, 없으면 자동: <forward> / <1st backward> / <2nd backward> ...
 
     Returns:
         완성된 DOT 텍스트.
@@ -378,8 +390,17 @@ def fold_multi_layer_dot_graph(
         lines.append(f'subgraph cluster_{layer_idx} {{\n')
         lines.append('  style = rounded;\n')
         lines.append('  color = lightgray;\n')
-        if layer_names:
-            lines.append(f'  label = "{layer_names[layer_idx]}";\n')
+
+        # 층 라벨 — 내부 중앙 상단 (labeljust="c" + labelloc 기본 "t").
+        # show_labels 독립 옵션 (verbose=shape/dtype와 분리 — 브로 결정):
+        # layer_names 우선, 없으면 <forward> / <1st backward> ... 자동 (서수+앵글 브래킷).
+        if show_labels:
+            label = (
+                layer_names[layer_idx] if layer_names
+                else ('forward' if layer_idx == 0 else f'{_ordinal(layer_idx)} backward')
+            )
+            lines.append('  labeljust = c;\n')
+            lines.append(f'  label = "< {label} >";\n')
 
         # (a) 층 최상위 — 공유 재료(서브그룹 2개 이상 소속) + 서브그룹 없는 층 전체
         for vid, (l, g) in var_cell.items():
@@ -438,6 +459,7 @@ def plot_multi_layer_graph(
     layer_names: "list[str] | None" = None,
     to_file: str = 'output/multi_layer.png',
     array_show_value: bool = True,
+    show_labels: bool = True,
 ) -> str:
     """다층 계산 그래프를 DOT로 인코딩하여 Graphviz로 렌더링, 파일로 저장.
 
@@ -445,12 +467,13 @@ def plot_multi_layer_graph(
         start_vars: 각 층의 시작점. 3종 (상세는 fold_multi_layer_dot_graph).
             단변수: [y, gx, gx2] / 다변수 자동: [z, [gx, gy]] /
             Hessian 행별: [z, [gx, gy], [[hxx, hyx], [hxy, hyy]]]
-        verbose: True면 Variable 노드에 shape/dtype 추가.
+        verbose: True면 Variable 노드에 shape/dtype 추가 (노드 정적 정보).
         show_value: True면 Variable 노드에 값 추가.
         value_format: 값 포맷 스펙 (None이면 적응형 기본).
-        layer_names: 각 층의 표시 이름.
+        layer_names: 각 층의 표시 이름 (주면 자동 라벨 대신 사용).
         to_file: 출력 파일 경로 (확장자가 렌더링 포맷 결정).
         array_show_value: show_value=True일 때 배열 값 표시 (True=요약 / False=shape만).
+        show_labels: True(기본)면 층 라벨 — <forward> / <1st backward> ... 자동.
 
     Returns:
         저장된 파일 경로.
@@ -463,7 +486,8 @@ def plot_multi_layer_graph(
         )
 
     dot_graph = fold_multi_layer_dot_graph(
-        start_vars, verbose, show_value, value_format, layer_names, array_show_value
+        start_vars, verbose, show_value, value_format, layer_names,
+        array_show_value, show_labels
     )
 
     out_dir = os.path.dirname(to_file) or '.'
