@@ -362,3 +362,5 @@ class TestSubgroupLayout:
         dot_explicit = fold_multi_layer_dot_graph([z, [[gx], [gy]]], verbose=False)  # type: ignore[arg-type]
 
         assert dot_auto == dot_explicit
+
+

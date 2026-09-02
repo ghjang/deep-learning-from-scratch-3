@@ -381,7 +381,7 @@ def fold_multi_layer_dot_graph(
         members = groups_by_layer[primary]
         func_cell[fid] = (primary, next(iter(members)) if len(members) == 1 else None)
 
-    # ③ DOT 조립 — 각 노드는 자기 배치에 딱 1번 (무복제)
+    # ③ DOT 조립 — 각 노드는 자기 배치(primary 층)에 딱 1번 (무복제).
     lines: list[str] = []
 
     for layer_idx in range(len(layers)):
@@ -390,6 +390,10 @@ def fold_multi_layer_dot_graph(
         lines.append(f'subgraph cluster_{layer_idx} {{\n')
         lines.append('  style = rounded;\n')
         lines.append('  color = lightgray;\n')
+        if show_labels and draw_subgroups:
+            # 라벨과 서브그룹 박스(자식 cluster) 사이 여백 — 라벨이 자식 박스에
+            # 겹쳐 "서브그룹 라벨"처럼 보이는 것 방지 (브로 지적, 2026-09-02)
+            lines.append('  margin = 16;\n')
 
         # 층 라벨 — 내부 중앙 상단 (labeljust="c" + labelloc 기본 "t").
         # show_labels 독립 옵션 (verbose=shape/dtype와 분리 — 브로 결정):
@@ -402,14 +406,32 @@ def fold_multi_layer_dot_graph(
             lines.append('  labeljust = c;\n')
             lines.append(f'  label = "< {label} >";\n')
 
+        # 이 층에 표시할 노드 — primary가 이 층인 것만 (무복제).
+        # 배치: 그 층에서의 소속 서브그룹 (단일 그룹이면 그 박스, 복수면 층 최상위).
+        var_entries: list[tuple[int, "int | None"]] = []
+        for vid, gbl in var_groups.items():
+            if layer_idx not in gbl or min(gbl) != layer_idx:
+                continue
+            members = gbl[layer_idx]
+            group_at = next(iter(members)) if len(members) == 1 else None
+            var_entries.append((vid, group_at))
+
+        func_entries: list[tuple[int, "int | None"]] = []
+        for fid, gbl in func_groups.items():
+            if layer_idx not in gbl or min(gbl) != layer_idx:
+                continue
+            members = gbl[layer_idx]
+            group_at = next(iter(members)) if len(members) == 1 else None
+            func_entries.append((fid, group_at))
+
         # (a) 층 최상위 — 공유 재료(서브그룹 2개 이상 소속) + 서브그룹 없는 층 전체
-        for vid, (l, g) in var_cell.items():
-            if l == layer_idx and (g is None or not draw_subgroups):
+        for vid, g in var_entries:
+            if g is None or not draw_subgroups:
                 seed = layer_idx > 0 and _is_seed(vars_by_id[vid])
                 lines.append('  ' + _dot_var_node(vars_by_id[vid], verbose, show_value, value_format, is_seed=seed, array_show_value=array_show_value))
 
-        for fid, (l, g) in func_cell.items():
-            if l == layer_idx and (g is None or not draw_subgroups):
+        for fid, g in func_entries:
+            if g is None or not draw_subgroups:
                 lines.append('  ' + _dot_func_node(funcs_by_id[fid], verbose, show_value))
 
         # (b) 서브그룹 박스 — 각 그래디언트 성분/Hessian 행을 중첩 cluster로 구분.
@@ -419,14 +441,17 @@ def fold_multi_layer_dot_graph(
                 lines.append(f'  subgraph cluster_{layer_idx}_{group_idx} {{\n')
                 lines.append('    style = rounded;\n')
                 lines.append('    color = gray62;\n')
+                # 빈 라벨 명시 — 부모 라벨이 자식 박스 위에 반복 렌더링되는
+                # Graphviz 중첩 cluster 증상 차단 (브로 발견: backward 3회 등장)
+                lines.append('    label = "";\n')
 
-                for vid, (l, g) in var_cell.items():
-                    if l == layer_idx and g == group_idx:
+                for vid, g in var_entries:
+                    if g == group_idx:
                         seed = layer_idx > 0 and _is_seed(vars_by_id[vid])
                         lines.append('    ' + _dot_var_node(vars_by_id[vid], verbose, show_value, value_format, is_seed=seed, array_show_value=array_show_value))
 
-                for fid, (l, g) in func_cell.items():
-                    if l == layer_idx and g == group_idx:
+                for fid, g in func_entries:
+                    if g == group_idx:
                         lines.append('    ' + _dot_func_node(funcs_by_id[fid], verbose, show_value))
 
                 lines.append('  }\n')
@@ -473,7 +498,7 @@ def plot_multi_layer_graph(
         layer_names: 각 층의 표시 이름 (주면 자동 라벨 대신 사용).
         to_file: 출력 파일 경로 (확장자가 렌더링 포맷 결정).
         array_show_value: show_value=True일 때 배열 값 표시 (True=요약 / False=shape만).
-        show_labels: True(기본)면 층 라벨 — <forward> / <1st backward> ... 자동.
+        show_labels: True(기본)면 층 라벨 — < forward > / < 1st backward > ... 자동.
 
     Returns:
         저장된 파일 경로.
