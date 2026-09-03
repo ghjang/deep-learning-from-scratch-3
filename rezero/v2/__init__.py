@@ -82,7 +82,13 @@ from rezero.v2.functions import (
     sub,
     tanh,
 )
-from rezero.v2.utils import fold_dot_graph, numerical_diff, plot_dot_graph
+from rezero.v2.utils import (
+    derive,
+    fold_dot_graph,
+    numerical_diff,
+    plot_derivatives,
+    plot_dot_graph,
+)
 
 __all__ = [
     # core
@@ -125,7 +131,9 @@ __all__ = [
     "Sub",
     "Tanh",
     # utils
+    "derive",
     "fold_dot_graph",
     "numerical_diff",
+    "plot_derivatives",
     "plot_dot_graph",
 ]

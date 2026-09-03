@@ -11,7 +11,8 @@ import numpy as np
 from rezero.v2 import Variable, backprop
 from rezero.v2.core import iter_reverse_topo
 from rezero.v2.functions import cos, sin
-from rezero.v2.utils import _format_data, fold_multi_layer_dot_graph
+from rezero.v2.functions import abs as rz_abs
+from rezero.v2.utils import _format_data, derive, fold_multi_layer_dot_graph, plot_derivatives
 
 
 def _count_funcs(var: Variable) -> int:
@@ -362,5 +363,104 @@ class TestSubgroupLayout:
         dot_explicit = fold_multi_layer_dot_graph([z, [[gx], [gy]]], verbose=False)  # type: ignore[arg-type]
 
         assert dot_auto == dot_explicit
+
+
+class TestDerive:
+    """derive 도우미 — N계 미분 루프 (이슈 52, 2026-09-03)."""
+
+    def test_values_x2_four_orders(self):
+        """x² (x=2)의 1~4계: y=4, g1=4, g2=2, g3=0, g4=0."""
+        x = Variable(np.array(2.0), name='x')
+        y = x ** 2
+
+        layers = derive(y, x, order=4)
+        vals = []
+        for v in layers:
+            assert v.data is not None
+            vals.append(float(v.data))
+
+        assert vals == [4.0, 4.0, 2.0, 0.0, 0.0]
+
+    def test_values_sin_cycle(self):
+        """sin(x=0.5) 4계 — 값 4주기 회귀 (g4 == y)."""
+        x = Variable(np.array(0.5), name='x')
+        y = sin(x)
+
+        layers = derive(y, x, order=4)
+        vals = []
+        for v in layers:
+            assert v.data is not None
+            vals.append(float(v.data))
+
+        assert vals[4] == vals[0]
+        assert vals[1] > 0 and vals[2] < 0 and vals[3] < 0
+
+    def test_disconnect_raises_runtime_error(self):
+        """abs는 2계 단절 → RuntimeError (몇 계째인지 메시지에)."""
+        x = Variable(np.array(2.0), name='x')
+        y = rz_abs(x)
+
+        try:
+            derive(y, x, order=2)
+            assert False, 'Should have raised'
+        except RuntimeError as e:
+            assert '2계' in str(e)
+
+
+class TestPlotDerivatives:
+    """plot_derivatives — mode별 출력 (이슈 52). dot 바이너리 필요 (스모크)."""
+
+    def test_all_mode_multilayer(self, tmp_path):
+        """mode='all' — order+1개 층 cluster 생성 + 파일 저장."""
+        x = Variable(np.array(2.0), name='x')
+        y = x ** 2
+
+        out = plot_derivatives(
+            y, x, order=2, mode='all', verbose=False,
+            to_file=str(tmp_path / 'd_all.png'),
+        )
+
+        import os
+        assert os.path.exists(out)
+
+        dot = open(str(tmp_path / 'd_all.dot')).read()
+        assert dot.count('subgraph cluster_') == 3  # forward + 2 backward
+
+    def test_last_mode_single_graph(self, tmp_path):
+        """mode='last' — 마지막 계 그래프만 (cluster 없는 단일 그래프)."""
+        x = Variable(np.array(2.0), name='x')
+        y = x ** 2
+
+        out = plot_derivatives(
+            y, x, order=2, mode='last', verbose=False,
+            to_file=str(tmp_path / 'd_last.png'),
+        )
+
+        import os
+        assert os.path.exists(out)
+
+        dot = open(str(tmp_path / 'd_last.dot')).read()
+        assert 'subgraph cluster_' not in dot
+
+    def test_invalid_mode_raises(self):
+        """mode 런타임 방어 — 동적 값 경로의 ValueError.
+
+        Literal 타입 덕분에 리터럴 오타는 pyright가 호출 시점에 이미 잡음
+        (이 테스트 자체가 적용 전엔 그 정적 검사 대상). 여기선 cast로 동적
+        값 경로를 시뮬레이션해 런타임 방어(ValueError)를 검증.
+        """
+        from typing import Literal, cast
+
+        x = Variable(np.array(2.0), name='x')
+        y = x ** 2
+
+        bad_mode = cast("Literal['all', 'last']", 'everything')
+
+        try:
+            plot_derivatives(y, x, order=1, mode=bad_mode, verbose=False,
+                             to_file='output/_never.png')
+            assert False, 'Should have raised'
+        except ValueError:
+            pass
 
 

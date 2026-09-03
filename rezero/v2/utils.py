@@ -7,17 +7,19 @@ numerical_diff는 버전 공통 순수 수학이라 rezero.common에 상주 (ste
 import math
 import os
 import subprocess
-from typing import cast
+from typing import Literal, cast
 
 import numpy as np
 
 from rezero.common.utils import numerical_diff  # noqa: F401 — 공통 모듈 re-export
-from rezero.v2.core import Function, Variable, iter_reverse_topo
+from rezero.v2.core import Function, Variable, backprop, iter_reverse_topo
 
 __all__ = [
+    "derive",
     "fold_dot_graph",
     "fold_multi_layer_dot_graph",
     "numerical_diff",
+    "plot_derivatives",
     "plot_dot_graph",
     "plot_multi_layer_graph",
 ]
@@ -530,6 +532,91 @@ def plot_multi_layer_graph(
 # 이 외에도 jpg, gif, ps 등 수십 개 있지만, rezero 범위에선 이 3개면 충분.
 # 용도: png(범용/문서), svg(벡터/VSCode에서 까보기 좋음), pdf(인쇄/발표).
 SUPPORTED_FORMATS: frozenset[str] = frozenset({'png', 'svg', 'pdf'})
+
+
+# ===== 미분 투어 도우미 (이슈 52) ===============================================
+# 투어 스크립트마다 반복되던 "미분 루프 + plot 호출"의 공통화.
+# derive = 값/그래프 계산 (렌더링 무의존 — 테스트 가능), plot_derivatives = 출력 위임.
+def derive(y: Variable, x: Variable, order: int = 1) -> list[Variable]:
+    """y를 x로 order계까지 미분한 Variable 목록 [y, g1, ..., g_order] 반환.
+
+    매 계마다 x.clear_grad() 후 backprop(create_graph=True) — 이슈 45 투어에서
+    검증된 패턴. 중간에 그래프가 단절되면 (값 참조 도함수 — abs/identity류)
+    그 지점에서 RuntimeError (몇 계째에 끊겼는지 메시지에 포함).
+    """
+    assert order >= 1, "order는 1 이상"
+
+    result = [y]
+    current = y
+    for k in range(order):
+        x.clear_grad()
+        backprop(current, create_graph=True)
+
+        g = x.grad
+        if g is None:
+            raise RuntimeError(
+                f"{k + 1}계 미분 실패 — 그래프 단절 "
+                f"(값 참조 도함수? abs/identity류는 1계까지만 가능)"
+            )
+
+        result.append(g)
+        current = g
+
+    return result
+
+
+def plot_derivatives(
+    y: Variable,
+    x: Variable,
+    order: int = 4,
+    mode: Literal['all', 'last'] = 'all',
+    verbose: bool = True,
+    show_value: bool = False,
+    value_format: "str | None" = None,
+    layer_names: "list[str] | None" = None,
+    to_file: str = 'output/derivatives.png',
+    array_show_value: bool = True,
+    show_labels: bool = True,
+) -> str:
+    """y를 x로 order계까지 미분하고 계산 그래프를 출력 (이슈 52 도우미).
+
+    Args:
+        y: 순전파 출력 Variable (미분 출발점).
+        x: 미분 대상 변수 (단변수 — 다변수는 서브그룹 구조가 있어 수동 유지).
+        order: 몇 계까지 미분.
+        mode: 'all' (기본) — [y, g1, ..., gk] 다층 한 장 (plot_multi_layer_graph).
+            'last' — 마지막 k계 미분식의 그래프만 단일 (plot_dot_graph —
+            고차 폭주로 전체 층이 과할 때). Literal 타입 — 정적 검사가
+            오타를 호출 시점에 잡음 (동적 값은 런타임 ValueError가 방어).
+        verbose / show_value / value_format / layer_names / array_show_value /
+            show_labels / to_file: 위임 대상 plot 함수으로 패스스루.
+
+    Returns:
+        저장된 파일 경로.
+
+    Raises:
+        RuntimeError: 중간 계에서 그래프 단결 (derive).
+        ValueError: mode가 'all'/'last'가 아님.
+    """
+    layers = derive(y, x, order)
+
+    if mode == 'all':
+        # list[Variable] → start_vars 타입 (공변 한계 — cast로 정적 분석과 화해)
+        start = cast(
+            "list[Variable | list[Variable] | list[list[Variable]]]", layers
+        )
+        return plot_multi_layer_graph(
+            start, verbose, show_value, value_format, layer_names,
+            to_file, array_show_value, show_labels,
+        )
+
+    if mode == 'last':
+        return plot_dot_graph(
+            layers[-1], verbose, show_value, value_format, to_file,
+            array_show_value,
+        )
+
+    raise ValueError(f"알 수 없는 mode: '{mode}' — 'all' 또는 'last'")
 
 
 def plot_dot_graph(
