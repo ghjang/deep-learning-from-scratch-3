@@ -4,6 +4,7 @@
 numerical_diff는 버전 공통 순수 수학이라 rezero.common에 상주 (step32).
 """
 
+import colorsys
 import math
 import os
 import subprocess
@@ -166,12 +167,51 @@ def _dot_func(f: Function, verbose: bool = False, show_value: bool = False) -> s
     return ret
 
 
+def _iter_graph_vars(output: Variable) -> list[Variable]:
+    """그래프 전체 순회로 등장하는 Variable 목록 (id 중복 제거)."""
+    vars_by_id: dict[int, Variable] = {}
+    for func in iter_reverse_topo(output):
+        for x in func.inputs or []:
+            vars_by_id.setdefault(id(x), x)
+        if func.output is not None:
+            o = func.output()
+            if o is not None:
+                vars_by_id.setdefault(id(o), o)
+    return list(vars_by_id.values())
+
+
+def _collect_seed_info(layers: list[Variable]) -> "tuple[dict[int, str], dict[int, str]]":
+    """계별 seed 식별 → (id→테두리색, id→표시 라벨) 맵 (last 모드용, 브로 요청).
+
+    각 계 그래프를 순회하며 "처음 보는 seed"를 그 계의 씨앗으로 기록 (seen 추적).
+    색: k=1 gold (기본 모양 고정), k≥2 황금각 팔레트 — all 모드와 일관.
+    라벨: seed1/seed2/... — last는 층 구분이 없어 이름으로 계를 보여줌.
+    """
+    seen: set[int] = set()
+    colors: dict[int, str] = {}
+    labels: dict[int, str] = {}
+    for k, layer in enumerate(layers[1:], start=1):
+        for v in _iter_graph_vars(layer):
+            vid = id(v)
+            if v.name == 'seed' and vid not in seen:
+                colors[vid] = 'gold' if k == 1 else _seed_border_color(k)
+                labels[vid] = f'seed{k}'
+                seen.add(vid)
+
+    # 씨앗이 1개뿐이면 번호는 정보가 아니라 노이즈 — 라벨은 2개 이상일 때만
+    if len(labels) < 2:
+        labels = {}
+    return colors, labels
+
+
 def fold_dot_graph(
     output: Variable,
     verbose: bool = True,
     show_value: bool = False,
     value_format: "str | None" = None,
     array_show_value: bool = True,
+    seed_colors: "dict[int, str] | None" = None,
+    seed_labels: "dict[int, str] | None" = None,
 ) -> str:
     """output에서 역방향으로 그래프를 순회하며 DOT 텍스트를 합성(fold).
 
@@ -184,12 +224,28 @@ def fold_dot_graph(
         show_value: True면 Variable 노드에 값 추가 (동적 정보, 디버깅용).
         value_format: 값 포맷 스펙 (None이면 적응형 기본). 상세는 _format_value.
         array_show_value: show_value=True일 때 배열 값 표시 (True=요약 / False=shape만).
+        seed_colors: id(Variable)→테두리색 맵 — name='seed' 노드에 골드 채움 +
+            지정 테두리 적용 (last 모드의 계층 구분 — plot_derivatives가 전달).
+        seed_labels: id(Variable)→표시 라벨 맵 — seed 노드 이름을 seed1/seed2/...
+            로 표시 (last 모드 — 층 구분이 없어 이름으로 계 표시, 브로 요청).
 
     Returns:
         완성된 DOT 텍스트 ("digraph g { ... }").
     """
+
+    def _emit_var(v: Variable) -> str:
+        node = _dot_var(v, verbose, show_value, value_format, array_show_value)
+        if v.name == 'seed' and seed_colors and id(v) in seed_colors:
+            node = node.replace(
+                'color=orange, style=filled',
+                f'fillcolor=gold, color="{seed_colors[id(v)]}", style=filled, penwidth=2',
+            )
+            if seed_labels and id(v) in seed_labels:
+                node = node.replace('<B>seed</B>', f'<B>{seed_labels[id(v)]}</B>')
+        return node
+
     # output 노드는 순회 시작 전 먼저 찍기 (iter_reverse_topo가 yield하는 건 Function뿐)
-    txt = _dot_var(output, verbose, show_value, value_format, array_show_value)
+    txt = _emit_var(output)
 
     # 역방향 순회하며 각 Function + inputs를 DOT 텍스트로 누적
     for func in iter_reverse_topo(output):
@@ -197,7 +253,7 @@ def fold_dot_graph(
         assert func.output is not None, "func.output must be set"
         txt += _dot_func(func, verbose, show_value)
         for x in func.inputs:
-            txt += _dot_var(x, verbose, show_value, value_format, array_show_value)
+            txt += _emit_var(x)
 
     return f'digraph g {{\n{txt}}}'
 
@@ -298,6 +354,17 @@ def _ordinal(n: int) -> str:
     return f'{n}{suffix}'
 
 
+def _seed_border_color(layer_idx: int) -> str:
+    """seed 테두리 팔레트 — 계층별 황금각 hue 순회 (브로 아이디어, 2026-09-03).
+
+    채움은 gold 고정, 테두리색만 k·137.5° 순회 — 인접 계끼리 색이 최대한 멀어져
+    몇 계까지든 구분 가능. 헥스는 따옴표로 감싸야 함 (DOT '#' 주석 함정).
+    """
+    hue = (layer_idx * 137.508) % 360 / 360
+    r, g, b = colorsys.hls_to_rgb(hue, 0.42, 0.85)
+    return f'#{round(r * 255):02X}{round(g * 255):02X}{round(b * 255):02X}'
+
+
 def fold_multi_layer_dot_graph(
     start_vars: "list[Variable | list[Variable] | list[list[Variable]]]",
     verbose: bool = True,
@@ -306,6 +373,7 @@ def fold_multi_layer_dot_graph(
     layer_names: "list[str] | None" = None,
     array_show_value: bool = True,
     show_labels: bool = True,
+    seed_border: bool = False,
 ) -> str:
     """여러 시작 Variable의 계산 그래프를 층별 cluster + 층 내 서브그룹으로 병합.
 
@@ -330,6 +398,9 @@ def fold_multi_layer_dot_graph(
         array_show_value: show_value=True일 때 배열 값 표시 (True=요약 / False=shape만).
         show_labels: True(기본)면 층 라벨 표시 — verbose와 독립인 별도 축.
             layer_names 우선, 없으면 자동: <forward> / <1st backward> / <2nd backward> ...
+        seed_border: True면 seed 노드 테두리색을 계층별 팔레트로 (브로 아이디어) —
+            채움은 gold 고정, 테두리만 k·137.5° 황금각 hue 순회. all(다층) 모드
+            전용 — seed의 primary 층이 곧 그 씨앗의 계라 정확 매핑.
 
     Returns:
         완성된 DOT 텍스트.
@@ -429,8 +500,16 @@ def fold_multi_layer_dot_graph(
         # (a) 층 최상위 — 공유 재료(서브그룹 2개 이상 소속) + 서브그룹 없는 층 전체
         for vid, g in var_entries:
             if g is None or not draw_subgroups:
-                seed = layer_idx > 0 and _is_seed(vars_by_id[vid])
-                lines.append('  ' + _dot_var_node(vars_by_id[vid], verbose, show_value, value_format, is_seed=seed, array_show_value=array_show_value))
+                is_seed = layer_idx > 0 and _is_seed(vars_by_id[vid])
+                node = _dot_var_node(vars_by_id[vid], verbose, show_value, value_format, is_seed=is_seed, array_show_value=array_show_value)
+                if seed_border and is_seed and layer_idx > 1:
+                    # 1계 씨앗은 기본 gold 그대로 — 1계 미분이 대다수인 용도와의
+                    # 일관성 (브로 요청). 팔레트는 2계부터.
+                    node = node.replace(
+                        'color=gold, style=filled, penwidth=2',
+                        f'fillcolor=gold, color="{_seed_border_color(layer_idx)}", style=filled, penwidth=2',
+                    )
+                lines.append('  ' + node)
 
         for fid, g in func_entries:
             if g is None or not draw_subgroups:
@@ -449,8 +528,14 @@ def fold_multi_layer_dot_graph(
 
                 for vid, g in var_entries:
                     if g == group_idx:
-                        seed = layer_idx > 0 and _is_seed(vars_by_id[vid])
-                        lines.append('    ' + _dot_var_node(vars_by_id[vid], verbose, show_value, value_format, is_seed=seed, array_show_value=array_show_value))
+                        is_seed = layer_idx > 0 and _is_seed(vars_by_id[vid])
+                        node = _dot_var_node(vars_by_id[vid], verbose, show_value, value_format, is_seed=is_seed, array_show_value=array_show_value)
+                        if seed_border and is_seed and layer_idx > 1:
+                            node = node.replace(
+                                'color=gold, style=filled, penwidth=2',
+                                f'fillcolor=gold, color="{_seed_border_color(layer_idx)}", style=filled, penwidth=2',
+                            )
+                        lines.append('    ' + node)
 
                 for fid, g in func_entries:
                     if g == group_idx:
@@ -487,6 +572,7 @@ def plot_multi_layer_graph(
     to_file: str = 'output/multi_layer.png',
     array_show_value: bool = True,
     show_labels: bool = True,
+    seed_border: bool = False,
 ) -> str:
     """다층 계산 그래프를 DOT로 인코딩하여 Graphviz로 렌더링, 파일로 저장.
 
@@ -501,22 +587,39 @@ def plot_multi_layer_graph(
         to_file: 출력 파일 경로 (확장자가 렌더링 포맷 결정).
         array_show_value: show_value=True일 때 배열 값 표시 (True=요약 / False=shape만).
         show_labels: True(기본)면 층 라벨 — < forward > / < 1st backward > ... 자동.
+        seed_border: True면 seed 테두리 계층별 팔레트 (브로 아이디어).
 
     Returns:
         저장된 파일 경로.
     """
-    extension = os.path.splitext(to_file)[1][1:]
+    dot_graph = fold_multi_layer_dot_graph(
+        start_vars, verbose, show_value, value_format, layer_names,
+        array_show_value, show_labels, seed_border
+    )
+
+    return _render_dot(dot_graph, to_file)
+
+
+# Graphviz dot이 지원하는 렌더링 포맷 (학습/디버깅 용도로 자주 쓰는 3종).
+# 이 외에도 jpg, gif, ps 등 수십 개 있지만, rezero 범위에선 이 3개면 충분.
+# 용도: png(범용/문서), svg(벡터/VSCode에서 까보기 좋음), pdf(인쇄/발표).
+SUPPORTED_FORMATS: frozenset[str] = frozenset({'png', 'svg', 'pdf'})
+
+
+def _render_dot(dot_graph: str, to_file: str) -> str:
+    """DOT 텍스트를 Graphviz로 렌더링해 파일로 저장 — plot 계열 공통 파이프라인.
+
+    to_file 확장자가 렌더링 포맷 결정. DOT 소스(.dot)도 산출물로 함께 저장
+    (브로가 까볼 수 있도록 — step25 관례).
+    """
+    extension = os.path.splitext(to_file)[1][1:]  # e.g. 'png', 'svg'
     if extension not in SUPPORTED_FORMATS:
         raise ValueError(
             f"지원하지 않는 포맷: '.{extension}'. "
-            f"지원 포맷: {sorted(SUPPORTED_FORMATS)}"
+            f"지원 포맷: {sorted(SUPPORTED_FORMATS)} (png/svg/pdf)"
         )
 
-    dot_graph = fold_multi_layer_dot_graph(
-        start_vars, verbose, show_value, value_format, layer_names,
-        array_show_value, show_labels
-    )
-
+    # 산출물 디렉터리 보장 — to_file이 'output/foo.png'면 같은 폴더에 DOT도 저장
     out_dir = os.path.dirname(to_file) or '.'
     os.makedirs(out_dir, exist_ok=True)
 
@@ -524,14 +627,13 @@ def plot_multi_layer_graph(
     with open(dot_path, 'w') as f:
         f.write(dot_graph)
 
-    subprocess.run(['dot', dot_path, '-T', extension, '-o', to_file], check=True)
+    # dot 바이너리로 렌더링 (확장자 → 포맷). shell=False + check=True로 안전하게.
+    subprocess.run(
+        ['dot', dot_path, '-T', extension, '-o', to_file],
+        check=True,
+    )
+
     return to_file
-
-
-# Graphviz dot이 지원하는 렌더링 포맷 (학습/디버깅 용도로 자주 쓰는 3종).
-# 이 외에도 jpg, gif, ps 등 수십 개 있지만, rezero 범위에선 이 3개면 충분.
-# 용도: png(범용/문서), svg(벡터/VSCode에서 까보기 좋음), pdf(인쇄/발표).
-SUPPORTED_FORMATS: frozenset[str] = frozenset({'png', 'svg', 'pdf'})
 
 
 # ===== 미분 투어 도우미 (이슈 52) ===============================================
@@ -577,6 +679,7 @@ def plot_derivatives(
     to_file: str = 'output/derivatives.png',
     array_show_value: bool = True,
     show_labels: bool = True,
+    seed_border: bool = False,
 ) -> str:
     """y를 x로 order계까지 미분하고 계산 그래프를 출력 (이슈 52 도우미).
 
@@ -590,6 +693,10 @@ def plot_derivatives(
             오타를 호출 시점에 잡음 (동적 값은 런타임 ValueError가 방어).
         verbose / show_value / value_format / layer_names / array_show_value /
             show_labels / to_file: 위임 대상 plot 함수으로 패스스루.
+        seed_border: seed 테두리 계층별 팔레트 (브로 아이디어) — 양 모두 지원.
+            all: primary 층 = 씨앗의 계. last: derive 이력으로 계별 식별
+            (k=1 gold 고정, k≥2 황금각 팔레트) + 라벨 seed1/seed2/... 표시
+            (층 구분이 없는 last에선 이름으로 계를 보여줌).
 
     Returns:
         저장된 파일 경로.
@@ -607,14 +714,29 @@ def plot_derivatives(
         )
         return plot_multi_layer_graph(
             start, verbose, show_value, value_format, layer_names,
-            to_file, array_show_value, show_labels,
+            to_file, array_show_value, show_labels, seed_border,
         )
 
     if mode == 'last':
-        return plot_dot_graph(
-            layers[-1], verbose, show_value, value_format, to_file,
-            array_show_value,
+        colors, labels = _collect_seed_info(layers)
+        inner = fold_dot_graph(
+            layers[-1], verbose, show_value, value_format, array_show_value,
+            seed_colors=colors if seed_border else None,
+            seed_labels=labels if seed_border else None,
         )
+
+        # 단일 그래프를 라벨된 층 박스로 감싸기 — "몇 번째 역전파인지" 표시
+        # (브로 요청, 2026-09-03). fold_dot_graph 결과(digraph g {...})의
+        # 본문을 추출해 cluster로 재포장. seed 등 중복 노드는 현상 유지.
+        prefix = 'digraph g {\n'
+        body = inner[len(prefix):-1]  # 앞 스킨 + 마지막 '}' 제거
+
+        header = 'subgraph cluster_0 {\n  style = rounded;\n  color = lightgray;\n'
+        if show_labels:
+            header += '  labeljust = c;\n'
+            header += f'  label = "< {_ordinal(order)} backward >";\n'
+
+        return _render_dot(f'digraph g {{\n{header}{body}}}\n}}', to_file)
 
     raise ValueError(f"알 수 없는 mode: '{mode}' — 'all' 또는 'last'")
 
@@ -657,29 +779,6 @@ def plot_dot_graph(
         subprocess.CalledProcessError: dot 바이너리는 있지만 렌더링 실패
             (exit code nonzero). subprocess.run(check=True)가 발생.
     """
-    # 포맷 검증 — 지원 포맷만 허용 (확장자 → 포맷)
-    extension = os.path.splitext(to_file)[1][1:]  # e.g. 'png', 'svg'
-    if extension not in SUPPORTED_FORMATS:
-        raise ValueError(
-            f"지원하지 않는 포맷: '.{extension}'. "
-            f"지원 포맷: {sorted(SUPPORTED_FORMATS)} (png/svg/pdf)"
-        )
-
     dot_graph = fold_dot_graph(output, verbose, show_value, value_format, array_show_value)
 
-    # 산출물 디렉터리 보장 — to_file이 'output/foo.png'면 같은 폴더에 DOT도 저장
-    out_dir = os.path.dirname(to_file) or '.'
-    os.makedirs(out_dir, exist_ok=True)
-
-    # DOT 소스 저장 (to_file에서 확장자만 .dot으로 교체)
-    dot_path = os.path.splitext(to_file)[0] + '.dot'
-    with open(dot_path, 'w') as f:
-        f.write(dot_graph)
-
-    # dot 바이너리로 렌더링 (확장자 → 포맷). shell=False + check=True로 안전하게.
-    subprocess.run(
-        ['dot', dot_path, '-T', extension, '-o', to_file],
-        check=True,
-    )
-
-    return to_file
+    return _render_dot(dot_graph, to_file)

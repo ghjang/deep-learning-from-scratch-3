@@ -258,6 +258,50 @@ class TestFormatData:
         dot = fold_multi_layer_dot_graph(layers, verbose=False)  # type: ignore[arg-type]
         assert 'label = "< 2nd backward >"' in dot
 
+    def test_seed_border_layered_palette(self):
+        """seed_border=True — 1계는 gold 고정, 2계부터 팔레트 (브로 요청)."""
+        layers = _build_x2_derivatives(max_order=3)
+        dot = fold_multi_layer_dot_graph(
+            layers, verbose=False, seed_border=True,  # type: ignore[arg-type]
+        )
+
+        import re
+        # 2·3계 씨앗: fillcolor=gold + 서로 다른 팔레트 헥스
+        hexes = re.findall(r'fillcolor=gold, color="(#[0-9A-F]{6})"', dot)
+        assert len(hexes) == 2, f'팔레트 씨앗 {len(hexes)}개 — 2계부터라 2개 필요'
+        assert hexes[0] != hexes[1]
+        # 1계 씨앗: 기본 형태 그대로 (gold, 치환 안 됨)
+        assert dot.count('color=gold, style=filled, penwidth=2') == 1
+
+    def test_seed_border_last_mode(self):
+        """mode='last'에서도 seed 테두리 구분 — derive 이력으로 계별 식별 (브로 요청)."""
+        import os
+
+        x = Variable(np.array(2.0), name='x')
+        y = x ** 2
+
+        out = plot_derivatives(
+            y, x, order=3, mode='last', verbose=False, seed_border=True,
+            to_file='output/_tmp_last_border.png',
+        )
+        assert os.path.exists(out)
+
+        import re
+        dot = open('output/_tmp_last_border.dot').read()
+        borders = re.findall(r'fillcolor=gold, color="([^"]+)"', dot)
+        # g3 그래프는 3계의 씨앗 3개를 품음 — gold(1계) + 팔레트 2개
+        assert len(borders) == 3
+        assert 'gold' in borders
+        os.remove(out)
+        os.remove('output/_tmp_last_border.dot')
+
+    def test_seed_border_off_keeps_gold(self):
+        """seed_border 기본 False — 기존 'color=gold' 유지 (소급 영향 없음)."""
+        layers = _build_x2_derivatives(max_order=2)
+        dot = fold_multi_layer_dot_graph(layers, verbose=False)  # type: ignore[arg-type]
+        assert 'color=gold' in dot
+        assert 'fillcolor=gold' not in dot
+
     def test_show_labels_false(self):
         """show_labels=False → 층 라벨 없음."""
         x = Variable(np.array(2.0), name='x')
@@ -421,7 +465,7 @@ class TestPlotDerivatives:
         assert dot.count('subgraph cluster_') == 3  # forward + 2 backward
 
     def test_last_mode_single_graph(self, tmp_path):
-        """mode='last' — 마지막 계 그래프만 (cluster 없는 단일 그래프)."""
+        """mode='last' — 마지막 계 그래프를 라벨된 층 박스로 감싸 단일 출력 (브로 요청)."""
         x = Variable(np.array(2.0), name='x')
         y = x ** 2
 
@@ -434,7 +478,8 @@ class TestPlotDerivatives:
         assert os.path.exists(out)
 
         dot = open(str(tmp_path / 'd_last.dot')).read()
-        assert 'subgraph cluster_' not in dot
+        assert dot.count('subgraph cluster_') == 1  # 단일 층 박스
+        assert 'label = "< 2nd backward >"' in dot  # 몇 번째 역전파인지 라벨
 
     def test_invalid_mode_raises(self):
         """mode 런타임 방어 — 동적 값 경로의 ValueError.
