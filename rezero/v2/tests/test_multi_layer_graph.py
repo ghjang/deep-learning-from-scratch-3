@@ -9,15 +9,9 @@ PNG 생성 확인: output/ 폴더 (demo_x2_*.png)
 import numpy as np
 
 from rezero.v2 import Variable, backprop
-from rezero.v2.core import iter_reverse_topo
 from rezero.v2.functions import cos, sin
 from rezero.v2.functions import abs as rz_abs
 from rezero.v2.utils import _format_data, derive, fold_multi_layer_dot_graph, plot_derivatives
-
-
-def _count_funcs(var: Variable) -> int:
-    """Variable의 그래프에서 Function 노드 수 세기."""
-    return sum(1 for _ in iter_reverse_topo(var))
 
 
 def _build_x2_derivatives(x_val: float = 2.0, max_order: int = 4):
