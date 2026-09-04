@@ -312,8 +312,28 @@ def _dot_func_node(f: Function, verbose: bool = False, show_value: bool = False)
     return f'{id(f)} [label="{f.dot_label(show_param)}", color=lightblue, style=filled, shape=box]\n'
 
 
+def _apply_hessian_badge(
+    node_dot: str,
+    vid: int,
+    hessian_index: "dict[int, tuple[int, int]]",
+    vars_by_id: "dict[int, Variable]",
+) -> str:
+    """노드 DOT 라벨에 Hessian 인덱스 배지 추가 — "x.grad" → "x.grad (0,1)".
+
+    이름이 있는 성분에만 적용 (무명 노드엔 붙이지 않음 — 해석 불가하므로).
+    """
+    idx = hessian_index.get(vid)
+    v = vars_by_id.get(vid)
+    if idx is None or v is None or not v.name:
+        return node_dot
+
+    return node_dot.replace(
+        f'<B>{v.name}</B>', f'<B>{v.name}</B> ({idx[0]},{idx[1]})', 1
+    )
+
+
 def _normalize_layers(
-    start_vars: "list[Variable | list[Variable] | list[list[Variable]]]",
+    start_vars: "list[Variable | list[Variable] | list[list[Variable | None]]]",
 ) -> list[list[list[Variable]]]:
     """각 층을 서브그룹 목록 list[list[Variable]]로 정규화.
 
@@ -330,16 +350,21 @@ def _normalize_layers(
     for item in start_vars:
         if isinstance(item, Variable):
             layers.append([[item]])
-        elif all(isinstance(v, Variable) for v in item):
+        elif all(isinstance(v, Variable) for v in cast("list[Variable | list[Variable] | list[Variable | None]]", item)):
             assert item, "빈 층(list)은 전달할 수 없음"
             # all(isinstance)는 타입 가드가 아니므로 cast로 정적 분석과 화해
             flat = cast("list[Variable]", item)
             layers.append([[v] for v in flat])
         else:
-            groups = [list(cast("list[Variable]", g)) for g in item]
-            assert groups and all(
-                g and all(isinstance(v, Variable) for v in g) for g in groups
-            ), "list[list[Variable]] 형태여야 함 (각 내부 리스트는 비지 않은 Variable 목록)"
+            # None은 자리표시자 — Hessian의 미계산 성분(그래프 단절). 자리(인덱스)는
+            # 유지하되 그래프에는 포함하지 않음 (브로 요청: 인덱스 정확성 우선).
+            groups: list[list[Variable]] = []
+            for row in cast("list[list[Variable | None]]", item):
+                valid = [v for v in row if v is not None]
+                assert valid, "각 행에는 최소 1개의 Variable 필요 (None만의 행 불가)"
+                assert all(isinstance(v, Variable) for v in valid), \
+                    "list[list[Variable | None]] 형태여야 함"
+                groups.append(valid)
             layers.append(groups)
 
     return layers
@@ -366,7 +391,7 @@ def _seed_border_color(layer_idx: int) -> str:
 
 
 def fold_multi_layer_dot_graph(
-    start_vars: "list[Variable | list[Variable] | list[list[Variable]]]",
+    start_vars: "list[Variable | list[Variable] | list[list[Variable | None]]]",
     verbose: bool = True,
     show_value: bool = False,
     value_format: "str | None" = None,
@@ -391,6 +416,8 @@ def fold_multi_layer_dot_graph(
             단변수: [y, gx, gx2] (기존 방식 그대로 — 하위 박스 없음)
             다변수 자동: [z, [gx, gy]] — cluster_1 안에 gx박스 + gy박스
             Hessian 행별: [z, [gx, gy], [[hxx, hyx], [hxy, hyy]]]
+            (None 자리표시자 허용 — [[hxx, None], [None, hyy]]처럼 미계산 성분을
+             빈 칸으로 두면 인덱스가 정확히 유지됨)
         verbose: True면 Variable 노드에 shape/dtype 추가 (노드 정적 정보 — 책 관례).
         show_value: True면 Variable 노드에 값 추가.
         value_format: 값 포맷 스펙 (None이면 적응형 기본).
@@ -406,6 +433,22 @@ def fold_multi_layer_dot_graph(
         완성된 DOT 텍스트.
     """
     layers = _normalize_layers(start_vars)
+
+    # Hessian 인덱스 배지 (브로 아이디어, 2026-09-04) — 3단 중첩(층-행-성분) 층의
+    # 성분에 행렬 인덱스 (i, j)를 라벨에 자동 부여: "x.grad (0,1)" = H[0][1].
+    # 이름 규칙(x.grad)은 유지 + 인덱스만 추가 (유니코드 수학 기호 대신 좌표로).
+    # 관례: 행 우선 [[hxx, hyx], [hxy, hyy]] — 인덱스 정확성은 호출자의 순서 책임.
+    hessian_index: dict[int, tuple[int, int]] = {}
+    for layer_pos, item in enumerate(start_vars):
+        if layer_pos < 2:
+            continue  # 배지는 2계 이상 층만 — 1계의 [[gx],[gy]] 서브그룹 표기와 충돌 방지
+        if isinstance(item, Variable) or all(isinstance(v, Variable) for v in item):
+            continue  # Variable / 평면 리스트 — 해당 없음 (3단 중첩만)
+        for i, row in enumerate(cast("list[list[Variable | None]]", item)):
+            for j, v in enumerate(row):
+                if v is None:
+                    continue  # 자리표시자 — 인덱스 j는 유지
+                hessian_index[id(v)] = (i, j)
 
     # ① 층별·서브그룹별 역순회 → 노드별 소속 (층 × 서브그룹) + 객체 + 간선 수집
     var_groups: dict[int, dict[int, set[int]]] = {}   # vid → {층 idx: {서브그룹 idx}}
@@ -502,6 +545,7 @@ def fold_multi_layer_dot_graph(
             if g is None or not draw_subgroups:
                 is_seed = layer_idx > 0 and _is_seed(vars_by_id[vid])
                 node = _dot_var_node(vars_by_id[vid], verbose, show_value, value_format, is_seed=is_seed, array_show_value=array_show_value)
+                node = _apply_hessian_badge(node, vid, hessian_index, vars_by_id)
                 if seed_border and is_seed and layer_idx > 1:
                     # 1계 씨앗은 기본 gold 그대로 — 1계 미분이 대다수인 용도와의
                     # 일관성 (브로 요청). 팔레트는 2계부터.
@@ -530,6 +574,7 @@ def fold_multi_layer_dot_graph(
                     if g == group_idx:
                         is_seed = layer_idx > 0 and _is_seed(vars_by_id[vid])
                         node = _dot_var_node(vars_by_id[vid], verbose, show_value, value_format, is_seed=is_seed, array_show_value=array_show_value)
+                        node = _apply_hessian_badge(node, vid, hessian_index, vars_by_id)
                         if seed_border and is_seed and layer_idx > 1:
                             node = node.replace(
                                 'color=gold, style=filled, penwidth=2',
@@ -564,7 +609,7 @@ def fold_multi_layer_dot_graph(
 
 
 def plot_multi_layer_graph(
-    start_vars: "list[Variable | list[Variable] | list[list[Variable]]]",
+    start_vars: "list[Variable | list[Variable] | list[list[Variable | None]]]",
     verbose: bool = True,
     show_value: bool = False,
     value_format: "str | None" = None,
@@ -580,6 +625,8 @@ def plot_multi_layer_graph(
         start_vars: 각 층의 시작점. 3종 (상세는 fold_multi_layer_dot_graph).
             단변수: [y, gx, gx2] / 다변수 자동: [z, [gx, gy]] /
             Hessian 행별: [z, [gx, gy], [[hxx, hyx], [hxy, hyy]]]
+            (None 자리표시자 허용 — [[hxx, None], [None, hyy]]처럼 미계산 성분을
+             빈 칸으로 두면 인덱스가 정확히 유지됨)
         verbose: True면 Variable 노드에 shape/dtype 추가 (노드 정적 정보).
         show_value: True면 Variable 노드에 값 추가.
         value_format: 값 포맷 스펙 (None이면 적응형 기본).
@@ -710,7 +757,7 @@ def plot_derivatives(
     if mode == 'all':
         # list[Variable] → start_vars 타입 (공변 한계 — cast로 정적 분석과 화해)
         start = cast(
-            "list[Variable | list[Variable] | list[list[Variable]]]", layers
+            "list[Variable | list[Variable] | list[list[Variable | None]]]", layers
         )
         return plot_multi_layer_graph(
             start, verbose, show_value, value_format, layer_names,

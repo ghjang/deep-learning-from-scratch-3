@@ -393,6 +393,44 @@ class TestSubgroupLayout:
         assert 'cluster_2_0' in dot and 'cluster_2_1' in dot  # 2계: x행 + y행
         assert dot.count('subgraph cluster_') == 3 + 4  # 층 3 + 서브그룹 2+2
 
+        # Hessian 인덱스 배지 (브로 아이디어) — 2계 층 성분에 (행,열) 자동 부여
+        # 라벨이 HTML 형태 <B>x.grad</B> (0,0) 이므로 태그 포함으로 검색
+        assert '<B>x.grad</B> (0,0)' in dot, 'hxx = H[0][0] 배지 없음'
+        assert '<B>y.grad</B> (0,1)' in dot, 'hyx = H[0][1] 배지 없음'
+        assert '<B>x.grad</B> (1,0)' in dot, 'hxy = H[1][0] 배지 없음'
+        assert '<B>y.grad</B> (1,1)' in dot, 'hyy = H[1][1] 배지 없음'
+
+    def test_hessian_none_placeholder_keeps_index(self):
+        """None 자리표시자 — 빈 칸도 인덱스 유지 (브로 요청: 인덱스 정확성 우선).
+
+        x²+y²의 Hessian은 대각만 계산됨 → [[hxx, None], [None, hyy]]로 넣으면
+        hyy가 (1,1)로 정확히 찍혀야 함 (None을 빼서 (1,0)으로 당겨지지 않게).
+        """
+        x = Variable(np.array(1.0), name='x')
+        y = Variable(np.array(2.0), name='y')
+        z = x ** 2 + y ** 2
+
+        backprop(z, create_graph=True)
+        gx, gy = x.grad, y.grad
+        assert gx is not None and gy is not None
+
+        x.clear_grad(); y.clear_grad()
+        backprop(gx, create_graph=True)
+        hxx = x.grad  # y.grad는 None (대각만)
+
+        x.clear_grad(); y.clear_grad()
+        backprop(gy, create_graph=True)
+        hyy = y.grad
+        assert hxx is not None and hyy is not None
+
+        dot = fold_multi_layer_dot_graph(
+            [z, [gx, gy], [[hxx, None], [None, hyy]]],  # type: ignore[arg-type]
+            verbose=False,
+        )
+        assert '<B>x.grad</B> (0,0)' in dot
+        assert '<B>y.grad</B> (1,1)' in dot, 'None 자리 덕에 (1,1)이어야 함 — (1,0)으로 당겨지면 실패'
+        assert '(1,0)' not in dot
+
     def test_flat_list_equals_auto_subgroups(self):
         """[z, [gx, gy]] (자동)와 [z, [[gx], [gy]]] (명시)는 같은 구조 생성."""
         _, _, z, gx, gy = self._build_xy()
