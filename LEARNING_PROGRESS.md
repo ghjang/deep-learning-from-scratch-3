@@ -47,7 +47,7 @@
      - C1 Exp + C2 Sigmoid → step40 언저리 (Sigmoid 재료로 exp 등장)
      - C3 뉴턴 극소 판별기 → step42~45 (optimizer 맥락)
      - D1 fill_grad 누적 토론 → step45 언저리 (backward 호출 관례)
-  3. 대기 이슈: 51 (duplicate_shared) / 53 (부동소수점) / 54 (상속 시각화) / 47 (MatMul, step41) / 44 (포워드 모드)
+  3. 대기 이슈: 51 (duplicate_shared) / 53 (부동소수점) / 54 (상속 시각화) / 47 (MatMul, step41) / 44 (포워드 모드) / 55 (sympy 폴드 — 그래프→식→LaTeX, 4고지 중 여유 시)
 
   ⑦~⑨ 노트 39·40·41 놀이터 (그대로 유지)
 - ★ **step25/26 특이사항 (해결됨)**: step25 작업 시 step26 영역(Goldstein 그래프 출력)까지 선행 커버했었음 (정답지 배분 착각). 2026-08-19 브로 책 재확인으로 step26 본문에 코드 외 새 개념 없음 확인 → step26 공식 ✅ 처리 완료. 시각화 2부작 종결.
