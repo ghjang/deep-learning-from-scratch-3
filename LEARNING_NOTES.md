@@ -2314,8 +2314,8 @@ tanh의 고차 미분 그래프를 시각화 — 도함수(tanh' = 1 - tanh²)�
 ## Step 37 — [4고지] 텐서를 다루다
 
 **Issue**: [#56](https://github.com/ghjang/deep-learning-from-scratch-3/issues/56)
-**완료일**: -
-**상태**: 🔄
+**완료일**: 2026-09-09
+**상태**: ✅
 
 ### 🎯 학습 시작 전 도출 — 감동/학습 포인트 (2026-09-09, 브로-AI 대화)
 
@@ -2340,18 +2340,62 @@ tanh의 고차 미분 그래프를 시각화 — 도함수(tanh' = 1 - tanh²)�
 
 ### 📖 요약 (한 줄)
 
+텐서(다차원 ndarray) 1급 시민 선언 — "선언"의 step으로 기존 element-wise 구조가
+수정 0으로 텐서를 통과함을 확인. 신규는 Sum 하나 (도함수 ones — 브로드캐스팅 shape
+복원). v3 창설 (v2 계승).
 
 ### ❓ 질문 / 막힌 점
 
+- (해결) "Sum은 후속 스텝 이야기의 선취 아닌가?" — 맞다. 단 선취한 건 책이 먼저:
+  정답지가 설명 없이 F.sum을 사용만 함. rezero는 재현을 위해 최소 구현(전체 합)까지 —
+  그 과정에서 NumPy 우선 버그 조기 발견이라는 수확. 뒷 step(40 언저리)에서
+  axis/keepdims + sum_to/broadcast_to 확장 시 회수 약속 (이슈 56 코멘트).
 
 ### 💡 통찰 / 배운 점
 
+- **★★ NumPy 우선 object 배열 버그** (이번 step 최대 수확):
+  도함수가 **다차원 ndarray**를 반환하면 `ndarray * Variable`에서 NumPy가
+  element-wise를 이겨버려 grad가 object 배열(원소 Variable)로 오염.
+  탐구 25의 "__array_priority__ 없이도 __rmul__로 충분"은 **스칼라(0-dim) 기준**이었다.
+  3고지의 Abs(np.sign)는 0-dim만 반환해 미발견이었음.
+  → 수정: backward 뼈대 `local_deriv = as_variable(df(x))` — 이슈 45의
+  "값 참조는 곱해지면 리프 Variable" 계약을 뼈대가 이행. v2 백포트 + 회귀 테스트.
+  **스칼라 시대의 결론이 텐서 시대에 한계를 드러낸 첫 실증 사례.**
+- **페이스 트레이싱 판별법 확립**: "책 본문이 이 step에서 설명하는가?" vs
+  "정답지가 사용만 하는가?" — 후자면 데모 동작에 필요한 최소분만 포함 +
+  "뒷 step 설명 예정" 명시. 4고지는 step-코드/패키지-설명 정렬이 흐트러지는
+  시기(책이 스텝바이스텝을 '대충' — 브로 지적)라 이 판별법이 우리 지도.
+- **그래프 동등성 확인** — as_variable 정규화는 기존 동작과 그래프가 동일
+  (float * Variable → __rmul__이나 as_variable 후 __mul__이나 어차피
+  __call__ 도입부에서 같은 정규화 → "리프 1 + Mul" 동일).
+- v1/v0은 이 버그와 무관 — grad가 ndarray/float라 Variable이 곱셈에 없음
+  (백포트 불필요의 근거).
 
 ### 🔗 관련 링크
 
+- [이슈 56](https://github.com/ghjang/deep-learning-from-scratch-3/issues/56) — 진행 본문 (버그 서사 + Sum 선취 논의 + 판별법)
+- `rezero/v3/` — 창설 패키지 (구조는 v2 계승, docstring만 4고지화)
+- `rezero/v3/functions.py` Sum — 도함수 성분 유형 지도 ②의 값 참조 변주 (Abs와 동반)
+- 탐구 노트 25 (__array_priority__/ufunc 역사) — 본 step에서 "스칼라 기준" 교정됨
+- 탐구 노트 32 §5 (도함수 성분 유형 지도) — Sum 등록
 
 ### 📝 코드 / 수식 메모
 
+```python
+# Sum의 역전파 — hook 유지 방식 (dezero는 backward 직접 오버라이드)
+class Sum(Function):
+    def apply(self, x): return x.sum()          # (2,3) → 0-dim
+    def derivative(self):
+        data = self.inputs[0].data
+        return lambda _: np.ones_like(data)     # 값 참조 — 그래프 무연결 상수
+
+# backward 뼈대: local_deriv * upstream = ones(2,3) * Variable(0-dim)
+#   → 곱셈 브로드캐스팅이 0-dim upstream을 입력 shape로 자동 복원
+#   → x.grad = ones(2,3)  (∂(Σx_i)/∂x_i = 1)
+
+# 버그 수정 (backward 뼈대) — NumPy 우선 object 배열 방지:
+local_deriv = as_variable(df(x))   # ndarray 도함수도 리프 Variable로 정규화
+```
 
 ---
 

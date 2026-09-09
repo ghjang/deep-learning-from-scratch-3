@@ -15,14 +15,16 @@ rezero — 『밑바닥부터 시작하는 딥러닝 3』 직접 구현 학습 �
   3. 파이썬 기법/이디엄도 적극 학습. 모르면 그때그때 찾아보기.
   4. 변종 실험 환영. 더 좋은 이름, 더 좋은 구조를 상상해볼 것.
 
-★ 버전 폴더 구조 (step23 도입 — step32에서 v2 브랜칭):
+★ 버전 폴더 구조 (step23 도입 — step32 v2 브랜칭, 2026-09-04 v0 신설, 2026-09-09 v3 브랜칭):
+  - rezero/v0/ — 순수 Python 학습 실험실 (NumPy 배제, 이슈 43 작업 3). data=float
   - rezero/v1/ — 제 1~2고지 스코프 (step01~22). grad가 ndarray — 1차 미분까지만
-  - rezero/v2/ — 제 3고지 "고차 미분 계산" (step32~). grad가 Variable,
+  - rezero/v2/ — 제 3고지 "고차 미분 계산" (step32~36). grad가 Variable,
     fill_grad(y, create_graph=True)로 double backprop 지원
+  - rezero/v3/ — 제 4고지 "신경망 만들기" (step37~51). v2 계승 + 텐서 1급 시민
+    + Sum. 모듈 3분류 A안 (functions / activations·layers는 등장 step에 생성)
   - rezero/common/ — 버전 공통 순수 함수 (numerical_diff).
     판별 기준: "grad 타입/그래프 구조에 의존하는가?" — 무관하면 common
-  - rezero/v3/ — (미래) 제 4고지+ 신경망
-  사용: `from rezero.v1 import ...` / `from rezero.v2 import ...`
+  사용: `from rezero.v1 import ...` / `from rezero.v2 import ...` / `from rezero.v3 import ...`
 
   ★ vX는 "박제가 아니라 살아있는 코드" — 신중하게 수정 가능
     (rezero/steps/ 과거 학습 흔적 수정 금지와는 별개 규칙).
@@ -30,9 +32,11 @@ rezero — 『밑바닥부터 시작하는 딥러닝 3』 직접 구현 학습 �
   rezero/steps/ — 학습 흔적 전부 (step01~60). 과거 step은 수정 금지.
 
 진행 상황:
-  - 현재 단계: 제 4고지 대기 (step37~51, 신경망 만들기 — 진입 전 후보 10번 야코비안 회수 예정)
-  - 완료한 step: step01 ~ step36 ✅ ★ 제 3고지 (step25~36, 고차 미분 계산) 완료!
-    (+ 고차 미분 이외의 용도 — 살아있는 그래프 재사용, 탐구 노트 33)
+  - 현재 단계: step38 (제 4고지 진행 중 — 정답지는 reshape/transpose 계열, 제목은 책 확인 필요)
+  - 완료한 step: step01 ~ step37 ✅ ★ 제 4고지 개막 (텐서를 다루다 — v3 창설,
+    Sum 도함수 ones + 브로드캐스팅 shape 복원, NumPy 우선 버그 수정)
+  - 이전 고지: 1고지 미분 자동 계산 ✅ / 2고지 자연스러운 코드로 ✅ /
+    3고지 고차 미분 계산 (step25~36) ✅
 """
 
-__version__ = "0.3.0"  # ★★★ 제 3고지 완료 (step25~36 고차 미분 계산. MINOR bump — 고지 완료)
+__version__ = "0.3.1"  # step37 완료 (텐서를 다루다 — v3 창설, 4고지 개막)
