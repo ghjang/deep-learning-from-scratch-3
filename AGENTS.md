@@ -55,12 +55,16 @@
 | **참고 방향** | `rezero` 작성 중 막힐 때 참조 | `dezero`를 보고 이해한 뒤 내 손으로 재구현 |
 | **이름 유래** | Deep + Zero | Re:Zero (다시 시작하는 zero) 오마주 + "다시"의 의미 |
 
-### `rezero/` 디렉터리 구조 (버전 폴더 전략 — step23 도입, step32에서 v2 브랜칭, 2026-09-04 v0 신설)
+### `rezero/` 디렉터리 구조 (버전 폴더 전략 — step23 도입, step32에서 v2 브랜칭, 2026-09-04 v0 신설, 2026-09-09 v3 브랜칭)
 
 > ★ **step32에서 v2 탄생** (고차 미분 구현. grad ndarray→Variable은 API 호환성이
 > 깨지는 대개편이라 v2로 분기 — 책의 core_simple/core 이분법과 평행).
 > ★ **2026-09-04 v0 신설** — "자연수에 나중에 추가한 0" (이슈 43 작업 3, 브로 아이디어).
 > v1에서 NumPy를 걷어낸 학습 실험실 — 두 축(그래프/데이터) 분리 체감.
+> ★ **2026-09-09 v3 탄생** (step37 "텐서를 다루다", 4고지 진입) — v2를 구조 변경 없이
+> 계승 (element-wise 중심 구조가 다차원 ndarray를 무수정 통과) + 텐서 1급 시민.
+> 모듈 3분류 A안 채택 (이슈 50): functions.py만 두고 activations.py는 step40,
+> layers.py는 step49 등장 시 생성.
 > 상세는 아래 **"📁 디렉터리 구조"** 섹션 + **"★★ rezero 버전 폴더 전략"** 참조.
 
 ```
@@ -75,21 +79,28 @@ rezero/
 │   ├── core.py       # Variable, Function, Config, fill_grad — grad가 ndarray
 │   ├── functions.py  # Square/Add/Mul/Neg/Sub/Div/Pow/Sin + wrapper
 │   ├── utils.py      # 시각화 (fold_dot_graph, plot_dot_graph) + common re-export
-│   └── tests/        # v1 회귀 테스트 (pytest, 105개)
-└── v2/               # ★ step32 브랜칭 — 제 3고지 고차 미분 (step32~36)
-    ├── __init__.py   # re-export + v2 전제 10개 문서화
-    ├── core.py       # grad가 Variable + fill_grad(create_graph) + DerivativeFn
-    ├── functions.py  # derivative가 Variable 취급 + ★Cos 신규 (sin 고차미분용)
-    ├── utils.py      # 시각화 (v2 소유) + common re-export
-    └── tests/        # v2 회귀 테스트 (pytest, 114개 — double backprop 9개 포함)
+│   └── tests/        # v1 회귀 테스트 (pytest, 113개)
+├── v2/               # ★ step32 브랜칭 — 제 3고지 고차 미분 (step32~36)
+│   ├── __init__.py   # re-export + v2 전제 10개 문서화
+│   ├── core.py       # grad가 Variable + fill_grad(create_graph) + DerivativeFn
+│   ├── functions.py  # derivative가 Variable 취급 + ★Cos 신규 (sin 고차미분용)
+│   ├── utils.py      # 시각화 (v2 소유) + common re-export
+│   └── tests/        # v2 회귀 테스트 (pytest, 171개 — double backprop 9개 포함)
+└── v3/               # ★ step37 브랜칭 — 제 4고지 신경망 만들기 (step37~51)
+    ├── __init__.py   # re-export + v3 전제 (텐서 1급 시민) + 3분류 A안 선언
+    ├── core.py       # v2 계승 + backward 뼈대 as_variable 정규화 (step37 버그 수정)
+    ├── functions.py  # v2 계승 + ★Sum 신규 (도함수 ones — 값 참조 shape판)
+    ├── utils.py      # 시각화 (v3 소유) + common re-export
+    └── tests/        # v3 회귀 테스트 (pytest, 184개 — Sum 14개 포함)
 ```
 
-→ **v1 vs v2 선택 가이드 (★ 새 세션 필독)**:
+→ **v1 vs v2 vs v3 선택 가이드 (★ 새 세션 필독)**:
   - `from rezero.v1 import ...` — 1차 미분까지만 필요할 때 (step01~31 재현/참조)
-  - `from rezero.v2 import ...` — 고차 미분(2차+) 필요할 때 (step32+ 작업).
+  - `from rezero.v2 import ...` — 고차 미분(2차+) 필요할 때 (step32~36 스코프).
     grad가 Variable이라 값 접근은 `x.grad.data`
+  - `from rezero.v3 import ...` — ★ step37+ 작업 (텐서·신경망). v2 계승 + 텐서
+    1급 시민 + Sum. 4고지 진행 중 새 함수는 여기에
   - 공통 도구(gradient check)는 어느 쪽이든 `numerical_diff` (common 소유)
-→ `v3/`(4고지+ 신경망)는 미래 폴더 (아직 없음).
 
 ### `rezero` 학습 원칙
 
@@ -731,9 +742,10 @@ uv run python your_script.py
 
 # 단위 테스트 실행
 uv run python -m unittest discover tests            # 원본 dezero 테스트 (unittest)
-uv run pytest rezero/v1/tests/ rezero/v2/tests/     # ★ rezero 전체 (v1+v2 — 랩업 시 언제나 둘 다)
+uv run pytest rezero/v1/tests/ rezero/v2/tests/ rezero/v3/tests/   # ★ rezero 전체 (v1+v2+v3 — 랩업 시 언제나 전부)
 uv run pytest rezero/v1/tests/                       # v1만 (1차 미분 스코프)
 uv run pytest rezero/v2/tests/ -v                    # v2만 (고차 미분 포함, 상세 출력)
+uv run pytest rezero/v3/tests/ -v                    # v3만 (텐서·신경망 스코프, 상세 출력)
 uv run pytest rezero/v2/tests/test_double_backprop.py -v  # step32 본체 (double backprop)
 
 # 새 의존성 추가 (pyproject.toml + uv.lock 자동 갱신)
@@ -791,11 +803,12 @@ tests/         단위 테스트 — 원본
 
 rezero/        ✍️ 학습 노트 — dezero/를 정답지로 삼아 직접 재구현 (자유 수정 가능)
 ├── steps/        step01.py ~ step60.py (학습 흔적, 과거 step 수정 금지)
-└── v1/           ★ 버전 폴더 — 제 1~2고지 (step01~22) 패키지
-    ├── core.py       Variable, Function, Config, fill_grad, as_array, as_variable
-    ├── functions.py  Square/Add/Mul/Neg/Sub/Div/Pow + wrapper 9종
-    ├── utils.py      numerical_diff (gradient check용)
-    └── tests/        v1 회귀 테스트 (pytest, 80개)
+├── common/       버전 공통 순수 함수 (numerical_diff)
+├── v0/           순수 Python 학습 실험실 (NumPy 배제 — 이슈 43 작업 3)
+├── v1/           버전 폴더 — 제 1~2고지 (step01~22). grad가 ndarray
+├── v2/           버전 폴더 — 제 3고지 고차 미분 (step32~36). grad가 Variable
+└── v3/           버전 폴더 — 제 4고지 신경망 (step37~51). 텐서 1급 시민 + Sum
+                 (상세 구조는 위 "rezero/ 디렉터리 구조" 코드블록 참조)
 
 .github/       이슈/PR 템플릿 (Issue Forms + PR 템플릿)
 pyproject.toml uv 프로젝트 명세
@@ -827,7 +840,12 @@ notes/                🧪 보충 탐구 노트 (주제별 개별 파일, 깊이
     grad가 Variable, `fill_grad(y, create_graph=True)`로 double backprop.
     브랜칭 사유: grad ndarray→Variable은 API 호환성이 깨지는 대개편이라
     "고차 미분 전(v1)/후(v2)"를 나란히 보존 — 책의 core_simple/core와 평행.
-  - `rezero/v3/` — (미래) 제 4고지+ (step37~60). 신경망.
+  - `rezero/v3/` — ★ 2026-09-09 탄생 (step37 "텐서를 다루다"). 제 4고지 신경망
+    만들기 (step37~51). v2를 **구조 변경 없이** 계승 — element-wise 중심 구조가
+    텐서(다차원 ndarray)를 무수정 통과함을 확인하고 출범. backward 뼈대에
+    as_variable 정규화 추가 (다차원 ndarray 도함수의 NumPy 우선 버그 수정 —
+    탐구 25 "스칼라 기준" 교정). 모듈 3분류 A안 (이슈 50): functions.py만 두고
+    activations.py(step40) / layers.py(step49)는 등장 시 생성.
   - `rezero/common/` — ★ step32 신설. 버전 공통 순수 함수 (numerical_diff).
     **판별 기준**: "grad 타입/그래프 구조에 의존하는가?" — 무관하면 common,
     의존하면 각 vX 소유 (시각화 등). vX 수정 시 불일치 곪는 것 방지.
@@ -839,6 +857,7 @@ notes/                🧪 보충 탐구 노트 (주제별 개별 파일, 깊이
 | **v0** (순수 Python) | data=float, 루프로 배치 표현 | **"배치 = 독립 스칼라 실험의 묶음"**(노트 34)이 코드로 드러남 — 루프가 데이터축을 보여줌. NumPy 없이도 미분 기계는 완전 동작 |
 | **v1** (NumPy 도입) | data=ndarray, grad=ndarray | **벡터화의 마법** — 배치 3점이 fill_grad **1번 호출**로 (v0에선 루프 3번). 브로드캐스팅으로 스칼라×배열도 자동 |
 | **v2** (고차 미분) | grad=Variable, create_graph | **그래프는 항상 자란다** — 1계 미분 그래프가 새 계산을 낳고, 그게 또 미분 가능. "미분의 미분"이 자연스럽게 됨 |
+| **v3** (텐서·신경망) | 텐서 1급 시민, Sum (도함수 ones) | **브로드캐스팅 = 미분의 shape 복원 장치** — Sum의 ones * upstream이 0-dim을 입력 shape로 자동 확장. 스칼라 시대의 결론(__rmul__로 충분)이 텐서에서 한계 드러낸 첫 사례도 이 step (NumPy 우선 버그 → as_variable 정규화) |
 
 #### 📝 NumPy가 해주는 일 — v0 걷어내기에서 발견한 목록 (2026-09-04)
 
@@ -860,7 +879,7 @@ v0을 만들며 v1에서 무엇을 걷어냈는지 = **NumPy가 대신해주던 
 **★ vX는 "박제가 아니라 살아있는 코드"** (브로 원칙, step32):
   - v1도 이후 수정 가능성 있음 (학습 이해가 깊어지면 개선 반영).
   - `rezero/steps/` 과거 step **파일** 수정 금지와는 별개 규칙.
-  - 단 신중하게 — vX 수정 시 `pytest rezero/v1/tests/ rezero/v2/tests/` 둘 다 통과 확인.
+  - 단 신중하게 — vX 수정 시 `pytest rezero/v1/tests/ rezero/v2/tests/ rezero/v3/tests/` 전부 통과 확인.
 
 **사용법:**
 ```python
@@ -876,19 +895,26 @@ fill_grad(y, create_graph=True)      # 역전파가 그래프를 남김
 gx = x.grad                           # Variable ("2x라는 식")
 x.clear_grad(); fill_grad(gx)         # 2차 미분!
 print(x.grad.data)                    # 2.0
+
+# v3 — 텐서·신경망 스코프 (step37+)
+from rezero.v3 import Variable, fill_grad, sum
+xt = Variable(np.array([[1., 2.], [3., 4.]]))   # 텐서 1급 시민
+y = sum(xt * xt)                                 # 텐서→0-dim 축소
+fill_grad(y, retain_grad=True)
+print(xt.grad.data)                   # [[2. 4.] [6. 8.]] ← 2x
 ```
 
 ### dezero ↔ rezero 구조 대응표 (★ 새 세션 필수 참조)
 
-| dezero (정답지) | rezero v1 | rezero v2 | 비고 |
-|---|---|---|---|
-| `dezero/core_simple.py` | `rezero/v1/core.py` | — | step23~32 학습용 단순 코어 (고차 미분 미지원) |
-| `dezero/core.py` | — | `rezero/v2/core.py` | ★ step33+ 정식 코어 — backward(create_graph) |
-| `dezero/functions.py` | `rezero/v1/functions.py` | `rezero/v2/functions.py` | v2는 derivative가 Variable 취급 + Cos |
-| `dezero/utils.py` | `rezero/v1/utils.py` | `rezero/v2/utils.py` | numerical_diff는 `rezero/common/` 소유 |
-| `dezero/__init__.py` | `rezero/v1/__init__.py` | `rezero/v2/__init__.py` | re-export |
-| `dezero/layers.py` | (v3에서 예정) | (v3에서 예정) | 신경망은 4고지에서 |
-| `dezero/models.py` | (v3에서 예정) | | |
+| dezero (정답지) | rezero v1 | rezero v2 | rezero v3 | 비고 |
+|---|---|---|---|---|
+| `dezero/core_simple.py` | `rezero/v1/core.py` | — | — | step23~32 학습용 단순 코어 (고차 미분 미지원) |
+| `dezero/core.py` | — | `rezero/v2/core.py` | `rezero/v3/core.py` | ★ step33+ 정식 코어 — backward(create_graph). v3는 계승 + as_variable 정규화 |
+| `dezero/functions.py` | `rezero/v1/functions.py` | `rezero/v2/functions.py` | `rezero/v3/functions.py` | v2는 derivative가 Variable 취급 + Cos / v3는 + Sum |
+| `dezero/utils.py` | `rezero/v1/utils.py` | `rezero/v2/utils.py` | `rezero/v3/utils.py` | numerical_diff는 `rezero/common/` 소유 |
+| `dezero/__init__.py` | `rezero/v1/__init__.py` | `rezero/v2/__init__.py` | `rezero/v3/__init__.py` | re-export |
+| `dezero/layers.py` | (미래) | (미래) | (v3 — step49 예정) | 신경망 계층 (3분류 A안: 등장 시 생성) |
+| `dezero/models.py` | (미래) | | (v3 — step51 언저리 예정) | |
 | `dezero/optimizers.py` | (v3에서 예정) | | |
 | `tests/` | `rezero/v1/tests/` | `rezero/v2/tests/` | pytest 스타일 (함수 + assert) |
 
@@ -931,7 +957,7 @@ rezero는 dezero를 그대로 베낀 게 아니라 **학습하며 변형 실험*
 > 참고: `rezero/tests/` (원본 mirror, 전부 `@skip`)는 step23에서 삭제됨.
 > 각 버전 패키지 하위에 실제 테스트를 둠 (`rezero/v1/tests/`, `rezero/v2/tests/`).
 > ★ **rezero 테스트는 pytest로 실행** (국룰, 탐구 17번).
-> - `uv run pytest rezero/v1/tests/ rezero/v2/tests/` → ★ 랩업 시 언제나 v1+v2 둘 다 (step32+)
+> - `uv run pytest rezero/v1/tests/ rezero/v2/tests/ rezero/v3/tests/` → ★ 랩업 시 언제나 v1+v2+v3 전부 (step37+)
 > 브로가 vX 패키지를 구현하며 pytest 스타일(함수 + assert)로 테스트를 채워나감.
 
 ### 2. CuPy / GPU 백엔드 (macOS 미지원)

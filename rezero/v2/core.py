@@ -36,7 +36,9 @@ import numpy as np
 # 반환은 Variable 또는 float 상수 — backward 뼈대에서 upstream과 곱해질 때
 # Variable로 정규화됨 (float * Variable → __rmul__ → Variable).
 # ndarray도 허용 (이슈 45 — Abs 등 '값 참조' 변주, dezero ReLU 관례):
-# 그래프와 무연결인 상수 값으로, 곱해지면 리프 Variable이 된다.
+# 그래프와 무연결인 상수 값. backward 뼈대가 as_variable로 리프 Variable로
+# 정규화해 곱한다 (v3 step37 백포트 — 다차원 ndarray는 NumPy가 element-wise를
+# 이겨버리므로 뼈대가 이 계약을 이행).
 type DerivativeFn = Callable[["Variable"], "Variable | float | np.ndarray"]
 
 
@@ -316,7 +318,13 @@ class Function(ABC):
 
         downstream_grads = []
         for x, df in zip(self.inputs, partials):
-            local_deriv = df(x)  # ★ Variable → Variable (v1: ndarray → ndarray)
+            # ndarray 값 참조(sign 등)도 리프 Variable로 정규화.
+            # ★ v3(step37)에서 발견한 버그의 백포트: 도함수가 **다차원 ndarray**를
+            #   반환하면 ndarray * Variable에서 NumPy가 element-wise를 이겨버려
+            #   object 배열(원소 Variable)로 grad가 오염됨. 리프 Variable화로 방어 —
+            #   "곱해지면 리프 Variable이 된다"는 이슈 45 계약을 뼈대가 이행.
+            #   (v1/v0은 grad가 ndarray/float라 Variable이 곱셈에 없어 무관.)
+            local_deriv = as_variable(df(x))
             downstream_grads.append(local_deriv * upstream_grad)  # Variable 연산
 
         return tuple(downstream_grads)

@@ -218,6 +218,23 @@ class TestAbs:
 
         assert x.grad is None
 
+    def test_matrix_input_grad_not_object_array(self):
+        """★ 다차원 ndarray 도함수(sign) 회귀 — v3 step37 버그의 백포트 검증.
+
+        ndarray * Variable에서 NumPy가 element-wise를 이겨 object 배열로
+        오염되던 버그 (v2 잠복 — 3고지에선 0-dim만이라 미발견).
+        backward 뼈대의 as_variable 정규화가 방어하는지 확인.
+        """
+        data = np.array([[1.0, -2.0], [-3.0, 4.0]])
+        x = Variable(data)
+        fill_grad(rz_abs(x))
+
+        gx = x.grad
+        assert gx is not None and gx.data is not None
+        assert gx.data.shape == (2, 2)
+        assert gx.data.dtype != np.dtype(object)
+        np.testing.assert_array_equal(gx.data, np.sign(data))
+
 
 class TestIdentity:
     """항등함수 — 상수형 도함수 (이슈 45 투어 Stop 1.5, 2026-09-02).

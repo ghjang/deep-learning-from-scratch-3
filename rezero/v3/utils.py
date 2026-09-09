@@ -1,0 +1,832 @@
+"""rezero.v3.utils — 유틸리티 함수.
+
+계산 그래프 시각화 (Graphviz DOT) — 그래프 순회 구조와 결합되어 v3 소유
+(v2에서 step37 브랜칭 시 계승).
+numerical_diff는 버전 공통 순수 수학이라 rezero.common에 상주 (step32).
+"""
+
+import colorsys
+import math
+import os
+import subprocess
+from typing import Literal, cast
+
+import numpy as np
+
+from rezero.common.utils import numerical_diff  # noqa: F401 — 공통 모듈 re-export
+from rezero.v3.core import Function, Variable, backprop, iter_reverse_topo
+
+__all__ = [
+    "derive",
+    "fold_dot_graph",
+    "fold_multi_layer_dot_graph",
+    "numerical_diff",
+    "plot_derivatives",
+    "plot_dot_graph",
+    "plot_multi_layer_graph",
+]
+
+
+# ===== 계산 그래프 시각화 (Graphviz DOT) ========================================
+# step25 — Variable/Function으로 구성된 계산 그래프를 DOT 언어로 인코딩하여
+# Graphviz dot 바이너리로 PNG/PDF 등에 렌더링.
+#
+# 파이프라인:
+#   Variable/Function 인스턴스
+#       ↓ _dot_var / _dot_func    (각 객체 → DOT 노드 문자열)
+#   fold_dot_graph(output)        (역방향 순회하며 DOT 텍스트 합성 = fold)
+#       ↓
+#   "digraph g { ... }"           (완성된 DOT 텍스트)
+#       ↓ plot_dot_graph          (파일 쓰기 + dot 명령 → PNG 렌더링)
+#   goldstein.png
+#
+# ★ fold_dot_graph의 순회 패턴(worklist + visited)은 fill_grad와 거의 동일.
+#   공통화 리팩터 후보 → 이슈 32번 (step25 이후 회수).
+def _format_value(v: float, fmt: "str | None" = None) -> str:
+    """show_value용 값 포맷팅 — 디버깅 관점 설계.
+
+    기본(fmt=None): 적응형 — 사람이 읽기 좋은 범위(1e-4 ≤ |v| < 1e5)는
+    고정 소수점 4자리 (trailing 0 제거), 밖은 지수 표기 2자리.
+    작은 값을 강제 고정 소수점하면 0.0000으로 죽어버려 정보 손실 → 지수로 보존.
+
+    NaN/inf는 명시적 표기 — 디버깅 시 역전파 어디서 터졌는지 추적하는 단서.
+
+    Args:
+        v: 포맷팅할 값.
+        fmt: 커스텀 포맷 스펙 (f-string format spec. 예: '.2f', '.6e', '.3g').
+            None이면 적응형 기본.
+    """
+    if fmt is not None:
+        return f'{v:{fmt}}'
+
+    if math.isnan(v):
+        return 'nan'
+    if math.isinf(v):
+        return 'inf'
+    if v == 0:
+        return '0'
+
+    # 적응형: 읽기 좋은 범위는 고정 소수점, 밖은 지수
+    if 1e-4 <= abs(v) < 1e5:
+        return f'{v:.4f}'.rstrip('0').rstrip('.')
+    return f'{v:.2e}'
+
+
+def _format_data(
+    data: np.ndarray,
+    fmt: "str | None" = None,
+    max_items: int = 4,
+    show_array: bool = True,
+) -> str:
+    """노드 라벨용 데이터 포맷팅 — 스칼라는 값 그대로, 배열은 show_array에 따라.
+
+    책 관례(dezero)는 배열 값을 표시하지 않고 shape/dtype만(verbose) 보이지만,
+    rezero의 show_value 옵션은 "값을 보여준다"는 계약이므로 배열도 성실히 이행 —
+    show_array=True(기본): 앞 max_items개 원소 (적응형 포맷 재사용) + shape.
+    show_array=False: 배열은 값 없이 shape만 (책 관례에 가까운 절제 모드).
+    """
+    if data.ndim == 0:
+        return _format_value(float(data), fmt)
+
+    if not show_array:
+        return f'{data.shape}'
+
+    flat = data.ravel()
+    shown = [_format_value(float(u), fmt) for u in flat[:max_items]]
+    suffix = ', ...' if flat.size > max_items else ''
+    return f'[{", ".join(shown)}{suffix}] {data.shape}'
+
+
+def _dot_var(
+    v: Variable,
+    verbose: bool = False,
+    show_value: bool = False,
+    value_format: "str | None" = None,
+    array_show_value: bool = True,
+) -> str:
+    """Variable을 DOT 노드 문자열로 인코딩 (주황색 원).
+
+    변수명은 볼드로 강조 (DOT HTML-like label 사용) → 그래프에서 변수 위치를
+    한눈에 파악하기 쉽게. 값/shape/dtype은 보통 텍스트.
+
+    Args:
+        v: 시각화할 Variable.
+        verbose: True면 라벨에 shape/dtype 추가 (정적 정보, 텐서 시대(v2+)에서 빛을 발).
+        show_value: True면 라벨에 값 추가 (동적 정보, 디버깅용).
+            스칼라는 값 그대로, 배열은 array_show_value에 따라 요약/shape.
+            verbose와 독립 — 정적 구조 정보와 동적 상태 정보는 관심사 분리.
+        array_show_value: show_value=True일 때 배열 값을 표시할지.
+            True(기본) — 앞 4개 요약 + shape / False — shape만 (책 관례 절제 모드).
+        value_format: 값 포맷 스펙 (None이면 적응형 기본). 상세는 _format_value.
+    """
+    parts: list[str] = []
+
+    # 변수명 — 볼드 강조 (그래프에서 변수 위치를 시각적 앵커로)
+    if v.name:
+        parts.append(f'<B>{v.name}</B>')
+
+    # shape/dtype (정적 정보) — 변수명 뒤면 ": "로 연결
+    if verbose and v.data is not None:
+        info = f'{v.shape} {v.dtype}'
+        parts.append(f': {info}' if v.name else info)
+
+    # 값 (동적 정보) — 변수명(또는 info) 뒤면 " = "로 연결
+    if show_value and v.data is not None:
+        value = _format_data(v.data, value_format, show_array=array_show_value)
+        parts.append(f' = {value}' if len(parts) > 0 else value)
+
+    # HTML-like label: '<...>' 로 감싸면 Graphviz가 HTML 해석.
+    # parts가 비어있으면 빈 라벨. 변수명/info/값은 구분자 포함해 바로 이어붙이기.
+    label = ''.join(parts)
+    return f'{id(v)} [label=<{label}>, color=orange, style=filled]\n'
+
+
+def _dot_func(f: Function, verbose: bool = False, show_value: bool = False) -> str:
+    """Function을 DOT 노드 문자열로 인코딩 (파란 박스) + 입력/출력 간선.
+
+    라벨은 f.dot_label(show_param) 훅 — 기본은 클래스명(구조만, 책 방식).
+    파라미터 표시 조건: verbose(정적 상세) **또는** show_value(값의 해석 맥락 —
+    값 추적 시 Pow의 c가 있어야 어떤 항의 값인지 해석 가능).
+    v1은 단출력(스칼라) 가정이므로 f.output은 weakref.ref 단수.
+    """
+    assert f.inputs is not None, "f.inputs must be set"
+    assert f.output is not None, "f.output must be set"
+
+    show_param = verbose or show_value
+    ret = f'{id(f)} [label="{f.dot_label(show_param)}", color=lightblue, style=filled, shape=box]\n'
+
+    # 입력 간선: 각 input Variable → 이 Function
+    dot_edge = '{} -> {}\n'
+    for x in f.inputs:
+        ret += dot_edge.format(id(x), id(f))
+
+    # 출력 간선: 이 Function → output Variable (weakref 역참조)
+    output = f.output()
+    if output is not None:
+        ret += dot_edge.format(id(f), id(output))
+
+    return ret
+
+
+def _iter_graph_vars(output: Variable) -> list[Variable]:
+    """그래프 전체 순회로 등장하는 Variable 목록 (id 중복 제거)."""
+    vars_by_id: dict[int, Variable] = {}
+    for func in iter_reverse_topo(output):
+        for x in func.inputs or []:
+            vars_by_id.setdefault(id(x), x)
+        if func.output is not None:
+            o = func.output()
+            if o is not None:
+                vars_by_id.setdefault(id(o), o)
+    return list(vars_by_id.values())
+
+
+def _collect_seed_info(layers: list[Variable]) -> "tuple[dict[int, str], dict[int, str]]":
+    """계별 seed 식별 → (id→테두리색, id→표시 라벨) 맵 (last 모드용, 브로 요청).
+
+    각 계 그래프를 순회하며 "처음 보는 seed"를 그 계의 씨앗으로 기록 (seen 추적).
+    색: k=1 gold (기본 모양 고정), k≥2 황금각 팔레트 — all 모드와 일관.
+    라벨: seed1/seed2/... — last는 층 구분이 없어 이름으로 계를 보여줌.
+    """
+    seen: set[int] = set()
+    colors: dict[int, str] = {}
+    labels: dict[int, str] = {}
+    for k, layer in enumerate(layers[1:], start=1):
+        for v in _iter_graph_vars(layer):
+            vid = id(v)
+            if v.name == 'seed' and vid not in seen:
+                colors[vid] = 'gold' if k == 1 else _seed_border_color(k)
+                labels[vid] = f'seed{k}'
+                seen.add(vid)
+
+    # 씨앗이 1개뿐이면 번호는 정보가 아니라 노이즈 — 라벨은 2개 이상일 때만
+    if len(labels) < 2:
+        labels = {}
+    return colors, labels
+
+
+def fold_dot_graph(
+    output: Variable,
+    verbose: bool = True,
+    show_value: bool = False,
+    value_format: "str | None" = None,
+    array_show_value: bool = True,
+    seed_colors: "dict[int, str] | None" = None,
+    seed_labels: "dict[int, str] | None" = None,
+) -> str:
+    """output에서 역방향으로 그래프를 순회하며 DOT 텍스트를 합성(fold).
+
+    순회 알고리즘은 fill_grad와 공유 (iter_reverse_topo 제너레이터).
+    이 함수는 순회하며 DOT 텍스트를 누적하는 시각화 로직만 담당 (관심사 분리).
+
+    Args:
+        output: 그래프의 최종 출력 Variable (순회 시작점).
+        verbose: True면 Variable 노드에 shape/dtype 추가 (정적 정보).
+        show_value: True면 Variable 노드에 값 추가 (동적 정보, 디버깅용).
+        value_format: 값 포맷 스펙 (None이면 적응형 기본). 상세는 _format_value.
+        array_show_value: show_value=True일 때 배열 값 표시 (True=요약 / False=shape만).
+        seed_colors: id(Variable)→테두리색 맵 — name='seed' 노드에 골드 채움 +
+            지정 테두리 적용 (last 모드의 계층 구분 — plot_derivatives가 전달).
+        seed_labels: id(Variable)→표시 라벨 맵 — seed 노드 이름을 seed1/seed2/...
+            로 표시 (last 모드 — 층 구분이 없어 이름으로 계 표시, 브로 요청).
+
+    Returns:
+        완성된 DOT 텍스트 ("digraph g { ... }").
+    """
+
+    def _emit_var(v: Variable) -> str:
+        node = _dot_var(v, verbose, show_value, value_format, array_show_value)
+        if v.name == 'seed' and seed_colors and id(v) in seed_colors:
+            node = node.replace(
+                'color=orange, style=filled',
+                f'fillcolor=gold, color="{seed_colors[id(v)]}", style=filled, penwidth=2',
+            )
+            if seed_labels and id(v) in seed_labels:
+                node = node.replace('<B>seed</B>', f'<B>{seed_labels[id(v)]}</B>')
+        return node
+
+    # output 노드는 순회 시작 전 먼저 찍기 (iter_reverse_topo가 yield하는 건 Function뿐)
+    txt = _emit_var(output)
+
+    # 역방향 순회하며 각 Function + inputs를 DOT 텍스트로 누적
+    for func in iter_reverse_topo(output):
+        assert func.inputs is not None, "func.inputs must be set"
+        assert func.output is not None, "func.output must be set"
+        txt += _dot_func(func, verbose, show_value)
+        for x in func.inputs:
+            txt += _emit_var(x)
+
+    return f'digraph g {{\n{txt}}}'
+
+
+# ===== 다층 계산 그래프 시각화 (이슈 45) =========================================
+# 여러 시작 Variable의 그래프를 한 장에 병합 — 층별 cluster + 공유 노드 복제+점선.
+#
+# 핵심 착안: fold_dot_graph의 노드 id가 Python 객체 id이므로,
+# 여러 그래프에서 같은 객체가 나타나면 자동으로 같은 id → "공유"가 즉시 가시화됨.
+#
+# ★ 브로 원안 (2026-08-31): 공유 변수는 **원본을 원층 cluster 안에 두고**,
+# 다른 층에는 **복제 노드**를 배치한 뒤 원본을 **점선 화살표**로 가리키게 함.
+# 각 층이 그래프의 완결성을 유지하면서 변수 재사용이 명시적으로 보임.
+#
+# 파이프라인:
+#   [Variable, Variable, ...]     (예: [y, x.grad] — 1계 미분 + 2계 미분)
+#       ↓ 각 층별 역순회
+#   노드별 소속 층 기록           (id → {0, 1, ...})
+#       ↓ 분류
+#   소속 1개 → 해당 층 cluster 안
+#   소속 2개+ → 원본은 첫 층 cluster 안 / 복제는 이후 층 cluster 안 + 점선 → 원본
+#       ↓ DOT 조립
+
+
+def _is_seed(v: Variable) -> bool:
+    """역전파 씨앗 판별 — fill_grad가 name='seed'로 이름을 부여함.
+
+    값이 1이라고 전부 씨앗이 아님 (chain rule 상수 1과 구분).
+    """
+    return v.name == "seed"
+
+
+def _dot_var_node(
+    v: Variable,
+    verbose: bool = False,
+    show_value: bool = False,
+    value_format: "str | None" = None,
+    is_seed: bool = False,
+    array_show_value: bool = True,
+) -> str:
+    """Variable을 DOT 노드 정의만으로 인코딩 (간선 제외).
+    is_seed=True면 금색으로 구분 (역전파 시작 씨앗)."""
+    base = _dot_var(v, verbose, show_value, value_format, array_show_value)
+    if is_seed:
+        # 씨앗: gold 배경 + 별도 표시 — "이 1이 역전파를 시작했다"
+        base = base.replace(
+            'color=orange, style=filled',
+            'color=gold, style=filled, penwidth=2'
+        )
+    return base
+
+
+def _dot_func_node(f: Function, verbose: bool = False, show_value: bool = False) -> str:
+    """Function을 DOT 노드 정의만으로 인코딩 (간선 제외, _dot_func의 첫 줄)."""
+    show_param = verbose or show_value
+    return f'{id(f)} [label="{f.dot_label(show_param)}", color=lightblue, style=filled, shape=box]\n'
+
+
+def _apply_hessian_badge(
+    node_dot: str,
+    vid: int,
+    hessian_index: "dict[int, tuple[int, int]]",
+    vars_by_id: "dict[int, Variable]",
+) -> str:
+    """노드 DOT 라벨에 Hessian 인덱스 배지 추가 — "x.grad" → "x.grad (0,1)".
+
+    이름이 있는 성분에만 적용 (무명 노드엔 붙이지 않음 — 해석 불가하므로).
+    """
+    idx = hessian_index.get(vid)
+    v = vars_by_id.get(vid)
+    if idx is None or v is None or not v.name:
+        return node_dot
+
+    return node_dot.replace(
+        f'<B>{v.name}</B>', f'<B>{v.name}</B> ({idx[0]},{idx[1]})', 1
+    )
+
+
+def _normalize_layers(
+    start_vars: "list[Variable | list[Variable] | list[list[Variable | None]]]",
+) -> list[list[list[Variable]]]:
+    """각 층을 서브그룹 목록 list[list[Variable]]로 정규화.
+
+    층 표현 3종 (서브그룹핑 — 브로 아이디어, 이슈 45):
+      Variable             → 서브그룹 1개 (하위 박스는 생략 — 1개뿐이니 그릴 필요 없음)
+      list[Variable]       → 각 Variable이 서브그룹 1개씩 (자동 서브그룹핑 —
+                             "층에 넘긴 리스트의 각 Variable = 서브그룹 1개" 규칙)
+      list[list[Variable]] → 각 내부 리스트가 서브그룹 (2계 Hessian 행별 묶음 —
+                             [[hxx, hyx], [hxy, hyy]] → x행 박스 + y행 박스)
+    """
+    assert len(start_vars) >= 2, "다층 시각화는 시작점 2개 이상 필요"
+
+    layers: list[list[list[Variable]]] = []
+    for item in start_vars:
+        if isinstance(item, Variable):
+            layers.append([[item]])
+        elif all(isinstance(v, Variable) for v in cast("list[Variable | list[Variable] | list[Variable | None]]", item)):
+            assert item, "빈 층(list)은 전달할 수 없음"
+            # all(isinstance)는 타입 가드가 아니므로 cast로 정적 분석과 화해
+            flat = cast("list[Variable]", item)
+            layers.append([[v] for v in flat])
+        else:
+            # None은 자리표시자 — Hessian의 미계산 성분(그래프 단절). 자리(인덱스)는
+            # 유지하되 그래프에는 포함하지 않음 (브로 요청: 인덱스 정확성 우선).
+            groups: list[list[Variable]] = []
+            for row in cast("list[list[Variable | None]]", item):
+                valid = [v for v in row if v is not None]
+                assert valid, "각 행에는 최소 1개의 Variable 필요 (None만의 행 불가)"
+                assert all(isinstance(v, Variable) for v in valid), \
+                    "list[list[Variable | None]] 형태여야 함"
+                groups.append(valid)
+            layers.append(groups)
+
+    return layers
+
+
+def _ordinal(n: int) -> str:
+    """서수 접미사 — 1st/2nd/3rd/4th... (11~13은 th). 층 라벨용."""
+    if 11 <= n % 100 <= 13:
+        suffix = 'th'
+    else:
+        suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')
+    return f'{n}{suffix}'
+
+
+def _seed_border_color(layer_idx: int) -> str:
+    """seed 테두리 팔레트 — 계층별 황금각 hue 순회 (브로 아이디어, 2026-09-03).
+
+    채움은 gold 고정, 테두리색만 k·137.5° 순회 — 인접 계끼리 색이 최대한 멀어져
+    몇 계까지든 구분 가능. 헥스는 따옴표로 감싸야 함 (DOT '#' 주석 함정).
+    """
+    hue = (layer_idx * 137.508) % 360 / 360
+    r, g, b = colorsys.hls_to_rgb(hue, 0.42, 0.85)
+    return f'#{round(r * 255):02X}{round(g * 255):02X}{round(b * 255):02X}'
+
+
+def fold_multi_layer_dot_graph(
+    start_vars: "list[Variable | list[Variable] | list[list[Variable | None]]]",
+    verbose: bool = True,
+    show_value: bool = False,
+    value_format: "str | None" = None,
+    layer_names: "list[str] | None" = None,
+    array_show_value: bool = True,
+    show_labels: bool = True,
+    seed_border: bool = False,
+) -> str:
+    """여러 시작 Variable의 계산 그래프를 층별 cluster + 층 내 서브그룹으로 병합.
+
+    ★ 무복제 원칙: 각 노드는 전체 그래프에 딱 1번만 등장.
+    ★ 다변수 지원 (브로 발견, 2026-08-31): 한 층에 여러 Variable을 리스트로
+      전달 가능 — 다변수 함수의 역전파는 입력 변수 수만큼 그래디언트 그래프를
+      만들므로, 같은 층에 전부 포함해야 정확한 시각화.
+    ★ 층 내 서브그룹핑 (브로 아이디어, 2026-09-02): 다변수 층의 그래프는
+      그래디언트 성분별(1계)·Hessian 행별(2계)로 여러 덩어리가 섞여 보임 →
+      Graphviz 중첩 cluster로 구분. 서브그룹 2개 이상에 소속된 노드
+      (seed 등 공통 재료)는 서브그룹 밖 층 최상위에 배치해 '공유'임을 시각화.
+
+    Args:
+        start_vars: 각 층의 시작점. 3종 (상세는 _normalize_layers).
+            단변수: [y, gx, gx2] (기존 방식 그대로 — 하위 박스 없음)
+            다변수 자동: [z, [gx, gy]] — cluster_1 안에 gx박스 + gy박스
+            Hessian 행별: [z, [gx, gy], [[hxx, hyx], [hxy, hyy]]]
+            (None 자리표시자 허용 — [[hxx, None], [None, hyy]]처럼 미계산 성분을
+             빈 칸으로 두면 인덱스가 정확히 유지됨)
+        verbose: True면 Variable 노드에 shape/dtype 추가 (노드 정적 정보 — 책 관례).
+        show_value: True면 Variable 노드에 값 추가.
+        value_format: 값 포맷 스펙 (None이면 적응형 기본).
+        layer_names: 각 층의 표시 이름 (주면 자동 라벨 대신 사용).
+        array_show_value: show_value=True일 때 배열 값 표시 (True=요약 / False=shape만).
+        show_labels: True(기본)면 층 라벨 표시 — verbose와 독립인 별도 축.
+            layer_names 우선, 없으면 자동: <forward> / <1st backward> / <2nd backward> ...
+        seed_border: True면 seed 노드 테두리색을 계층별 팔레트로 (브로 아이디어) —
+            채움은 gold 고정, 테두리만 k·137.5° 황금각 hue 순회. all(다층) 모드
+            전용 — seed의 primary 층이 곧 그 씨앗의 계라 정확 매핑.
+
+    Returns:
+        완성된 DOT 텍스트.
+    """
+    layers = _normalize_layers(start_vars)
+
+    # Hessian 인덱스 배지 (브로 아이디어, 2026-09-04) — 3단 중첩(층-행-성분) 층의
+    # 성분에 행렬 인덱스 (i, j)를 라벨에 자동 부여: "x.grad (0,1)" = H[0][1].
+    # 이름 규칙(x.grad)은 유지 + 인덱스만 추가 (유니코드 수학 기호 대신 좌표로).
+    # 관례: 행 우선 [[hxx, hyx], [hxy, hyy]] — 인덱스 정확성은 호출자의 순서 책임.
+    hessian_index: dict[int, tuple[int, int]] = {}
+    for layer_pos, item in enumerate(start_vars):
+        if layer_pos < 2:
+            continue  # 배지는 2계 이상 층만 — 1계의 [[gx],[gy]] 서브그룹 표기와 충돌 방지
+        if isinstance(item, Variable) or all(isinstance(v, Variable) for v in item):
+            continue  # Variable / 평면 리스트 — 해당 없음 (3단 중첩만)
+        for i, row in enumerate(cast("list[list[Variable | None]]", item)):
+            for j, v in enumerate(row):
+                if v is None:
+                    continue  # 자리표시자 — 인덱스 j는 유지
+                hessian_index[id(v)] = (i, j)
+
+    # ① 층별·서브그룹별 역순회 → 노드별 소속 (층 × 서브그룹) + 객체 + 간선 수집
+    var_groups: dict[int, dict[int, set[int]]] = {}   # vid → {층 idx: {서브그룹 idx}}
+    func_groups: dict[int, dict[int, set[int]]] = {}  # fid → {층 idx: {서브그룹 idx}}
+    vars_by_id: dict[int, Variable] = {}
+    funcs_by_id: dict[int, Function] = {}
+    edges: set[tuple[int, int]] = set()
+
+    def register_var(v: Variable, layer_idx: int, group_idx: int) -> None:
+        vid = id(v)
+        var_groups.setdefault(vid, {}).setdefault(layer_idx, set()).add(group_idx)
+        vars_by_id[vid] = v
+
+    for layer_idx, groups in enumerate(layers):
+        for group_idx, group in enumerate(groups):
+            for start_var in group:
+                register_var(start_var, layer_idx, group_idx)
+
+                for func in iter_reverse_topo(start_var):
+                    fid = id(func)
+                    func_groups.setdefault(fid, {}).setdefault(layer_idx, set()).add(group_idx)
+                    funcs_by_id[fid] = func
+
+                    output = func.output() if func.output else None
+                    if output is not None:
+                        register_var(output, layer_idx, group_idx)
+                        edges.add((fid, id(output)))
+
+                    if func.inputs:
+                        for x in func.inputs:
+                            register_var(x, layer_idx, group_idx)
+                            edges.add((id(x), fid))
+
+    # ② 배치 결정 — primary = 처음 등장한 층. 그 층에서의 소속 서브그룹이
+    #    정확히 1개면 그 서브그룹 박스로, 2개 이상이면(공유 재료) 층 최상위로.
+    var_cell: dict[int, tuple[int, int | None]] = {}   # vid → (층, 서브그룹 or None)
+    func_cell: dict[int, tuple[int, int | None]] = {}
+
+    for vid, groups_by_layer in var_groups.items():
+        primary = min(groups_by_layer)
+        members = groups_by_layer[primary]
+        var_cell[vid] = (primary, next(iter(members)) if len(members) == 1 else None)
+
+    for fid, groups_by_layer in func_groups.items():
+        primary = min(groups_by_layer)
+        members = groups_by_layer[primary]
+        func_cell[fid] = (primary, next(iter(members)) if len(members) == 1 else None)
+
+    # ③ DOT 조립 — 각 노드는 자기 배치(primary 층)에 딱 1번 (무복제).
+    lines: list[str] = []
+
+    for layer_idx in range(len(layers)):
+        draw_subgroups = len(layers[layer_idx]) > 1
+
+        lines.append(f'subgraph cluster_{layer_idx} {{\n')
+        lines.append('  style = rounded;\n')
+        lines.append('  color = lightgray;\n')
+        if show_labels and draw_subgroups:
+            # 라벨과 서브그룹 박스(자식 cluster) 사이 여백 — 라벨이 자식 박스에
+            # 겹쳐 "서브그룹 라벨"처럼 보이는 것 방지 (브로 지적, 2026-09-02)
+            lines.append('  margin = 16;\n')
+
+        # 층 라벨 — 내부 중앙 상단 (labeljust="c" + labelloc 기본 "t").
+        # show_labels 독립 옵션 (verbose=shape/dtype와 분리 — 브로 결정):
+        # layer_names 우선, 없으면 <forward> / <1st backward> ... 자동 (서수+앵글 브래킷).
+        if show_labels:
+            label = (
+                layer_names[layer_idx] if layer_names
+                else ('forward' if layer_idx == 0 else f'{_ordinal(layer_idx)} backward')
+            )
+            lines.append('  labeljust = c;\n')
+            lines.append(f'  label = "< {label} >";\n')
+
+        # 이 층에 표시할 노드 — primary가 이 층인 것만 (무복제).
+        # 배치: 그 층에서의 소속 서브그룹 (단일 그룹이면 그 박스, 복수면 층 최상위).
+        var_entries: list[tuple[int, "int | None"]] = []
+        for vid, gbl in var_groups.items():
+            if layer_idx not in gbl or min(gbl) != layer_idx:
+                continue
+            members = gbl[layer_idx]
+            group_at = next(iter(members)) if len(members) == 1 else None
+            var_entries.append((vid, group_at))
+
+        func_entries: list[tuple[int, "int | None"]] = []
+        for fid, gbl in func_groups.items():
+            if layer_idx not in gbl or min(gbl) != layer_idx:
+                continue
+            members = gbl[layer_idx]
+            group_at = next(iter(members)) if len(members) == 1 else None
+            func_entries.append((fid, group_at))
+
+        # (a) 층 최상위 — 공유 재료(서브그룹 2개 이상 소속) + 서브그룹 없는 층 전체
+        for vid, g in var_entries:
+            if g is None or not draw_subgroups:
+                is_seed = layer_idx > 0 and _is_seed(vars_by_id[vid])
+                node = _dot_var_node(vars_by_id[vid], verbose, show_value, value_format, is_seed=is_seed, array_show_value=array_show_value)
+                node = _apply_hessian_badge(node, vid, hessian_index, vars_by_id)
+                if seed_border and is_seed and layer_idx > 1:
+                    # 1계 씨앗은 기본 gold 그대로 — 1계 미분이 대다수인 용도와의
+                    # 일관성 (브로 요청). 팔레트는 2계부터.
+                    node = node.replace(
+                        'color=gold, style=filled, penwidth=2',
+                        f'fillcolor=gold, color="{_seed_border_color(layer_idx)}", style=filled, penwidth=2',
+                    )
+                lines.append('  ' + node)
+
+        for fid, g in func_entries:
+            if g is None or not draw_subgroups:
+                lines.append('  ' + _dot_func_node(funcs_by_id[fid], verbose, show_value))
+
+        # (b) 서브그룹 박스 — 각 그래디언트 성분/Hessian 행을 중첩 cluster로 구분.
+        #     라벨은 없음 — 박스 안 노드들이 이미 무엇인지 보여주므로 (브로 취향).
+        if draw_subgroups:
+            for group_idx in range(len(layers[layer_idx])):
+                lines.append(f'  subgraph cluster_{layer_idx}_{group_idx} {{\n')
+                lines.append('    style = rounded;\n')
+                lines.append('    color = gray62;\n')
+                # 빈 라벨 명시 — 부모 라벨이 자식 박스 위에 반복 렌더링되는
+                # Graphviz 중첩 cluster 증상 차단 (브로 발견: backward 3회 등장)
+                lines.append('    label = "";\n')
+
+                for vid, g in var_entries:
+                    if g == group_idx:
+                        is_seed = layer_idx > 0 and _is_seed(vars_by_id[vid])
+                        node = _dot_var_node(vars_by_id[vid], verbose, show_value, value_format, is_seed=is_seed, array_show_value=array_show_value)
+                        node = _apply_hessian_badge(node, vid, hessian_index, vars_by_id)
+                        if seed_border and is_seed and layer_idx > 1:
+                            node = node.replace(
+                                'color=gold, style=filled, penwidth=2',
+                                f'fillcolor=gold, color="{_seed_border_color(layer_idx)}", style=filled, penwidth=2',
+                            )
+                        lines.append('    ' + node)
+
+                for fid, g in func_entries:
+                    if g == group_idx:
+                        lines.append('    ' + _dot_func_node(funcs_by_id[fid], verbose, show_value))
+
+                lines.append('  }\n')
+
+        lines.append('}\n')
+
+    # 간선 — 실제 객체 id로 직결. 배치가 다른 박스(층 or 서브그룹)에 걸치면 점선.
+    # (공유 노드 ↔ 서브그룹 연결은 같은 층 안이면 실선 — "공유 재료에서 흐름" 표현)
+    cell = {**var_cell, **func_cell}
+    for from_id, to_id in sorted(edges):
+        l_from, g_from = cell[from_id]
+        l_to, g_to = cell[to_id]
+        crosses_boundary = (l_from != l_to) or (
+            g_from is not None and g_to is not None and g_from != g_to
+        )
+
+        if crosses_boundary:
+            lines.append(f'{from_id} -> {to_id} [style=dashed, color=dimgray]\n')
+        else:
+            lines.append(f'{from_id} -> {to_id}\n')
+
+    return f'digraph g {{\n{"".join(lines)}}}'
+
+
+def plot_multi_layer_graph(
+    start_vars: "list[Variable | list[Variable] | list[list[Variable | None]]]",
+    verbose: bool = True,
+    show_value: bool = False,
+    value_format: "str | None" = None,
+    layer_names: "list[str] | None" = None,
+    to_file: str = 'output/multi_layer.png',
+    array_show_value: bool = True,
+    show_labels: bool = True,
+    seed_border: bool = False,
+) -> str:
+    """다층 계산 그래프를 DOT로 인코딩하여 Graphviz로 렌더링, 파일로 저장.
+
+    Args:
+        start_vars: 각 층의 시작점. 3종 (상세는 fold_multi_layer_dot_graph).
+            단변수: [y, gx, gx2] / 다변수 자동: [z, [gx, gy]] /
+            Hessian 행별: [z, [gx, gy], [[hxx, hyx], [hxy, hyy]]]
+            (None 자리표시자 허용 — [[hxx, None], [None, hyy]]처럼 미계산 성분을
+             빈 칸으로 두면 인덱스가 정확히 유지됨)
+        verbose: True면 Variable 노드에 shape/dtype 추가 (노드 정적 정보).
+        show_value: True면 Variable 노드에 값 추가.
+        value_format: 값 포맷 스펙 (None이면 적응형 기본).
+        layer_names: 각 층의 표시 이름 (주면 자동 라벨 대신 사용).
+        to_file: 출력 파일 경로 (확장자가 렌더링 포맷 결정).
+        array_show_value: show_value=True일 때 배열 값 표시 (True=요약 / False=shape만).
+        show_labels: True(기본)면 층 라벨 — < forward > / < 1st backward > ... 자동.
+        seed_border: True면 seed 테두리 계층별 팔레트 (브로 아이디어).
+
+    Returns:
+        저장된 파일 경로.
+    """
+    dot_graph = fold_multi_layer_dot_graph(
+        start_vars, verbose, show_value, value_format, layer_names,
+        array_show_value, show_labels, seed_border
+    )
+
+    return _render_dot(dot_graph, to_file)
+
+
+# Graphviz dot이 지원하는 렌더링 포맷 (학습/디버깅 용도로 자주 쓰는 3종).
+# 이 외에도 jpg, gif, ps 등 수십 개 있지만, rezero 범위에선 이 3개면 충분.
+# 용도: png(범용/문서), svg(벡터/VSCode에서 까보기 좋음), pdf(인쇄/발표).
+SUPPORTED_FORMATS: frozenset[str] = frozenset({'png', 'svg', 'pdf'})
+
+
+def _render_dot(dot_graph: str, to_file: str) -> str:
+    """DOT 텍스트를 Graphviz로 렌더링해 파일로 저장 — plot 계열 공통 파이프라인.
+
+    to_file 확장자가 렌더링 포맷 결정. DOT 소스(.dot)도 산출물로 함께 저장
+    (브로가 까볼 수 있도록 — step25 관례).
+    """
+    extension = os.path.splitext(to_file)[1][1:]  # e.g. 'png', 'svg'
+    if extension not in SUPPORTED_FORMATS:
+        raise ValueError(
+            f"지원하지 않는 포맷: '.{extension}'. "
+            f"지원 포맷: {sorted(SUPPORTED_FORMATS)} (png/svg/pdf)"
+        )
+
+    # 산출물 디렉터리 보장 — to_file이 'output/foo.png'면 같은 폴더에 DOT도 저장
+    out_dir = os.path.dirname(to_file) or '.'
+    os.makedirs(out_dir, exist_ok=True)
+
+    dot_path = os.path.splitext(to_file)[0] + '.dot'
+    with open(dot_path, 'w') as f:
+        f.write(dot_graph)
+
+    # dot 바이너리로 렌더링 (확장자 → 포맷). shell=False + check=True로 안전하게.
+    subprocess.run(
+        ['dot', dot_path, '-T', extension, '-o', to_file],
+        check=True,
+    )
+
+    return to_file
+
+
+# ===== 미분 투어 도우미 (이슈 52) ===============================================
+# 투어 스크립트마다 반복되던 "미분 루프 + plot 호출"의 공통화.
+# derive = 값/그래프 계산 (렌더링 무의존 — 테스트 가능), plot_derivatives = 출력 위임.
+def derive(y: Variable, x: Variable, order: int = 1) -> list[Variable]:
+    """y를 x로 order계까지 미분한 Variable 목록 [y, g1, ..., g_order] 반환.
+
+    매 계마다 x.clear_grad() 후 backprop(create_graph=True) — 이슈 45 투어에서
+    검증된 패턴. 중간에 그래프가 단절되면 (값 참조 도함수 — abs/identity류)
+    그 지점에서 RuntimeError (몇 계째에 끊겼는지 메시지에 포함).
+    """
+    assert order >= 1, "order는 1 이상"
+
+    result = [y]
+    current = y
+    for k in range(order):
+        x.clear_grad()
+        backprop(current, create_graph=True)
+
+        g = x.grad
+        if g is None:
+            raise RuntimeError(
+                f"{k + 1}계 미분 실패 — 그래프 단절 "
+                f"(값 참조 도함수? abs/identity류는 1계까지만 가능)"
+            )
+
+        result.append(g)
+        current = g
+
+    return result
+
+
+def plot_derivatives(
+    y: Variable,
+    x: Variable,
+    order: int = 4,
+    mode: Literal['all', 'last'] = 'all',
+    verbose: bool = True,
+    show_value: bool = False,
+    value_format: "str | None" = None,
+    layer_names: "list[str] | None" = None,
+    to_file: str = 'output/derivatives.png',
+    array_show_value: bool = True,
+    show_labels: bool = True,
+    seed_border: bool = False,
+) -> str:
+    """y를 x로 order계까지 미분하고 계산 그래프를 출력 (이슈 52 도우미).
+
+    Args:
+        y: 순전파 출력 Variable (미분 출발점).
+        x: 미분 대상 변수 (단변수 — 다변수는 서브그룹 구조가 있어 수동 유지).
+        order: 몇 계까지 미분.
+        mode: 'all' (기본) — [y, g1, ..., gk] 다층 한 장 (plot_multi_layer_graph).
+            'last' — 마지막 k계 미분식의 그래프만 단일 (plot_dot_graph —
+            고차 폭주로 전체 층이 과할 때). Literal 타입 — 정적 검사가
+            오타를 호출 시점에 잡음 (동적 값은 런타임 ValueError가 방어).
+        verbose / show_value / value_format / layer_names / array_show_value /
+            show_labels / to_file: 위임 대상 plot 함수으로 패스스루.
+        seed_border: seed 테두리 계층별 팔레트 (브로 아이디어) — 양 모두 지원.
+            all: primary 층 = 씨앗의 계. last: derive 이력으로 계별 식별
+            (k=1 gold 고정, k≥2 황금각 팔레트) + 라벨 seed1/seed2/... 표시
+            (층 구분이 없는 last에선 이름으로 계를 보여줌).
+
+    Returns:
+        저장된 파일 경로.
+
+    Raises:
+        RuntimeError: 중간 계에서 그래프 단결 (derive).
+        ValueError: mode가 'all'/'last'가 아님.
+    """
+    layers = derive(y, x, order)
+
+    if mode == 'all':
+        # list[Variable] → start_vars 타입 (공변 한계 — cast로 정적 분석과 화해)
+        start = cast(
+            "list[Variable | list[Variable] | list[list[Variable | None]]]", layers
+        )
+        return plot_multi_layer_graph(
+            start, verbose, show_value, value_format, layer_names,
+            to_file, array_show_value, show_labels, seed_border,
+        )
+
+    if mode == 'last':
+        colors, labels = _collect_seed_info(layers)
+        inner = fold_dot_graph(
+            layers[-1], verbose, show_value, value_format, array_show_value,
+            seed_colors=colors if seed_border else None,
+            seed_labels=labels if seed_border else None,
+        )
+
+        # 단일 그래프를 라벨된 층 박스로 감싸기 — "몇 번째 역전파인지" 표시
+        # (브로 요청, 2026-09-03). fold_dot_graph 결과(digraph g {...})의
+        # 본문을 추출해 cluster로 재포장. seed 등 중복 노드는 현상 유지.
+        prefix = 'digraph g {\n'
+        body = inner[len(prefix):-1]  # 앞 스킨 + 마지막 '}' 제거
+
+        header = 'subgraph cluster_0 {\n  style = rounded;\n  color = lightgray;\n'
+        if show_labels:
+            header += '  labeljust = c;\n'
+            header += f'  label = "< {_ordinal(order)} backward >";\n'
+
+        return _render_dot(f'digraph g {{\n{header}{body}}}\n}}', to_file)
+
+    raise ValueError(f"알 수 없는 mode: '{mode}' — 'all' 또는 'last'")
+
+
+def plot_dot_graph(
+    output: Variable,
+    verbose: bool = True,
+    show_value: bool = False,
+    value_format: "str | None" = None,
+    to_file: str = 'output/graph.png',
+    array_show_value: bool = True,
+) -> str:
+    """계산 그래프를 DOT로 인코딩하여 Graphviz로 렌더링, 파일로 저장.
+
+    관심사 분리: 렌더링(이 함수)과 표시(호출자)를 분리.
+    항상 파일 경로(to_file)를 반환 → 터미널 환경에서 파일 위치 명확.
+    Jupyter에서 인라인 표시가 필요하면 호출자가
+    ``IPython.display.Image(plot_dot_graph(...))`` 로 감쌀 것.
+
+    산출물은 output/ 폴더에 통합:
+      - ``{to_file}`` (PNG/PDF/SVG 등 렌더링 결과)
+      - ``{같은 이름}.dot`` (DOT 소스 — 브로가 까볼 수 있도록 산출물로 보존)
+
+    Args:
+        output: 그래프의 최종 출력 Variable.
+        verbose: True면 Variable 노드에 shape/dtype 추가 (정적 정보).
+        show_value: True면 Variable 노드에 값 추가 (동적 정보, 디버깅용).
+        value_format: 값 포맷 스펙 (None이면 적응형 기본). 상세는 _format_value.
+        to_file: 출력 파일 경로. **확장자가 렌더링 포맷 결정**.
+            지원 포맷: png (범용/문서), svg (벡터/VSCode에서 텍스트로도 까볼 수 있음),
+            pdf (인쇄/발표). 그 외 확장자는 ValueError.
+        array_show_value: show_value=True일 때 배열 값 표시 (True=요약 / False=shape만).
+
+    Returns:
+        저장된 파일 경로 (to_file 그대로).
+
+    Raises:
+        ValueError: to_file의 확장자가 지원 포맷이 아닐 때.
+        FileNotFoundError: graphviz dot 바이너리가 시스템에 없을 때.
+        subprocess.CalledProcessError: dot 바이너리는 있지만 렌더링 실패
+            (exit code nonzero). subprocess.run(check=True)가 발생.
+    """
+    dot_graph = fold_dot_graph(output, verbose, show_value, value_format, array_show_value)
+
+    return _render_dot(dot_graph, to_file)

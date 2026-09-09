@@ -2311,11 +2311,32 @@ tanh의 고차 미분 그래프를 시각화 — 도함수(tanh' = 1 - tanh²)�
 
 ---
 
-## Step 37 — [4고지] 고차 미분 구현 (1) (Variable.data를 ndarray로)
+## Step 37 — [4고지] 텐서를 다루다
 
-**Issue**: (링크)
+**Issue**: [#56](https://github.com/ghjang/deep-learning-from-scratch-3/issues/56)
 **완료일**: -
-**상태**: ⏳
+**상태**: 🔄
+
+### 🎯 학습 시작 전 도출 — 감동/학습 포인트 (2026-09-09, 브로-AI 대화)
+
+- **★ 제목 오기 정정**: 브로 종이책 확인 — "37단계 텐서를 다루다". 기존 progress/notes
+  기재였던 "고차 미분 구현 (1) (Variable.data를 ndarray로)"는 오기 (3고지 요약을
+  4고지 첫 step에 잘못 이어붙인 듯). 4곳 일치화 원칙대로 정정 완료.
+- **v2는 이미 90% 텐서 지원** — data가 ndarray면 다차원 그대로 OK, Add/Mul 등
+  element-wise 연산은 텐서에서도 무수정 동작, `np.ones_like`도 shape 자동 맞춤.
+  이번 step의 진짜 공백은 **Sum 함수 하나**. "선언의 step" — 프레임워크가 이미
+  텐서를 품고 있었음을 확인하는 자리.
+- **Sum의 도함수는 ones** — dezero는 backward 직접 오버라이드(`broadcast_to`)하지만,
+  rezero는 derivative hook 유지 가능: `np.ones_like(x.data)` 반환 (Abs가 확립한
+  '값 참조 ndarray' 관례, 지도 ②의 변주) → backward 뼈대의
+  `local_deriv * upstream`이 **곱셈 브로드캐스팅으로 자동 shape 복원**.
+  "브로드캐스팅 = 미분의 shape 복원 장치" 체감이 이번 step의 심장.
+- **도함수 지도 관점** — Sum(hook 가능) vs 4고지의 MatMul(⑤ upstream형 `gy·Wᵀ`,
+  hook 밖 직접 오버라이드 예정)의 대비. "어디까지 hook 패턴으로 표현 가능한가"의
+  경계를 긋는 첫 축.
+- **적합성 메모** — retain_grad=True로 x.grad가 ones(2,3)이 되는 걸 눈으로 확인.
+  `y = sum(x + c)`는 신경망 손실 함수(loss = 오차들의 합)의 원형 — 4고지 전체의
+  첫 프리뷰.
 
 ### 📖 요약 (한 줄)
 
