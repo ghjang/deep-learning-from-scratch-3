@@ -2399,26 +2399,58 @@ local_deriv = as_variable(df(x))   # ndarray 도함수도 리프 Variable로 정
 
 ---
 
-## Step 38 — [4고지] 고차 미분 구현 (2) (연산자 오버로딩/형상)
+## Step 38 — [4고지] 형상 변환 함수
 
-**Issue**: (링크)
+**Issue**: [#57](https://github.com/ghjang/deep-learning-from-scratch-3/issues/57)
 **완료일**: -
-**상태**: ⏳
+**상태**: 🔄 (2026-09-21 — 1차 구현 완료, 브로 리뷰 대기)
+
+### 🎭 학습 시작 전 감동 포인트 후보 (브로-AI 대화로 확정 예정)
+
+> step27~28 패턴 — 가이드 전에 이 step의 심장을 도출한다. 아래는 AI가 제시한 후보 (2026-09-21),
+> 브로 반응으로 확정 예정:
+
+- **"미분은 형상을 기억한다"** — reshape의 backward는 forward가 기억해둔 입력 shape으로
+  되돌린다. 값에 손대지 않고 shape만 왕복. step37 "브로드캐스팅 = 미분의 shape 복원 장치"(Sum의
+  ones)에 이어 shape 이야기의 2막 — 신경망 시대의 shape 관리가 본격화되는 step
+- **도함수 성분 유형 지도 ⑤ upstream형의 첫 등장** — rezero의 backward 뼈대는
+  `df(x) * upstream` 곱셈 fold인데, reshape/transpose는 곱셈으로 표현이 불가능하다 (shape이
+  다른 두 배열은 곱셈 자체가 성립 안 함 — 브로드캐스팅도 못 구한다). derivative hook 패턴의
+  경계를 드러내는 첫 함수들 — backward 직접 오버라이드 관례(지도 ⑤) 수립, MatMul(이슈 47)의 예습
+- **transpose의 미분은 transpose (자기 역함수, involution)** — 두 번 하면 항등으로 돌아온다.
+  Neg과 같은 "자기 역" 부류. reshape도 "shape 왕복"이라는 점에서 같은 성격
 
 ### 📖 요약 (한 줄)
 
+(진행 중 — 완료 시 작성)
 
 ### ❓ 질문 / 막힌 점
 
+- (진행하며 기록)
 
 ### 💡 통찰 / 배운 점
 
+- (2026-09-21, 1차 구현 세션)
+  - ★ 도함수 지도 ⑤ upstream형 첫 사례 — Reshape/Transpose가 v3 첫 backward 직접
+    오버라이드. 곱셈 fold(df(x) * upstream)로 표현 불가 (shape이 다른 배열은 곱셈 자체가
+    성립 안 함 — Sum의 "ones * 0-dim" 트릭이 안 통하는 이유. 상세는 노트 45 §5)
+  - 개발 중 실제 함경: 2계 미분 데모에서 `x.clear_grad()` 누락 → 2차 미분이 2가 아니라
+    2x + 2로 나옴 (1차 grad 누적, step14 방식) — 이슈 43 D1의 실사례로 데모 6에 기록
+  - 탐구 노트 45 파생 (브로 질문 3연타): 미분 일반화 사다리 + 야코비안 용어 3얼굴 +
+    §2.5 단어의 나이 (미분(微分)=메커니즘어 vs derivative·도함수=관계어) + PyTorch
+    derivatives.yaml 실증 (rezero와 같은 처방 확인)
 
 ### 🔗 관련 링크
 
+- 이슈: [#57](https://github.com/ghjang/deep-learning-from-scratch-3/issues/57) (step38 진행)
+- 정답지: `steps/step38.py` (reshape/transpose 데모), `dezero/functions.py`의 Reshape/Transpose (최종형 — axes 지원 포함), `dezero/core.py`의 `Variable.reshape`/`Variable.transpose`/`Variable.T`
+- ★ 탐구: [exploration_45_derivative_as_linear_map.md](./notes/exploration_45_derivative_as_linear_map.md) — 리뷰 중 브로 질문 2연타("미분이란 용어가 맞나?" / "야코비안이 또 어색하다")에서 파생. 미분 일반화 사다리 + 야코비안 용어 3얼굴 + PyTorch derivatives.yaml 실증
+- 이슈 47 (MatMul 이중 구현 실험) — 지도 ⑤ upstream형의 본격 사례 (step41 언저리)
+- 이슈 43 회수 후보 C1 (Exp/Sigmoid) — step40 언저리
 
 ### 📝 코드 / 수식 메모
 
+(진행 중 — 구현 후 작성)
 
 ---
 

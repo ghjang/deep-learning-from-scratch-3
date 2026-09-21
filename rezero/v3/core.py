@@ -205,7 +205,43 @@ class VariableArithmeticMixin:
         return abs_fn(cast("Variable", self))
 
 
-class Variable(VariableDataPropertyMixin, VariableArithmeticMixin):
+# ===== VariableShapeMixin — 형상 변환 메서드 (step38) ==========================
+class VariableShapeMixin:
+    """Variable의 형상 변환 API — NumPy 스타일 메서드 (reshape / T).
+
+    ★ step38 신규 — DataProperty(읽기 위임) / Arithmetic(연산자)에 이은 세 번째
+      관심사 믹스인: "형상 변환". dunder가 아닌 평범한 메서드로 functions를
+      위임하는 첫 선례 (지연 import 패턴은 VariableArithmeticMixin과 동일).
+
+    ★ 그래프를 만드는 메서드 — x.reshape(6)은 읽기가 아니라 연산이다:
+      no-op가 아니면 Reshape 노드가 그래프에 추가된다 (functions.reshape 참조).
+    """
+
+    def reshape(self, *shape: "int | tuple[int, ...] | list[int]") -> "Variable":
+        """형상 변환 — reshape(6) / reshape((6,)) 모두 허용 (NumPy 관습).
+
+        가변 인수 정규화 후 functions.reshape 위임. no-op면 x 자체가 돌아온다.
+        """
+        from rezero.v3.functions import reshape as reshape_fn
+
+        # 단일 시퀀스 인자 풀기: reshape((6,)) → shape = (6,)
+        if len(shape) == 1 and isinstance(shape[0], (tuple, list)):
+            return reshape_fn(cast("Variable", self), tuple(shape[0]))
+
+        # reshape(2, 3) → shape = (2, 3) — *shape는 이미 튜플
+        return reshape_fn(cast("Variable", self), cast("tuple[int, ...]", shape))
+
+    @property
+    def T(self) -> "Variable":
+        """전치 프로퍼티 — x.T (NumPy 관습). 모든 축 역순의 축약형.
+
+        미분이 자기 자신 (involution) — Transpose 클래스 참조.
+        """
+        from rezero.v3.functions import transpose
+        return transpose(cast("Variable", self))
+
+
+class Variable(VariableDataPropertyMixin, VariableArithmeticMixin, VariableShapeMixin):
     """DeZero의 변수. 순수 데이터 상자.
 
     data + 미분값(grad) + 그래프 연결(creator + generation).
@@ -217,6 +253,7 @@ class Variable(VariableDataPropertyMixin, VariableArithmeticMixin):
     name 속성 + __repr__.
     data에 위임하는 property 4종 + __len__ → VariableDataPropertyMixin.
     산술 연산자 9종 → VariableArithmeticMixin.
+    형상 변환 메서드 (reshape / T) → VariableShapeMixin (step38).
     """
 
     def __init__(self, data: Optional[np.ndarray], *, name: Optional[str] = None):

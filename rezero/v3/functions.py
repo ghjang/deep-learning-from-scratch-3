@@ -1,4 +1,4 @@
-"""rezero.v3.functions — 구체 함수들 (Square/Add/Mul/Neg/Sub/Div/Pow/Sin/Cos/Sum + wrapper).
+"""rezero.v3.functions — 구체 함수들 (Square/Add/Mul/Neg/Sub/Div/Pow/Sin/Cos/Sum/Reshape/Transpose + wrapper).
 
 rezero v3 (제 4고지 "신경망 만들기") 스코프의 구체 함수 모음.
 v2에서 step37 브랜칭 — 고차 미분 지원 계승 + 텐서(다차원 ndarray) 1급 시민.
@@ -38,15 +38,19 @@ core.Function을 상속해 apply + derivative hook 구현.
                                 self.output 참조). y가 weakref로 소멸 가능해 유일하게
                                 "전략 선택"이 필요한 유형.
     (+ 입출력형 = ②+④ 조합)    — 미등장 (4고지 예고 — SiLU 등, 유형 아닌 조합)
-    ★ ⑤ upstream형 (gy 자체)  — hook의 세계 밖: backward 직접 오버라이드
-                                 (4고지 MatMul: gx = gy·Wᵀ — 탐구 노트 35 §5)
+    ★ ⑤ upstream형 (gy 자체)  — hook의 세계 밖: backward 직접 오버라이드.
+                                 ★ 첫 사례 step38 Reshape/Transpose (2026-09-21) —
+                                 gy를 입력 shape으로 되돌림 (곱셈 fold로 표현 불가:
+                                 shape이 다른 배열은 곱 자체가 성립 안 함. Sum의
+                                 "ones * 0-dim upstream" 트릭이 안 통하는 이유).
+                                 본격 사례 MatMul: gx = gy·Wᵀ (step41, 탐구 노트 35 §5)
 """
 
 from typing import override
 
 import numpy as np
 
-from rezero.v3.core import Config, DerivativeFn, Function, Variable
+from rezero.v3.core import Config, DerivativeFn, Function, Variable, as_variable
 
 
 # ===== 구체 함수 클래스 =========================================================
@@ -324,6 +328,86 @@ class Sum(Function):
         return lambda _: np.ones_like(data)
 
 
+class Reshape(Function):
+    """형상 변환: x → x.reshape(shape). 미분: gy를 입력 shape으로 되돌림.
+
+    ★ step38 신규 — "형상 변환 함수". 값은 하나도 바꾸지 않고 shape만 이동.
+    신경망(행렬 곱) 시대의 인프라 — MatMul(step41 예고)을 앞두고 shape 관리
+    도구를 먼저 확보하는 step. 브로드캐스팅(간접)과 달리 "명시적" shape 제어.
+
+    ★★ backward 직접 오버라이드 — 도함수 성분 유형 지도 ⑤ upstream형의 첫 사례:
+        rezero의 backward 뼈대는 df(x) * upstream **곱셈 fold**인데, reshape는
+        곱셈으로 표현 불가 — 도함수는 입력 shape, upstream은 출력 shape라
+        브로드캐스팅 자체가 성립 안 함 (Sum의 "ones * 0-dim" 트릭이 안 통함).
+        역전파의 본체는 "upstream을 입력 shape으로 되돌리는 것" — 곱이 아니라 이동.
+        derivative()는 미구현 (⑤형은 hook의 세계 밖).
+        (선형대수 관점: reshape은 치환행렬 P인 선형 사상이고 미분은 P⁻¹ 되돌림 —
+        P를 실체화하는 대신 희소 구조만 이용하는 게 autograd의 관례)
+
+    ★ x_shape은 apply(순전파) 시점 스냅샷 — backward에서 self.inputs를 다시 읽지
+        않음: "미분은 (순전파 시점의) 형상을 기억한다". backward 시점 상태에
+        의존하지 않는 스냅샷이 더 견고 (PyTorch도 forward에서 입력 shape 저장).
+        (변형 포인트 3 — 브로 위임 결정, 2026-09-21)
+
+    ★★ NumPy 경고 — np.reshape은 가능하면 **view**를 반환 (메모리 공유!):
+        y.data와 x.data가 같은 버퍼를 볼 수 있음. rezero 전제(data를 불변처럼
+        사용)에서는 안전하지만, in-place 연산이 미래에 등장하면 함경 지점.
+        실수 방지 문서화 (브로 요청, 2026-09-21).
+    """
+
+    def __init__(self, shape: tuple[int, ...]) -> None:
+        self.shape = shape                             # 커스텀 — 목표 shape 저장
+        self.x_shape: tuple[int, ...] | None = None    # apply에서 채움 (backward 재료)
+        super().__init__()                             # inputs/output/generation은 부모가 초기화
+
+    @override
+    def apply(self, x: np.ndarray) -> np.ndarray:  # type: ignore[override]
+        self.x_shape = x.shape  # 순전파 시점 스냅샷 — backward가 기억하는 "그 형상"
+
+        return x.reshape(self.shape)
+
+    @override
+    def backward(self, upstream_grad: "Variable") -> tuple["Variable", ...]:
+        """⑤ upstream형 — gy 자체를 입력 shape으로 되돌려 반환 (곱셈 없음).
+
+        모듈 레벨 reshape()를 호출 (raw np.reshape 금지) — backward가 fill_grad의
+        using_config('enable_backprop', create_graph) 컨텍스트 안에서 실행되므로,
+        모듈 함수여야 2계 미분 그래프까지 자연 연결된다.
+        """
+        assert self.x_shape is not None, "self.x_shape must be set (apply should have run)"
+
+        return (reshape(upstream_grad, self.x_shape),)
+
+
+class Transpose(Function):
+    """전치: x → x.transpose() — 모든 축을 역순으로. 미분: transpose (자기 역함수).
+
+    ★ step38 신규 — 최소분 (axes=None, 전체 축 역순만). 책 38단계 데모 범위.
+        2차원: 행/열 교환. 1차원: 역순이 없어 identity.
+
+    ★ 미분이 자기 자신 — involution (전치의 전치 = 항등). Neg과 같은 "자기 역"
+        부류: backward가 forward와 같은 호출. Reshape과 함께 ⑤ upstream형 —
+        gy를 전치해 반환 (곱셈 fold로 표현 불가).
+
+    ★ 상태 없는 함수 — __init__ 없음 (Reshape는 shape/x_shape를 저장하지만
+        Transpose는 기억할 것이 없음). forward와 backward가 대칭인 무상태 함수.
+
+    ★ 확장 포인트 (기록만 — 현재 step 스코프 밖, 브로 방침 2026-09-21):
+        axes 지정 전치 (transpose(x, (1, 0)))와 역치환 계산
+        (inv_axes = tuple(np.argsort([ax % n for ax in axes]))) —
+        정답지 최종형 dezero/functions.py 참조. 합성곱(5고지) 언저리에서 필요 예정.
+    """
+
+    @override
+    def apply(self, x: np.ndarray) -> np.ndarray:  # type: ignore[override]
+        return x.transpose()
+
+    @override
+    def backward(self, upstream_grad: "Variable") -> tuple["Variable", ...]:
+        # 전치의 역전파 = 전치 (involution). 모듈 함수 호출로 2계 미분 연결 유지.
+        return (transpose(upstream_grad),)
+
+
 # ===== wrapper 함수 ============================================================
 # wrapper는 단순하게 (Function.__call__ 도입부의 as_variable이 변환 처리).
 def square(x: Variable) -> Variable:
@@ -448,4 +532,30 @@ def sum(x: Variable) -> Variable:
     """
     result = Sum()(x)
     assert isinstance(result, Variable), "Sum은 단일 출력이므로 Variable이어야 함"
+    return result
+
+
+def reshape(x: Variable, shape: tuple[int, ...]) -> Variable:
+    """형상 변환 wrapper: x → x.reshape(shape). ★ step38 신규 — 값 불변, shape만.
+
+    no-op 최적화 (변형 포인트 2 채택, dezero 관례): 이미 같은 shape이면
+    노드를 만들지 않고 x 자체를 반환 — 그래프에 항등 Reshape 노드가 쌓이지
+    않는다. 수학적으로도 손실 0 (reshape의 미분은 shape 되돌림뿐, 값 변화 없음).
+    """
+    if x.shape == shape:
+        return as_variable(x)
+
+    result = Reshape(shape)(x)
+    assert isinstance(result, Variable), "Reshape는 단일 출력이므로 Variable이어야 함"
+    return result
+
+
+def transpose(x: Variable) -> Variable:
+    """전치 wrapper: x → x.T (모든 축 역순). ★ step38 신규.
+
+    미분이 자기 자신 (involution) — backward도 transpose 호출 (Transpose 클래스).
+    axes 지정은 최소분에서 제외 (확장 포인트 — 클래스 docstring 참조).
+    """
+    result = Transpose()(x)
+    assert isinstance(result, Variable), "Transpose는 단일 출력이므로 Variable이어야 함"
     return result

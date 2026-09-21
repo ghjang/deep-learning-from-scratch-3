@@ -25,11 +25,29 @@
 ## 📈 전체 요약
 
 - **완료**: 37 / 60 (step01~37 ✅ — ★ 4고지 개막)
-- **진행 중**: 0
+- **진행 중**: 1 (step38 — 형상 변환 함수)
 - **막힘**: 0
-- **마지막 업데이트**: 2026-09-09 — step37 완료 (텐서를 다루다). v3 창설 + Sum + NumPy 우선 버그 수정 (as_variable 정규화, v2 백포트). rezero 0.3.1
-- ★ **다음 작업** (2026-09-09 갱신):
-  **다음: step38 (브로 "고고" 선언 대기) — 정답지는 reshape/transpose, 책 제목은 시작 시 브로 확인 필요**
+- **마지막 업데이트**: 2026-09-21 (저녁) — step38 1차 구현 완료 (AI 작성) + 탐구 노트 45 완성 + 중간 커밋/푸시 (브로 요청 — 추석 연휴 전 백업). 브로 리뷰 대기 상태로 세션 종료
+- ★ **다음 작업** (2026-09-21 갱신 — ★★ 9/27 언저리 복귀 세션은 여기부터 읽으면 됨):
+  **step38 1차 구현 완료 → 브로 리뷰 대기** (코드 리뷰 + 노트 45 열람이 아직 남음)
+
+  **step38 현재 상태 (2026-09-21 세션 종료 시점)**:
+  - ✅ 1차 구현 (AI 작성 — 브로 "1차 코드 작성" 지시 + 변형 포인트 3개 결정):
+    rezero/v3에 Reshape/Transpose 추가 (★ v3 첫 backward 직접 오버라이드 — 도함수
+    지도 ⑤ upstream형 첫 사례) + VariableShapeMixin (x.reshape(6)/x.T) + no-op
+    최적화 + 테스트 19개. 검증: pytest 487 통과 (v1+v2+v3), pyright 0
+    변형 결정: ① backward 오버라이드 ② no-op 채택 ③ x_shape은 forward 스냅샷 (dezero 방식)
+  - ✅ 탐구 노트 45 완성 (미분은 선형 사상 — 미분 일반화 사다리 + 야코비안 용어 3얼굴
+    + §2.5 단어의 나이 + PyTorch derivatives.yaml 실증) + 브로 검수 1차 반영 (표현 10곳 정정)
+  - ⏳ **브로 복귀 시 할 일**:
+    1. **코드 리뷰** — 추천 순서: `rezero/steps/step38.py` 데모 6 (fill_grad 누적 함정 —
+       이슈 43 D1의 실사례, 구현 중 실제로 밟음) → `rezero/v3/functions.py` Reshape
+       docstring/backward (⑤형 계약) → `rezero/v3/core.py` VariableShapeMixin →
+       테스트 test_second_derivative (2계 미분 그래프 연결 증명)
+    2. **노트 45 리딩 마저** — §0만 읽고 표현 정정했음, §1~§9 남음
+       (복습 겸 읽으면 3권 기억 리프레시에도 좋음 — 미분 개념 사다리가 정리돼 있음)
+  - ⏳ 리뷰 반영 후 **랩업은 브로 "랩업하자" 선언 시에만**: ✅ 전환 + 버전 0.3.1→0.3.2 + 이슈 57 close + `#N` 검증
+  - 다음: step39 (정답지 = sum axis/keepdims — 책 제목 브로 확인 필요, 표 기재 오기 의심)
 
   **step37 완료** (중간 커밋 88cccb7 + 랩업):
   - v3 창설 (v2 계승 + 텐서 1급 시민) + 모듈 3분류 A안 (이슈 50 회수)
@@ -37,15 +55,12 @@
   - NumPy 우선 object 배열 버그 수정 + v2 백포트 + 회귀 테스트 (탐구 25 교정)
   - 페이스 트레이싱 판별법 확립: "책 본문이 설명하는가 vs 정답지가 사용만 하는가"
 
-  **다음 할 일**:
-  1. **step38 시작** (브로 선언 필요) — 정답지 step38.py = reshape/transpose.
-     책 제목 브로 확인 필요 (progress 기존 기재 "고차 미분 구현 (2)"는 의심 — step37 오기 패턴)
+  **다음 할 일** (step38 외):
+  1. step39+ 표 제목들도 오기 의심 (step39 정답지 = sum axis/keepdims 확장) — 시작할 때마다 브로 책 확인으로 순차 정정
   2. **이슈 43 Level 2·3 — 4고지 중 회수** (회수 시점 기록 완료):
      - C1 Exp + C2 Sigmoid → step40 언저리 (Sigmoid 재료로 exp 등장)
      - C3 뉴턴 극소 판별기 → step42~45 (optimizer 맥락)
      - D1 fill_grad 누적 토론 → step45 언저리 (backward 호출 관례)
-  3. 대기 이슈: 51 (duplicate_shared) / 53 (부동소수점) / 54 (상속 시각화) / 47 (MatMul, step41) / 44 (포워드 모드) / 55 (sympy 폴드 — 4고지 중 여유 시)
-
   3. 대기 이슈: 51 (duplicate_shared) / 53 (부동소수점) / 54 (상속 시각화) / 47 (MatMul, step41) / 44 (포워드 모드) / 55 (sympy 폴드 — 그래프→식→LaTeX, 4고지 중 여유 시)
 
   ⑦~⑨ 노트 39·40·41 놀이터 (그대로 유지)
@@ -118,7 +133,7 @@
 | Step | 주제 | 상태 | Issue | 완료일 | 메모 |
 |---|---|---|---|---|---|
 | step37 | 텐서를 다루다 | ✅ | [#56](https://github.com/ghjang/deep-learning-from-scratch-3/issues/56) | 2026-09-09 | ★ 4고지 개막 + v3 창설 (v2 구조 변경 없이 계승). "선언"의 step — element-wise 기존 연산의 텐서 무수정 통과 확인. Sum 신규 (도함수 ones — 값 참조 shape판, 브로드캐스팅 shape 복원). NumPy 우선 object 배열 버그 발견/수정 (backward 뼈대 as_variable 정규화 — 탐구 25 "스칼라 기준" 교정) + v2 백포트. 모듈 3분류 A안 (이슈 50). 페이스 트레이싱 판별법 확립 ("책 설명 vs 사용만"). 테스트 468 / pyright 0 |
-| step38 | 고차 미분 구현 (2) (연산자 오버로딩/형상) | ⏳ | - | - | - |
+| step38 | 형상 변환 함수 | 🔄 | [#57](https://github.com/ghjang/deep-learning-from-scratch-3/issues/57) | - | 학습 준비 완료 (2026-09-21) — reshape/transpose. 도함수 지도 ⑤ upstream형 첫 등장 예고 |
 | step39 | 뉴런 한 개 역전파 검증 (gradient check) | ⏳ | - | - | - |
 | step40 | 신경망 구축 (은닉층, 활성화) | ⏳ | - | - | - |
 | step41 | 텐서 (다차원 배열) 다루기 | ⏳ | - | - | - |
